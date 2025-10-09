@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <title>Project Forecaster - ML & Monte Carlo</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@4.5.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Chart.js CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/chart.js@2.9.3/dist/Chart.min.css" rel="stylesheet">
+    <!-- Custom CSS -->
+    <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
+
+    <style>
+        .navbar {
+            margin-bottom: 0;
+            border-radius: 0;
+        }
+
+        footer {
+            background-color: #f2f2f2;
+            padding: 25px;
+            margin-top: 50px;
+        }
+
+        .nav-tabs {
+            border-bottom: 2px solid #007bff;
+        }
+
+        .nav-tabs .nav-link {
+            border: none;
+            color: #6c757d;
+            font-weight: 500;
+        }
+
+        .nav-tabs .nav-link.active {
+            color: #007bff;
+            background-color: transparent;
+            border-bottom: 3px solid #007bff;
+        }
+
+        .nav-tabs .nav-link:hover {
+            border-color: transparent;
+            color: #0056b3;
+        }
+
+        .tab-content {
+            padding: 30px 0;
+        }
+
+        .chart-container {
+            margin: 30px 0;
+            padding: 20px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .chart-container img {
+            width: 100%;
+            height: auto;
+            border-radius: 4px;
+        }
+
+        .results-panel {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+
+        .metric-card {
+            background: white;
+            padding: 15px;
+            border-radius: 6px;
+            margin: 10px 0;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .risk-high { color: #dc3545; font-weight: bold; }
+        .risk-medium { color: #ffc107; font-weight: bold; }
+        .risk-low { color: #28a745; font-weight: bold; }
+
+        .almost-certain { background-color: rgba(75, 192, 192, 0.2); }
+        .somewhat-certain { background-color: rgba(255, 206, 86, 0.2); }
+        .not-certain { background-color: rgba(255, 99, 132, 0.2); }
+
+        @media (max-width: 992px) {
+            .probabilities-header { font-size: 12px; }
+        }
+
+        @media (max-width: 720px) {
+            .probabilities-header { font-size: 10px; }
+        }
+    </style>
+</head>
+
+<body>
+
+    <nav class="navbar navbar-expand-md navbar-dark bg-dark fixed-top">
+        <a class="navbar-brand" href="/">Project Forecaster</a>
+        <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarsExampleDefault">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+
+        <div class="collapse navbar-collapse" id="navbarsExampleDefault">
+            <ul class="navbar-nav mr-auto">
+                <li class="nav-item">
+                    <a class="nav-link" href="https://github.com/RodrigoAlmeidadeOliveira/project-forecaster-py" target="_blank">
+                        GitHub
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="https://github.com/rodrigozr/ProjectForecaster/wiki" target="_blank">
+                        Documentation
+                    </a>
+                </li>
+            </ul>
+        </div>
+    </nav>
+
+    <main role="main" class="container">
+        <br /><br /><br />
+
+        <div class="container text-center">
+            <h1>Project Forecaster</h1>
+            <p>
+                Forecast probabilities using <strong>Monte Carlo</strong> simulations and <strong>Machine Learning</strong>
+                <br/>
+                Your data is 100% safe and never leaves your browser/server
+            </p>
+        </div>
+
+        <!-- Tabs Navigation -->
+        <ul class="nav nav-tabs nav-fill" id="forecastTabs" role="tablist">
+            <li class="nav-item">
+                <a class="nav-link active" id="mc-traditional-tab" data-toggle="tab" href="#mc-traditional" role="tab">
+                    🎲 Monte Carlo Traditional
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" id="ml-forecast-tab" data-toggle="tab" href="#ml-forecast" role="tab">
+                    🤖 ML Forecast
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" id="combined-tab" data-toggle="tab" href="#combined" role="tab">
+                    ⚖️ Combined Analysis
+                </a>
+            </li>
+        </ul>
+
+        <!-- Tab Content -->
+        <div class="tab-content" id="forecastTabsContent">
+
+            <!-- Monte Carlo Traditional Tab -->
+            <div class="tab-pane fade show active" id="mc-traditional" role="tabpanel">
+                <div class="container-fluid">
+                    <h3 class="text-center">Monte Carlo Project Simulation</h3>
+                    <p class="text-center text-muted">Full project simulation with tasks, risks, and S-curve</p>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h4>Project Properties</h4>
+                            <div class="input-group mb-3">
+                                <div class="input-group-prepend">
+                                    <span class="input-group-text">Project Name</span>
+                                </div>
+                                <input type="text" id="projectName" class="form-control" />
+                            </div>
+                            <div class="input-group mb-3">
+                                <div class="input-group-prepend">
+                                    <span class="input-group-text">Team Size<span style="color:red">*</span></span>
+                                </div>
+                                <input type="number" min="1" max="9999" id="totalContributors" value="1" class="form-control" required />
+                                <div class="input-group-append">
+                                    <span class="input-group-text">contributors</span>
+                                </div>
+                            </div>
+                            <div class="input-group mb-3">
+                                <div class="input-group-prepend">
+                                    <span class="input-group-text">Number of Tasks<span style="color:red">*</span></span>
+                                </div>
+                                <input type="number" min="0" max="9999" id="numberOfTasks" value="1" class="form-control" required />
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <h4>Simulation Parameters</h4>
+                            <div class="input-group mb-3">
+                                <div class="input-group-prepend">
+                                    <span class="input-group-text">Simulations<span style="color:red">*</span></span>
+                                </div>
+                                <input type="number" min="10000" max="10000000" id="numberOfSimulations" value="100000" class="form-control" required />
+                            </div>
+                            <div class="input-group mb-3">
+                                <div class="input-group-prepend">
+                                    <span class="input-group-text">S-Curve Size</span>
+                                </div>
+                                <input type="number" min="0" max="50" id="sCurveSize" value="20" class="form-control" />
+                                <div class="input-group-append">
+                                    <span class="input-group-text">%</span>
+                                </div>
+                            </div>
+                            <div class="input-group mb-3">
+                                <div class="input-group-prepend">
+                                    <span class="input-group-text">Confidence Level</span>
+                                </div>
+                                <input type="number" min="1" max="99" id="confidenceLevel" value="85" class="form-control" />
+                                <div class="input-group-append">
+                                    <span class="input-group-text">%</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h4>Historical Data</h4>
+                    <div class="row">
+                        <div class="col-md-4">
+                            <label>Weekly Throughput<span style="color:red">*</span></label>
+                            <textarea id="tpSamples" rows="4" class="form-control text-monospace"
+                                placeholder="5, 6, 7, 4, 8..."></textarea>
+                        </div>
+                        <div class="col-md-4">
+                            <label>Task Lead-times (optional)</label>
+                            <textarea id="ltSamples" rows="4" class="form-control text-monospace"
+                                placeholder="1.5, 2.3, 1.8..."></textarea>
+                        </div>
+                        <div class="col-md-4">
+                            <label>Split Rates (optional)</label>
+                            <textarea id="splitRateSamples" rows="4" class="form-control text-monospace"
+                                placeholder="1.1, 1.2, 1.05..."></textarea>
+                        </div>
+                    </div>
+
+                    <div class="text-center mt-4">
+                        <button id="runMCTraditional" type="button" class="btn btn-primary btn-lg">
+                            Run Monte Carlo Simulation
+                        </button>
+                        <button id="shareMC" type="button" class="btn btn-secondary">Share</button>
+                    </div>
+
+                    <!-- Results -->
+                    <div id="results-mc-traditional" style="display:none">
+                        <h3 class="mt-5">Simulation Results</h3>
+                        <div class="col-md-4">
+                            <div class="input-group mb-1">
+                                <div class="input-group-prepend">
+                                    <span class="input-group-text font-weight-bold">Effort:</span>
+                                </div>
+                                <input type="text" id="res-effort-mc" class="form-control" readonly />
+                                <div class="input-group-append">
+                                    <span class="input-group-text">person-weeks</span>
+                                </div>
+                            </div>
+                            <div class="input-group mb-1">
+                                <div class="input-group-prepend">
+                                    <span class="input-group-text font-weight-bold">Duration:</span>
+                                </div>
+                                <input type="text" id="res-duration-mc" class="form-control" readonly />
+                                <div class="input-group-append">
+                                    <span class="input-group-text">calendar weeks</span>
+                                </div>
+                            </div>
+                        </div>
+                        <canvas id="res-duration-histogram-mc"></canvas>
+                        <canvas id="res-burn-downs-mc"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ML Forecast Tab -->
+            <div class="tab-pane fade" id="ml-forecast" role="tabpanel">
+                <div class="container-fluid">
+                    <h3 class="text-center">Machine Learning Forecast</h3>
+                    <p class="text-center text-muted">Trend-based predictions using ensemble ML models</p>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h4>Historical Data</h4>
+                            <div class="form-group">
+                                <label>Weekly Throughput<span style="color:red">*</span> (min 8 values)</label>
+                                <textarea id="tpSamplesML" rows="6" class="form-control text-monospace"
+                                    placeholder="5, 6, 7, 4, 8, 6, 5, 7, 6, 8">5, 6, 7, 4, 8, 6, 5, 7, 6, 8, 5, 7</textarea>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <h4>Forecast Parameters</h4>
+                            <div class="form-group">
+                                <label>Forecast Steps (weeks)</label>
+                                <input type="number" min="1" max="12" id="forecastStepsML" value="4" class="form-control" />
+                            </div>
+                            <div class="form-group">
+                                <label>Backlog (tasks)</label>
+                                <input type="number" min="1" max="10000" id="backlogML" value="50" class="form-control" />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="text-center">
+                        <button id="runMLForecast" type="button" class="btn btn-success btn-lg">
+                            Run ML Forecast
+                        </button>
+                    </div>
+
+                    <!-- ML Results -->
+                    <div id="results-ml" style="display:none">
+                        <div class="results-panel mt-4">
+                            <h4>Risk Assessment</h4>
+                            <div id="risk-assessment-ml"></div>
+                        </div>
+                        <div class="chart-container">
+                            <img id="ml-chart" src="" alt="ML Forecast">
+                        </div>
+                        <div class="chart-container">
+                            <img id="history-chart" src="" alt="Historical Analysis">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Combined Tab -->
+            <div class="tab-pane fade" id="combined" role="tabpanel">
+                <div class="container-fluid">
+                    <h3 class="text-center">Combined ML + Monte Carlo Analysis</h3>
+                    <p class="text-center text-muted">Compare both methods side by side</p>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h4>Historical Data</h4>
+                            <div class="form-group">
+                                <label>Weekly Throughput<span style="color:red">*</span></label>
+                                <textarea id="tpSamplesCombined" rows="6" class="form-control text-monospace">5, 6, 7, 4, 8, 6, 5, 7, 6, 8, 5, 7</textarea>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <h4>Parameters</h4>
+                            <div class="form-group">
+                                <label>Forecast Steps</label>
+                                <input type="number" min="1" max="12" id="forecastStepsCombined" value="4" class="form-control" />
+                            </div>
+                            <div class="form-group">
+                                <label>Backlog (tasks)</label>
+                                <input type="number" min="1" id="backlogCombined" value="50" class="form-control" />
+                            </div>
+                            <div class="form-group">
+                                <label>MC Simulations</label>
+                                <input type="number" min="1000" id="nSimulationsCombined" value="10000" class="form-control" />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="text-center">
+                        <button id="runCombined" type="button" class="btn btn-primary btn-lg">
+                            Run Combined Analysis
+                        </button>
+                    </div>
+
+                    <!-- Combined Results -->
+                    <div id="results-combined" style="display:none">
+                        <div class="chart-container mt-4">
+                            <h4>Comparison Chart</h4>
+                            <img id="comparison-chart" src="" alt="Comparison">
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="results-panel">
+                                    <h5>ML Forecast Summary</h5>
+                                    <div id="ml-summary-combined"></div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="results-panel">
+                                    <h5>Monte Carlo Summary</h5>
+                                    <div id="mc-summary-combined"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <br><br>
+    </main>
+
+    <footer class="container-fluid text-center">
+        <span>
+            Project Forecaster - ML & Monte Carlo Edition
+            <br />
+            <small><i>Powered by Flask, scikit-learn, XGBoost</i></small>
+        </span>
+    </footer>
+
+    <!-- jQuery -->
+    <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.5.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@2.9.3/dist/Chart.bundle.min.js"></script>
+    <!-- Chart.js Annotation -->
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@0.5.7/chartjs-plugin-annotation.min.js"></script>
+    <!-- Moment.js -->
+    <script src="https://cdn.jsdelivr.net/npm/moment@2.27.0/moment.min.js"></script>
+
+    <!-- Custom JS -->
+    <script src="{{ url_for('static', filename='js/unified.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/charts.js') }}"></script>
+
+</body>
+
+</html>
