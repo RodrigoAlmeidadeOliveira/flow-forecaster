@@ -14,6 +14,24 @@ from visualization import ForecastVisualizer
 app = Flask(__name__)
 
 
+def convert_to_native_types(obj):
+    """Convert numpy types to native Python types for JSON serialization."""
+    if isinstance(obj, np.ndarray):
+        return obj.tolist()
+    elif isinstance(obj, np.integer):
+        return int(obj)
+    elif isinstance(obj, np.floating):
+        return float(obj)
+    elif isinstance(obj, np.bool_):
+        return bool(obj)
+    elif isinstance(obj, dict):
+        return {key: convert_to_native_types(value) for key, value in obj.items()}
+    elif isinstance(obj, list):
+        return [convert_to_native_types(item) for item in obj]
+    else:
+        return obj
+
+
 @app.route('/')
 def index():
     """Render the main page."""
@@ -171,17 +189,18 @@ def ml_forecast():
         chart_ml = visualizer.plot_ml_forecasts(tp_data, forecasts, ensemble_stats, start_date)
         chart_history = visualizer.plot_historical_analysis(tp_data, start_date)
 
-        return jsonify({
+        response_data = {
             'forecasts': {k: v.tolist() for k, v in forecasts.items()},
             'ensemble_stats': {k: v.tolist() if isinstance(v, np.ndarray) else v
                              for k, v in ensemble_stats.items()},
             'model_results': model_results,
-            'risk_assessment': risk_assessment,
+            'risk_assessment': convert_to_native_types(risk_assessment),
             'charts': {
                 'ml_forecast': chart_ml,
                 'historical_analysis': chart_history
             }
-        })
+        }
+        return jsonify(response_data)
 
     except Exception as e:
         import traceback
@@ -227,14 +246,15 @@ def mc_throughput():
             start_date
         )
 
-        return jsonify({
-            'percentile_stats': mc_results['percentile_stats'],
-            'mean': mc_results['mean'],
-            'std': mc_results['std'],
+        response_data = {
+            'percentile_stats': convert_to_native_types(mc_results['percentile_stats']),
+            'mean': convert_to_native_types(mc_results['mean']),
+            'std': convert_to_native_types(mc_results['std']),
             'charts': {
                 'monte_carlo': chart_mc
             }
-        })
+        }
+        return jsonify(response_data)
 
     except Exception as e:
         import traceback
@@ -293,24 +313,25 @@ def combined_forecast():
             start_date
         )
 
-        return jsonify({
+        response_data = {
             'ml': {
                 'forecasts': {k: v.tolist() for k, v in forecasts.items()},
                 'ensemble': {k: v.tolist() if isinstance(v, np.ndarray) else v
                            for k, v in ensemble_stats.items()},
-                'risk_assessment': risk_assessment
+                'risk_assessment': convert_to_native_types(risk_assessment)
             },
             'monte_carlo': {
-                'percentile_stats': mc_results['percentile_stats'],
-                'mean': mc_results['mean'],
-                'std': mc_results['std']
+                'percentile_stats': convert_to_native_types(mc_results['percentile_stats']),
+                'mean': convert_to_native_types(mc_results['mean']),
+                'std': convert_to_native_types(mc_results['std'])
             },
             'charts': {
                 'ml_forecast': chart_ml,
                 'monte_carlo': chart_mc,
                 'comparison': chart_comparison
             }
-        })
+        }
+        return jsonify(response_data)
 
     except Exception as e:
         import traceback
