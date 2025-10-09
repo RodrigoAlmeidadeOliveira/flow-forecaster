@@ -3,7 +3,7 @@ Project Forecaster - Flask Application
 Monte Carlo simulation for project forecasting
 """
 
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, redirect, url_for
 import json
 import base64
 import numpy as np
@@ -40,8 +40,8 @@ def index():
 
 @app.route('/advanced')
 def advanced():
-    """Render the advanced forecasting page."""
-    return render_template('advanced_forecast.html')
+    """Redirect to the unified advanced forecasting section."""
+    return redirect(url_for('index') + '#advanced-forecast')
 
 
 @app.route('/api/simulate', methods=['POST'])
