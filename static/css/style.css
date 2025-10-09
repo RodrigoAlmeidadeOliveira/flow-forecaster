@@ -1,0 +1,118 @@
+/* Custom styles for Project Forecaster */
+
+body {
+    padding-top: 56px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+.container-fluid {
+    margin-bottom: 30px;
+}
+
+/* Input groups styling */
+.input-group-text {
+    min-width: 180px;
+    justify-content: flex-start;
+}
+
+/* Results styling */
+#results-main {
+    margin-top: 40px;
+    animation: fadeIn 0.5s;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+#results {
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    font-size: 12px;
+    resize: vertical;
+}
+
+/* Chart canvas spacing */
+canvas {
+    margin-bottom: 30px;
+    max-height: 400px;
+}
+
+/* Button styling */
+.btn-primary {
+    background-color: #007bff;
+    border-color: #007bff;
+    padding: 10px 30px;
+    font-size: 16px;
+    margin: 10px;
+}
+
+.btn-secondary {
+    padding: 10px 30px;
+    font-size: 16px;
+    margin: 10px;
+}
+
+/* Risk table styling */
+#risks input {
+    font-size: 14px;
+}
+
+.risk-row:hover {
+    background-color: #f8f9fa;
+}
+
+/* Probability table styling */
+#probabilities {
+    width: 100%;
+    font-size: 14px;
+}
+
+#probabilities th {
+    background-color: #343a40;
+    color: white;
+    font-weight: 600;
+}
+
+#probabilities td {
+    padding: 8px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .input-group-text {
+        min-width: 120px;
+        font-size: 12px;
+    }
+
+    .btn-primary, .btn-secondary {
+        padding: 8px 20px;
+        font-size: 14px;
+    }
+}
+
+/* Textarea styling */
+textarea.form-control {
+    font-family: 'Courier New', monospace;
+    font-size: 13px;
+}
+
+/* Loading state */
+.loading {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+/* Summary results styling */
+#res-summary-header {
+    color: #28a745;
+    font-weight: 600;
+    margin-top: 20px;
+    margin-bottom: 20px;
+}
+
+.input-group .form-control[readonly] {
+    background-color: #e9ecef;
+    font-weight: 600;
+}
