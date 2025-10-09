@@ -217,3 +217,4 @@ Se este projeto foi útil, considere dar uma ⭐ no GitHub!
 ---
 
 **Versão**: 2.0.0 - Advanced ML & Monte Carlo Edition
+# project-forecaster-py
