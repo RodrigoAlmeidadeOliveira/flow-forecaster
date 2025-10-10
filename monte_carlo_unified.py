@@ -10,6 +10,7 @@ import statistics
 import numpy as np
 import pandas as pd
 import scipy.stats as stats
+from scipy.special import gammaln
 from typing import List, Dict, Any, Optional, Tuple
 from dataclasses import dataclass
 
@@ -132,6 +133,166 @@ def error_rate(array: List[float]) -> int:
         return 0
 
     return round(100 * avg_error / (max_val - min_val))
+
+
+# ============================================================================
+# DESCRIPTIVE STATISTICS HELPERS
+# ============================================================================
+
+
+def _safe_mode(values: np.ndarray) -> Optional[float]:
+    if values.size == 0:
+        return None
+    try:
+        modes = statistics.multimode(values.tolist())
+        if not modes:
+            return None
+        return float(modes[0])
+    except Exception:
+        return None
+
+
+def describe_throughput_samples(samples: List[float]) -> Optional[Dict[str, Any]]:
+    if not samples:
+        return None
+
+    arr = np.asarray(samples, dtype=float)
+    arr = arr[np.isfinite(arr)]
+    if arr.size == 0:
+        return None
+
+    sorted_arr = np.sort(arr)
+    count = int(sorted_arr.size)
+    mean = float(np.mean(sorted_arr))
+    median = float(np.median(sorted_arr))
+    std = float(np.std(sorted_arr, ddof=0))
+    mad = float(np.mean(np.abs(sorted_arr - mean)))
+    mode_value = _safe_mode(sorted_arr)
+    min_val = float(sorted_arr.min())
+    max_val = float(sorted_arr.max())
+    cv = float((std / mean) * 100) if mean else None
+
+    percentile_map = {}
+    for p in [10, 25, 50, 75, 85, 90, 95]:
+        percentile_map[f'p{int(p)}'] = float(np.percentile(sorted_arr, p))
+
+    return {
+        'count': count,
+        'mean': mean,
+        'median': median,
+        'mode': mode_value,
+        'std': std,
+        'mad': mad,
+        'cv': cv,
+        'min': min_val,
+        'max': max_val,
+        'range': max_val - min_val,
+        'percentiles': percentile_map
+    }
+
+
+def _weibull_linear_fit(values: np.ndarray) -> Tuple[Optional[float], Optional[float], Optional[float]]:
+    positive = values[values > 0]
+    if positive.size < 2:
+        return None, None, None
+
+    sorted_vals = np.sort(positive)
+    ranks = np.arange(1, sorted_vals.size + 1)
+    probs = (ranks - 0.3) / (sorted_vals.size + 0.4)
+
+    x = np.log(sorted_vals)
+    y = np.log(-np.log(1 - probs))
+
+    slope, intercept = np.polyfit(x, y, 1)
+    y_pred = intercept + slope * x
+
+    ss_res = np.sum((y - y_pred) ** 2)
+    ss_tot = np.sum((y - np.mean(y)) ** 2)
+    r_squared = 1 - (ss_res / ss_tot) if ss_tot > 0 else 0.0
+
+    return float(slope), float(intercept), float(r_squared)
+
+
+def describe_lead_time_samples(samples: List[float]) -> Optional[Dict[str, Any]]:
+    if not samples:
+        return None
+
+    arr = np.asarray(samples, dtype=float)
+    arr = arr[np.isfinite(arr)]
+    if arr.size == 0:
+        return None
+
+    sorted_arr = np.sort(arr)
+    count = int(sorted_arr.size)
+    mean = float(np.mean(sorted_arr))
+    median = float(np.median(sorted_arr))
+    std = float(np.std(sorted_arr, ddof=0))
+    mad = float(np.mean(np.abs(sorted_arr - mean)))
+    mode_value = _safe_mode(sorted_arr)
+    min_val = float(sorted_arr.min())
+    max_val = float(sorted_arr.max())
+    data_range = max_val - min_val
+    cv = float((std / mean) * 100) if mean else None
+
+    percentiles = {
+        'p100': max_val,
+        'p98': float(np.percentile(sorted_arr, 98)),
+        'p95': float(np.percentile(sorted_arr, 95)),
+        'p90': float(np.percentile(sorted_arr, 90)),
+        'p85': float(np.percentile(sorted_arr, 85)),
+        'p75': float(np.percentile(sorted_arr, 75)),
+        'p50': float(np.percentile(sorted_arr, 50)),
+        'p25': float(np.percentile(sorted_arr, 25)),
+        'p15': float(np.percentile(sorted_arr, 15))
+    }
+
+    ratio_p98_p50 = percentiles['p98'] / percentiles['p50'] if percentiles['p50'] else None
+
+    q1 = percentiles['p25']
+    q3 = percentiles['p75']
+    iqr = q3 - q1
+    outlier_threshold = q3 + 1.5 * iqr
+
+    risk_metrics = {
+        'six_mean_threshold': mean * 6 if mean else None,
+        'count_above_six_mean': int(np.sum(sorted_arr > mean * 6)) if mean else 0,
+        'ten_median_threshold': median * 10 if median else None,
+        'count_above_ten_median': int(np.sum(sorted_arr > median * 10)) if median else 0,
+        'outlier_threshold': outlier_threshold,
+        'count_above_outlier': int(np.sum(sorted_arr > outlier_threshold))
+    }
+
+    shape, intercept, r_squared = _weibull_linear_fit(sorted_arr)
+    weibull_fit = None
+    if shape and shape > 0:
+        scale = math.exp(-intercept / shape)
+        predicted_mean = scale * math.exp(gammaln(1 + 1 / shape))
+        weibull_fit = {
+            'shape': float(shape),
+            'intercept': float(intercept),
+            'scale': float(scale),
+            'p63': float(scale),
+            'predicted_mean': float(predicted_mean),
+            'r_squared': float(r_squared)
+        }
+
+    return {
+        'count': count,
+        'mean': mean,
+        'median': median,
+        'mode': mode_value,
+        'std': std,
+        'mad': mad,
+        'cv': cv,
+        'min': min_val,
+        'max': max_val,
+        'range': data_range,
+        'percentiles': percentiles,
+        'ratio_p98_p50': ratio_p98_p50,
+        'iqr': iqr,
+        'risk_metrics': risk_metrics,
+        'weibull_fit': weibull_fit
+    }
 
 
 # ============================================================================
@@ -355,6 +516,9 @@ def run_monte_carlo_simulation(simulation_data: Dict[str, Any]) -> Dict[str, Any
         'p95': percentile(duration_histogram, 0.95)
     }
 
+    throughput_stats = describe_throughput_samples(simulation_data.get('tpSamples', []))
+    lead_time_stats = describe_lead_time_samples(simulation_data.get('ltSamples', []))
+
     return {
         'simulations': simulations,
         'burnDowns': burn_downs,
@@ -363,6 +527,10 @@ def run_monte_carlo_simulation(simulation_data: Dict[str, Any]) -> Dict[str, Any
         'tpErrorRate': tp_error_rate,
         'ltErrorRate': lt_error_rate,
         'resultsTable': results_table,
+        'input_stats': {
+            'throughput': throughput_stats,
+            'lead_time': lead_time_stats
+        }
     }
 
 
@@ -435,7 +603,10 @@ def simulate_throughput_forecast(tp_samples: List[float],
         'burn_downs': mc_result.get('burnDowns', []),
         'percentile_stats': percentile_stats,
         'mean': mean_duration,
-        'std': std_duration
+        'std': std_duration,
+        'input_stats': mc_result.get('input_stats', {
+            'throughput': describe_throughput_samples(tp_samples)
+        })
     }
 
 
@@ -766,12 +937,17 @@ def analyze_deadline(
     """
     # Parse dates
     def parse_date(date_str):
-        for fmt in ['%d/%m/%y', '%d/%m/%Y']:
+        if not date_str or not isinstance(date_str, str):
+            raise ValueError("Date must be provided in DD/MM/YY, DD/MM/YYYY, YYYY-MM-DD, or similar day-month-year format")
+        date_str = date_str.strip()
+        if not date_str:
+            raise ValueError("Date must be provided in DD/MM/YY, DD/MM/YYYY, YYYY-MM-DD, or similar day-month-year format")
+        for fmt in ['%d/%m/%y', '%d/%m/%Y', '%Y-%m-%d', '%d-%m-%y', '%d-%m-%Y', '%Y/%m/%d', '%d.%m.%Y']:
             try:
                 return datetime.strptime(date_str, fmt)
             except ValueError:
                 continue
-        raise ValueError(f"Date {date_str} doesn't match format DD/MM/YY or DD/MM/YYYY")
+        raise ValueError(f"Date {date_str} doesn't match expected day-month-year formats")
 
     deadline = parse_date(deadline_date)
     start = parse_date(start_date)
@@ -842,12 +1018,17 @@ def forecast_how_many(
     """
     # Parse dates
     def parse_date(date_str):
-        for fmt in ['%d/%m/%y', '%d/%m/%Y']:
+        if not date_str or not isinstance(date_str, str):
+            raise ValueError("Date must be provided in DD/MM/YY, DD/MM/YYYY, YYYY-MM-DD, or similar day-month-year format")
+        date_str = date_str.strip()
+        if not date_str:
+            raise ValueError("Date must be provided in DD/MM/YY, DD/MM/YYYY, YYYY-MM-DD, or similar day-month-year format")
+        for fmt in ['%d/%m/%y', '%d/%m/%Y', '%Y-%m-%d', '%d-%m-%y', '%d-%m-%Y', '%Y/%m/%d', '%d.%m.%Y']:
             try:
                 return datetime.strptime(date_str, fmt)
             except ValueError:
                 continue
-        raise ValueError(f"Date {date_str} doesn't match format DD/MM/YY or DD/MM/YYYY")
+        raise ValueError(f"Date {date_str} doesn't match expected day-month-year formats")
 
     start = parse_date(start_date)
     end = parse_date(end_date)
@@ -912,12 +1093,17 @@ def forecast_when(
     """
     # Parse start date
     def parse_date(date_str):
-        for fmt in ['%d/%m/%y', '%d/%m/%Y']:
+        if not date_str or not isinstance(date_str, str):
+            raise ValueError("Date must be provided in DD/MM/YY, DD/MM/YYYY, YYYY-MM-DD, or similar day-month-year format")
+        date_str = date_str.strip()
+        if not date_str:
+            raise ValueError("Date must be provided in DD/MM/YY, DD/MM/YYYY, YYYY-MM-DD, or similar day-month-year format")
+        for fmt in ['%d/%m/%y', '%d/%m/%Y', '%Y-%m-%d', '%d-%m-%y', '%d-%m-%Y', '%Y/%m/%d', '%d.%m.%Y']:
             try:
                 return datetime.strptime(date_str, fmt)
             except ValueError:
                 continue
-        raise ValueError(f"Date {date_str} doesn't match format DD/MM/YY or DD/MM/YYYY")
+        raise ValueError(f"Date {date_str} doesn't match expected day-month-year formats")
 
     start = parse_date(start_date)
 

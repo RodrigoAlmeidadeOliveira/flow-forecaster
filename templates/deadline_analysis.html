@@ -1,0 +1,1135 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Deadline & Forecast Analysis - Project Forecaster</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        :root {
+            --primary-color: #4A90E2;
+            --success-color: #28a745;
+            --danger-color: #dc3545;
+            --warning-color: #ffc107;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .main-container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .card {
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+
+        .card-header {
+            background: linear-gradient(135deg, var(--primary-color) 0%, #357ABD 100%);
+            color: white;
+            border-radius: 15px 15px 0 0 !important;
+            padding: 20px;
+        }
+
+        .section-title {
+            font-size: 1.5rem;
+            font-weight: bold;
+            margin-bottom: 1rem;
+            color: var(--primary-color);
+        }
+
+        .result-card {
+            border-left: 4px solid var(--primary-color);
+            background: #f8f9fa;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 8px;
+        }
+
+        .success-badge {
+            background: var(--success-color);
+            color: white;
+            padding: 5px 15px;
+            border-radius: 20px;
+            display: inline-block;
+        }
+
+        .danger-badge {
+            background: var(--danger-color);
+            color: white;
+            padding: 5px 15px;
+            border-radius: 20px;
+            display: inline-block;
+        }
+
+        .metric-box {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .metric-value {
+            font-size: 2rem;
+            font-weight: bold;
+            color: var(--primary-color);
+        }
+
+        .metric-label {
+            color: #6c757d;
+            font-size: 0.9rem;
+            margin-top: 5px;
+        }
+
+        .comparison-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            padding: 10px;
+            background: white;
+            border-radius: 5px;
+        }
+
+        .spinner-container {
+            display: none;
+            text-align: center;
+            padding: 40px;
+        }
+
+        .tab-content {
+            padding: 20px;
+        }
+
+        .nav-tabs .nav-link {
+            color: #6c757d;
+        }
+
+        .nav-tabs .nav-link.active {
+            color: var(--primary-color);
+            font-weight: bold;
+        }
+
+        .chart-container {
+            position: relative;
+            height: 300px;
+            margin-top: 20px;
+            background: white;
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        }
+
+        .chart-title {
+            text-align: center;
+            font-weight: bold;
+            color: var(--primary-color);
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="main-container">
+        <!-- Header -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h1 class="mb-0">
+                            <i class="fas fa-calendar-check"></i> Deadline & Forecast Analysis
+                        </h1>
+                        <p class="mb-0 mt-2">Análise probabilística de prazos e entregas usando Monte Carlo e Machine Learning</p>
+                    </div>
+                    <a href="/" class="btn btn-outline-light">
+                        <i class="fas fa-home"></i> Voltar
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Input Form -->
+        <div class="card">
+            <div class="card-body">
+                <div class="row">
+                    <!-- Throughput Data -->
+                    <div class="col-md-6">
+                        <h5><i class="fas fa-chart-line"></i> Dados Históricos</h5>
+                        <div class="mb-3">
+                            <label class="form-label">Throughput Semanal (separado por vírgulas)</label>
+                            <textarea class="form-control" id="tpSamples" rows="3" placeholder="5, 6, 7, 4, 8, 6, 5, 7, 6, 8, 5, 7">4, 5, 6, 7, 5, 6, 7, 8, 5, 6, 4, 7</textarea>
+                            <small class="text-muted">Histórico de items completados por semana</small>
+                        </div>
+                    </div>
+
+                    <!-- Project Data -->
+                    <div class="col-md-6">
+                        <h5><i class="fas fa-tasks"></i> Dados do Projeto</h5>
+                        <div class="mb-3">
+                            <label class="form-label">Backlog (items)</label>
+                            <input type="number" class="form-control" id="backlog" value="20">
+                        </div>
+                        <div class="row">
+                            <div class="col-6">
+                                <label class="form-label">Data Início</label>
+                                <input type="text" class="form-control" id="startDate" placeholder="DD/MM/YYYY" value="01/10/2025">
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label">Deadline</label>
+                                <input type="text" class="form-control" id="deadlineDate" placeholder="DD/MM/YYYY" value="01/11/2025">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Advanced Parameters (Collapsible) -->
+                <div class="mt-3">
+                    <button class="btn btn-outline-primary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#advancedParams">
+                        <i class="fas fa-cog"></i> Parâmetros Avançados (Equipe, S-curve, Lead Times)
+                    </button>
+                    <div class="collapse mt-3" id="advancedParams">
+                        <div class="row">
+                            <div class="col-md-3">
+                                <label class="form-label">Tamanho da Equipe</label>
+                                <input type="number" class="form-control" id="teamSize" value="1">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Min Contributors</label>
+                                <input type="number" class="form-control" id="minContributors" value="">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Max Contributors</label>
+                                <input type="number" class="form-control" id="maxContributors" value="">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">S-Curve Size (%)</label>
+                                <input type="number" class="form-control" id="sCurveSize" value="0" min="0" max="50">
+                            </div>
+                        </div>
+                        <div class="row mt-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Lead Times (dias, separado por vírgulas)</label>
+                                <input type="text" class="form-control" id="ltSamples" placeholder="1, 2, 3, 2, 1, 2">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Split Rates (separado por vírgulas)</label>
+                                <input type="text" class="form-control" id="splitRates" placeholder="1.0, 1.1, 1.2, 1.0">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="mt-4 text-center">
+                    <button class="btn btn-primary btn-lg" onclick="runDeadlineAnalysis()">
+                        <i class="fas fa-play-circle"></i> Análise de Deadline
+                    </button>
+                    <button class="btn btn-success btn-lg" onclick="runHowManyAnalysis()">
+                        <i class="fas fa-calculator"></i> Quantos Items?
+                    </button>
+                    <button class="btn btn-info btn-lg" onclick="runWhenAnalysis()">
+                        <i class="fas fa-calendar-alt"></i> Quando Termina?
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Loading Spinner -->
+        <div id="loadingSpinner" class="spinner-container">
+            <div class="spinner-border text-primary" style="width: 3rem; height: 3rem;" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-3">Executando simulações...</p>
+        </div>
+
+        <!-- Results Container -->
+        <div id="resultsContainer" style="display: none;">
+            <!-- Results will be dynamically inserted here -->
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        (function ensureChartRegistration() {
+            try {
+                const ChartGlobal = window.Chart;
+                if (ChartGlobal && typeof ChartGlobal.register === 'function' && ChartGlobal.registerables) {
+                    ChartGlobal.register(...ChartGlobal.registerables);
+                }
+            } catch (error) {
+                console.warn('Chart.js auto-registration skipped:', error);
+            }
+        })();
+    </script>
+    <script>
+        function getFormData() {
+            const tpSamples = document.getElementById('tpSamples').value
+                .split(',').map(x => parseFloat(x.trim())).filter(x => !isNaN(x));
+
+            const ltSamplesStr = document.getElementById('ltSamples').value;
+            const ltSamples = ltSamplesStr ? ltSamplesStr.split(',').map(x => parseFloat(x.trim())).filter(x => !isNaN(x)) : [];
+
+            const splitRatesStr = document.getElementById('splitRates').value;
+            const splitRateSamples = splitRatesStr ? splitRatesStr.split(',').map(x => parseFloat(x.trim())).filter(x => !isNaN(x)) : [];
+
+            const minContrib = document.getElementById('minContributors').value;
+            const maxContrib = document.getElementById('maxContributors').value;
+
+            const startDate = (document.getElementById('startDate').value || '').trim();
+            const deadlineDate = (document.getElementById('deadlineDate').value || '').trim();
+
+            return {
+                tpSamples,
+                backlog: parseInt(document.getElementById('backlog').value),
+                startDate,
+                deadlineDate,
+                teamSize: parseInt(document.getElementById('teamSize').value) || 1,
+                minContributors: minContrib ? parseInt(minContrib) : null,
+                maxContributors: maxContrib ? parseInt(maxContrib) : null,
+                sCurveSize: parseInt(document.getElementById('sCurveSize').value) || 0,
+                ltSamples,
+                splitRateSamples,
+                nSimulations: 10000
+            };
+        }
+
+        function showLoading() {
+            document.getElementById('loadingSpinner').style.display = 'block';
+            document.getElementById('resultsContainer').style.display = 'none';
+        }
+
+        function hideLoading() {
+            document.getElementById('loadingSpinner').style.display = 'none';
+        }
+
+        async function runDeadlineAnalysis() {
+            showLoading();
+            const data = getFormData();
+
+            if (!data.startDate || !data.deadlineDate) {
+                alert('Por favor informe Data de Início e Deadline.');
+                hideLoading();
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/deadline-analysis', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(data)
+                });
+
+                const result = await response.json();
+                if (result.error) {
+                    alert('Erro: ' + result.error);
+                    hideLoading();
+                    return;
+                }
+
+                displayDeadlineResults(result);
+            } catch (error) {
+                alert('Erro na análise: ' + error);
+                hideLoading();
+            }
+        }
+
+        function displayDeadlineResults(result) {
+            const mc = result.monte_carlo;
+            const ml = result.machine_learning;
+            const consensus = result.consensus;
+
+            let html = `
+                <div class="card">
+                    <div class="card-header">
+                        <h4><i class="fas fa-chart-bar"></i> Resultado: Análise de Deadline</h4>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <!-- Monte Carlo Results -->
+                            <div class="col-md-6">
+                                <div class="section-title">
+                                    <i class="fas fa-dice"></i> Monte Carlo
+                                </div>
+                                <div class="result-card">
+                                    <h6>Deadline: ${mc.deadline_date}</h6>
+                                    <div class="metric-box">
+                                        <div class="metric-value">${mc.weeks_to_deadline}</div>
+                                        <div class="metric-label">Semanas até Deadline</div>
+                                    </div>
+                                    <div class="metric-box">
+                                        <div class="metric-value">${mc.projected_weeks_p85}</div>
+                                        <div class="metric-label">Semanas Necessárias (P85)</div>
+                                    </div>
+                                    <div class="metric-box">
+                                        <div class="metric-value">${mc.projected_work_p85}</div>
+                                        <div class="metric-label">Trabalho a ser Entregue (P85)</div>
+                                    </div>
+                                    <div class="text-center mt-3">
+                                        <h6>Pode cumprir o deadline?</h6>
+                                        <span class="${mc.can_meet_deadline ? 'success-badge' : 'danger-badge'}">
+                                            ${mc.can_meet_deadline ? '✓ Sim' : '✗ Não'}
+                                        </span>
+                                    </div>
+                                    <div class="mt-3">
+                                        <div class="comparison-row">
+                                            <span>% Escopo Completado:</span>
+                                            <strong>${mc.scope_completion_pct}%</strong>
+                                        </div>
+                                        <div class="comparison-row">
+                                            <span>% Prazo Utilizado:</span>
+                                            <strong>${mc.deadline_completion_pct}%</strong>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Machine Learning Results -->
+                            <div class="col-md-6">
+                                <div class="section-title">
+                                    <i class="fas fa-brain"></i> Machine Learning
+                                </div>
+                                ${ml && !ml.error ? `
+                                <div class="result-card">
+                                    <h6>Deadline: ${ml.deadline_date}</h6>
+                                    <div class="metric-box">
+                                        <div class="metric-value">${ml.weeks_to_deadline}</div>
+                                        <div class="metric-label">Semanas até Deadline</div>
+                                    </div>
+                                    <div class="metric-box">
+                                        <div class="metric-value">${ml.projected_weeks_p85}</div>
+                                        <div class="metric-label">Semanas Necessárias (P85)</div>
+                                    </div>
+                                    <div class="metric-box">
+                                        <div class="metric-value">${ml.projected_work_p85}</div>
+                                        <div class="metric-label">Trabalho a ser Entregue (P85)</div>
+                                    </div>
+                                    ${ml.projected_effort_p85 ? `
+                                    <div class="metric-box">
+                                        <div class="metric-value">${ml.projected_effort_p85}</div>
+                                        <div class="metric-label">Esforço (person-weeks)</div>
+                                    </div>
+                                    ` : ''}
+                                    <div class="text-center mt-3">
+                                        <h6>Pode cumprir o deadline?</h6>
+                                        <span class="${ml.can_meet_deadline ? 'success-badge' : 'danger-badge'}">
+                                            ${ml.can_meet_deadline ? '✓ Sim' : '✗ Não'}
+                                        </span>
+                                    </div>
+                                    <div class="mt-3">
+                                        <div class="comparison-row">
+                                            <span>% Escopo Completado:</span>
+                                            <strong>${ml.scope_completion_pct}%</strong>
+                                        </div>
+                                        <div class="comparison-row">
+                                            <span>% Prazo Utilizado:</span>
+                                            <strong>${ml.deadline_completion_pct}%</strong>
+                                        </div>
+                                    </div>
+                                </div>
+                                ` : '<div class="alert alert-warning">ML não disponível (precisa 8+ amostras)</div>'}
+                            </div>
+                        </div>
+
+                        <!-- Consensus -->
+                        ${consensus ? `
+                        <div class="mt-4">
+                            <div class="section-title">
+                                <i class="fas fa-handshake"></i> Consenso entre Métodos
+                            </div>
+                            <div class="alert ${consensus.both_agree ? 'alert-success' : 'alert-warning'}">
+                                <h6>${consensus.recommendation}</h6>
+                                <p class="mb-0">
+                                    <strong>Diferença P85:</strong> ${consensus.difference_weeks.toFixed(1)} semanas
+                                </p>
+                            </div>
+                        </div>
+                        ` : ''}
+
+                        <!-- Charts -->
+                        <div class="mt-4">
+                            <div class="section-title">
+                                <i class="fas fa-chart-line"></i> Visualização dos Resultados
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="chart-container">
+                                        <canvas id="deadlineComparisonChart"></canvas>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="chart-container">
+                                        <canvas id="scopeCompletionChart"></canvas>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row mt-3">
+                                <div class="col-12">
+                                    <div class="chart-container" style="height: 250px;">
+                                        <canvas id="timelineChart"></canvas>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('resultsContainer').innerHTML = html;
+            document.getElementById('resultsContainer').style.display = 'block';
+
+            // Create charts
+            createDeadlineCharts(mc, ml, consensus);
+
+            hideLoading();
+        }
+
+        function createDeadlineCharts(mc, ml, consensus) {
+            // Chart 1: Deadline Comparison (Weeks Available vs Needed)
+            const ctx1 = document.getElementById('deadlineComparisonChart');
+            new Chart(ctx1, {
+                type: 'bar',
+                data: {
+                    labels: ['Monte Carlo', 'Machine Learning'],
+                    datasets: [
+                        {
+                            label: 'Semanas Disponíveis',
+                            data: [mc.weeks_to_deadline, ml ? ml.weeks_to_deadline : 0],
+                            backgroundColor: 'rgba(75, 192, 192, 0.6)',
+                            borderColor: 'rgba(75, 192, 192, 1)',
+                            borderWidth: 2
+                        },
+                        {
+                            label: 'Semanas Necessárias (P85)',
+                            data: [mc.projected_weeks_p85, ml ? ml.projected_weeks_p85 : 0],
+                            backgroundColor: 'rgba(255, 99, 132, 0.6)',
+                            borderColor: 'rgba(255, 99, 132, 1)',
+                            borderWidth: 2
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'Comparação: Disponível vs Necessário',
+                            font: { size: 16, weight: 'bold' }
+                        },
+                        legend: {
+                            position: 'bottom'
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Semanas'
+                            }
+                        }
+                    }
+                }
+            });
+
+            // Chart 2: Scope Completion Percentage
+            const ctx2 = document.getElementById('scopeCompletionChart');
+            new Chart(ctx2, {
+                type: 'doughnut',
+                data: {
+                    labels: ml ? ['Monte Carlo', 'Machine Learning'] : ['Monte Carlo'],
+                    datasets: [{
+                        label: '% Escopo Completado',
+                        data: ml ? [mc.scope_completion_pct, ml.scope_completion_pct] : [mc.scope_completion_pct],
+                        backgroundColor: [
+                            'rgba(54, 162, 235, 0.6)',
+                            'rgba(153, 102, 255, 0.6)'
+                        ],
+                        borderColor: [
+                            'rgba(54, 162, 235, 1)',
+                            'rgba(153, 102, 255, 1)'
+                        ],
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: '% Escopo que Será Completado',
+                            font: { size: 16, weight: 'bold' }
+                        },
+                        legend: {
+                            position: 'bottom'
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return context.label + ': ' + context.parsed + '%';
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+
+            // Chart 3: Timeline Comparison
+            const ctx3 = document.getElementById('timelineChart');
+            new Chart(ctx3, {
+                type: 'bar',
+                data: {
+                    labels: ['Deadline Disponível', 'MC Projetado (P85)', ml ? 'ML Projetado (P85)' : null].filter(Boolean),
+                    datasets: [{
+                        label: 'Semanas',
+                        data: [
+                            mc.weeks_to_deadline,
+                            mc.projected_weeks_p85,
+                            ml ? ml.projected_weeks_p85 : null
+                        ].filter(x => x !== null),
+                        backgroundColor: [
+                            'rgba(75, 192, 192, 0.6)',
+                            'rgba(255, 159, 64, 0.6)',
+                            'rgba(153, 102, 255, 0.6)'
+                        ],
+                        borderColor: [
+                            'rgba(75, 192, 192, 1)',
+                            'rgba(255, 159, 64, 1)',
+                            'rgba(153, 102, 255, 1)'
+                        ],
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'Timeline: Deadline vs Projeções',
+                            font: { size: 16, weight: 'bold' }
+                        },
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        x: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Semanas'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        async function runHowManyAnalysis() {
+            showLoading();
+            const data = getFormData();
+
+            if (!data.startDate || !data.deadlineDate) {
+                alert('Por favor informe Data de Início e Deadline para calcular quantos itens.');
+                hideLoading();
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/forecast-how-many', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(data)
+                });
+
+                const result = await response.json();
+                if (result.error) {
+                    alert('Erro: ' + result.error);
+                    hideLoading();
+                    return;
+                }
+
+                displayHowManyResults(result);
+            } catch (error) {
+                alert('Erro na análise: ' + error);
+                hideLoading();
+            }
+        }
+
+        function displayHowManyResults(result) {
+            const mc = result.monte_carlo;
+            const ml = result.machine_learning;
+
+            let html = `
+                <div class="card">
+                    <div class="card-header">
+                        <h4><i class="fas fa-calculator"></i> Resultado: Quantos Items no Período?</h4>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="section-title">Monte Carlo</div>
+                                <div class="result-card">
+                                    <p><strong>Período:</strong> ${mc.days} dias (${mc.weeks} semanas)</p>
+                                    <p><strong>Início:</strong> ${mc.start_date}</p>
+                                    <p><strong>Fim:</strong> ${mc.end_date}</p>
+                                    <hr>
+                                    <div class="metric-box">
+                                        <div class="metric-value">${mc.items_p50}</div>
+                                        <div class="metric-label">50% de Confiança (Mediana)</div>
+                                    </div>
+                                    <div class="metric-box">
+                                        <div class="metric-value">${mc.items_p85}</div>
+                                        <div class="metric-label">85% de Confiança</div>
+                                    </div>
+                                    <div class="metric-box">
+                                        <div class="metric-value">${mc.items_p95}</div>
+                                        <div class="metric-label">95% de Confiança</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="section-title">Machine Learning</div>
+                                ${ml && !ml.error ? `
+                                <div class="result-card">
+                                    <p><strong>Período:</strong> ${ml.days} dias (${ml.weeks} semanas)</p>
+                                    <p><strong>Início:</strong> ${ml.start_date}</p>
+                                    <p><strong>Fim:</strong> ${ml.end_date}</p>
+                                    <hr>
+                                    <div class="metric-box">
+                                        <div class="metric-value">${ml.items_p50}</div>
+                                        <div class="metric-label">50% de Confiança (Mediana)</div>
+                                    </div>
+                                    <div class="metric-box">
+                                        <div class="metric-value">${ml.items_p85}</div>
+                                        <div class="metric-label">85% de Confiança</div>
+                                    </div>
+                                    <div class="metric-box">
+                                        <div class="metric-value">${ml.items_p95}</div>
+                                        <div class="metric-label">95% de Confiança</div>
+                                    </div>
+                                </div>
+                                ` : '<div class="alert alert-warning">ML não disponível</div>'}
+                            </div>
+                        </div>
+
+                        <!-- Charts -->
+                        <div class="mt-4">
+                            <div class="section-title">
+                                <i class="fas fa-chart-bar"></i> Visualização dos Resultados
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="chart-container">
+                                        <canvas id="howManyComparisonChart"></canvas>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="chart-container">
+                                        <canvas id="confidenceLevelsChart"></canvas>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('resultsContainer').innerHTML = html;
+            document.getElementById('resultsContainer').style.display = 'block';
+
+            // Create charts
+            createHowManyCharts(mc, ml);
+
+            hideLoading();
+        }
+
+        function createHowManyCharts(mc, ml) {
+            // Chart 1: MC vs ML Comparison
+            const ctx1 = document.getElementById('howManyComparisonChart');
+            new Chart(ctx1, {
+                type: 'bar',
+                data: {
+                    labels: ['P50 (Mediana)', 'P85 (Recomendado)', 'P95 (Conservador)'],
+                    datasets: [
+                        {
+                            label: 'Monte Carlo',
+                            data: [mc.items_p50, mc.items_p85, mc.items_p95],
+                            backgroundColor: 'rgba(54, 162, 235, 0.6)',
+                            borderColor: 'rgba(54, 162, 235, 1)',
+                            borderWidth: 2
+                        },
+                        ...(ml && !ml.error ? [{
+                            label: 'Machine Learning',
+                            data: [ml.items_p50, ml.items_p85, ml.items_p95],
+                            backgroundColor: 'rgba(153, 102, 255, 0.6)',
+                            borderColor: 'rgba(153, 102, 255, 1)',
+                            borderWidth: 2
+                        }] : [])
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'Comparação MC vs ML por Nível de Confiança',
+                            font: { size: 16, weight: 'bold' }
+                        },
+                        legend: {
+                            position: 'bottom'
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Items Completados'
+                            }
+                        }
+                    }
+                }
+            });
+
+            // Chart 2: Confidence Levels Line Chart
+            const ctx2 = document.getElementById('confidenceLevelsChart');
+            new Chart(ctx2, {
+                type: 'line',
+                data: {
+                    labels: ['50%', '85%', '95%'],
+                    datasets: [
+                        {
+                            label: 'Monte Carlo',
+                            data: [mc.items_p50, mc.items_p85, mc.items_p95],
+                            borderColor: 'rgba(54, 162, 235, 1)',
+                            backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                            borderWidth: 3,
+                            fill: true,
+                            tension: 0.4
+                        },
+                        ...(ml && !ml.error ? [{
+                            label: 'Machine Learning',
+                            data: [ml.items_p50, ml.items_p85, ml.items_p95],
+                            borderColor: 'rgba(153, 102, 255, 1)',
+                            backgroundColor: 'rgba(153, 102, 255, 0.2)',
+                            borderWidth: 3,
+                            fill: true,
+                            tension: 0.4
+                        }] : [])
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'Distribuição de Confiança',
+                            font: { size: 16, weight: 'bold' }
+                        },
+                        legend: {
+                            position: 'bottom'
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Items'
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Nível de Confiança'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        async function runWhenAnalysis() {
+            showLoading();
+            const data = getFormData();
+
+            if (!data.startDate) {
+                alert('Por favor informe a Data de Início para calcular quando o backlog termina.');
+                hideLoading();
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/forecast-when', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(data)
+                });
+
+                const result = await response.json();
+                if (result.error) {
+                    alert('Erro: ' + result.error);
+                    hideLoading();
+                    return;
+                }
+
+                displayWhenResults(result);
+            } catch (error) {
+                alert('Erro na análise: ' + error);
+                hideLoading();
+            }
+        }
+
+        function displayWhenResults(result) {
+            const mc = result.monte_carlo;
+            const ml = result.machine_learning;
+
+            let html = `
+                <div class="card">
+                    <div class="card-header">
+                        <h4><i class="fas fa-calendar-alt"></i> Resultado: Quando o Backlog Termina?</h4>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="section-title">Monte Carlo</div>
+                                <div class="result-card">
+                                    <p><strong>Backlog:</strong> ${mc.backlog} items</p>
+                                    <p><strong>Início:</strong> ${mc.start_date}</p>
+                                    <hr>
+                                    <div class="metric-box">
+                                        <div class="metric-value">${mc.date_p50}</div>
+                                        <div class="metric-label">50% de Confiança (${mc.weeks_p50} semanas)</div>
+                                    </div>
+                                    <div class="metric-box">
+                                        <div class="metric-value">${mc.date_p85}</div>
+                                        <div class="metric-label">85% de Confiança (${mc.weeks_p85} semanas)</div>
+                                    </div>
+                                    <div class="metric-box">
+                                        <div class="metric-value">${mc.date_p95}</div>
+                                        <div class="metric-label">95% de Confiança (${mc.weeks_p95} semanas)</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="section-title">Machine Learning</div>
+                                ${ml && !ml.error ? `
+                                <div class="result-card">
+                                    <p><strong>Backlog:</strong> ${ml.backlog} items</p>
+                                    <p><strong>Início:</strong> ${ml.start_date}</p>
+                                    <hr>
+                                    <div class="metric-box">
+                                        <div class="metric-value">${ml.date_p50}</div>
+                                        <div class="metric-label">50% de Confiança (${ml.weeks_p50} semanas)</div>
+                                    </div>
+                                    <div class="metric-box">
+                                        <div class="metric-value">${ml.date_p85}</div>
+                                        <div class="metric-label">85% de Confiança (${ml.weeks_p85} semanas)</div>
+                                    </div>
+                                    <div class="metric-box">
+                                        <div class="metric-value">${ml.date_p95}</div>
+                                        <div class="metric-label">95% de Confiança (${ml.weeks_p95} semanas)</div>
+                                    </div>
+                                    ${ml.effort_p85 ? `
+                                    <div class="alert alert-info mt-3">
+                                        <strong>Esforço Estimado (P85):</strong> ${ml.effort_p85} person-weeks
+                                    </div>
+                                    ` : ''}
+                                </div>
+                                ` : '<div class="alert alert-warning">ML não disponível</div>'}
+                            </div>
+                        </div>
+
+                        <!-- Charts -->
+                        <div class="mt-4">
+                            <div class="section-title">
+                                <i class="fas fa-chart-line"></i> Visualização dos Resultados
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="chart-container">
+                                        <canvas id="whenWeeksChart"></canvas>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="chart-container">
+                                        <canvas id="whenConfidenceChart"></canvas>
+                                    </div>
+                                </div>
+                            </div>
+                            ${ml && ml.effort_p85 ? `
+                            <div class="row mt-3">
+                                <div class="col-12">
+                                    <div class="chart-container" style="height: 200px;">
+                                        <canvas id="effortChart"></canvas>
+                                    </div>
+                                </div>
+                            </div>
+                            ` : ''}
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('resultsContainer').innerHTML = html;
+            document.getElementById('resultsContainer').style.display = 'block';
+
+            // Create charts
+            createWhenCharts(mc, ml);
+
+            hideLoading();
+        }
+
+        function createWhenCharts(mc, ml) {
+            // Chart 1: Weeks Comparison
+            const ctx1 = document.getElementById('whenWeeksChart');
+            new Chart(ctx1, {
+                type: 'bar',
+                data: {
+                    labels: ['P50 (Mediana)', 'P85 (Recomendado)', 'P95 (Conservador)'],
+                    datasets: [
+                        {
+                            label: 'Monte Carlo',
+                            data: [mc.weeks_p50, mc.weeks_p85, mc.weeks_p95],
+                            backgroundColor: 'rgba(75, 192, 192, 0.6)',
+                            borderColor: 'rgba(75, 192, 192, 1)',
+                            borderWidth: 2
+                        },
+                        ...(ml && !ml.error ? [{
+                            label: 'Machine Learning',
+                            data: [ml.weeks_p50, ml.weeks_p85, ml.weeks_p95],
+                            backgroundColor: 'rgba(255, 159, 64, 0.6)',
+                            borderColor: 'rgba(255, 159, 64, 1)',
+                            borderWidth: 2
+                        }] : [])
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'Semanas até Conclusão',
+                            font: { size: 16, weight: 'bold' }
+                        },
+                        legend: {
+                            position: 'bottom'
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Semanas'
+                            }
+                        }
+                    }
+                }
+            });
+
+            // Chart 2: Confidence Distribution
+            const ctx2 = document.getElementById('whenConfidenceChart');
+            new Chart(ctx2, {
+                type: 'radar',
+                data: {
+                    labels: ['P50', 'P85', 'P95'],
+                    datasets: [
+                        {
+                            label: 'Monte Carlo',
+                            data: [mc.weeks_p50, mc.weeks_p85, mc.weeks_p95],
+                            borderColor: 'rgba(75, 192, 192, 1)',
+                            backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                            borderWidth: 2
+                        },
+                        ...(ml && !ml.error ? [{
+                            label: 'Machine Learning',
+                            data: [ml.weeks_p50, ml.weeks_p85, ml.weeks_p95],
+                            borderColor: 'rgba(255, 159, 64, 1)',
+                            backgroundColor: 'rgba(255, 159, 64, 0.2)',
+                            borderWidth: 2
+                        }] : [])
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'Radar de Confiança',
+                            font: { size: 16, weight: 'bold' }
+                        },
+                        legend: {
+                            position: 'bottom'
+                        }
+                    },
+                    scales: {
+                        r: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+
+            // Chart 3: Effort Chart (if ML has effort data)
+            if (ml && ml.effort_p85) {
+                const ctx3 = document.getElementById('effortChart');
+                new Chart(ctx3, {
+                    type: 'bar',
+                    data: {
+                        labels: ['Esforço Projetado (P85)'],
+                        datasets: [{
+                            label: 'Person-Weeks',
+                            data: [ml.effort_p85],
+                            backgroundColor: 'rgba(153, 102, 255, 0.6)',
+                            borderColor: 'rgba(153, 102, 255, 1)',
+                            borderWidth: 2
+                        }]
+                    },
+                    options: {
+                        indexAxis: 'y',
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: 'Esforço Estimado (Machine Learning)',
+                                font: { size: 16, weight: 'bold' }
+                            },
+                            legend: {
+                                display: false
+                            }
+                        },
+                        scales: {
+                            x: {
+                                beginAtZero: true,
+                                title: {
+                                    display: true,
+                                    text: 'Person-Weeks'
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+        }
+    </script>
+</body>
+</html>

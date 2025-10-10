@@ -53,19 +53,28 @@ $(document).ready(function() {
         $('#model-performance').html(html);
     }
 
-    function displayMCStats(stats) {
+    function displayMCStats(mcData) {
+        if (!mcData) {
+            $('#mc-stats').html('<div class="alert alert-warning">Monte Carlo stats unavailable.</div>');
+            return;
+        }
+
+        const stats = mcData.percentile_stats || {};
+        const mean = mcData.mean != null ? mcData.mean : '—';
+        const std = mcData.std != null ? mcData.std : '—';
+
         let html = `
             <div class="row">
-                <div class="col-md-3"><div class="metric-card"><strong>Mean:</strong> ${stats.mean} weeks</div></div>
-                <div class="col-md-3"><div class="metric-card"><strong>Std Dev:</strong> ${stats.std} weeks</div></div>
-                <div class="col-md-3"><div class="metric-card"><strong>P50:</strong> ${stats.p50} weeks</div></div>
-                <div class="col-md-3"><div class="metric-card"><strong>P85:</strong> ${stats.p85} weeks</div></div>
+                <div class="col-md-3"><div class="metric-card"><strong>Mean:</strong> ${mean} weeks</div></div>
+                <div class="col-md-3"><div class="metric-card"><strong>Std Dev:</strong> ${std} weeks</div></div>
+                <div class="col-md-3"><div class="metric-card"><strong>P50:</strong> ${stats.p50 ?? '—'} weeks</div></div>
+                <div class="col-md-3"><div class="metric-card"><strong>P85:</strong> ${stats.p85 ?? '—'} weeks</div></div>
             </div>
             <div class="row">
-                <div class="col-md-3"><div class="metric-card"><strong>P10:</strong> ${stats.p10} weeks</div></div>
-                <div class="col-md-3"><div class="metric-card"><strong>P25:</strong> ${stats.p25} weeks</div></div>
-                <div class="col-md-3"><div class="metric-card"><strong>P75:</strong> ${stats.p75} weeks</div></div>
-                <div class="col-md-3"><div class="metric-card"><strong>P90:</strong> ${stats.p90} weeks</div></div>
+                <div class="col-md-3"><div class="metric-card"><strong>P10:</strong> ${stats.p10 ?? '—'} weeks</div></div>
+                <div class="col-md-3"><div class="metric-card"><strong>P25:</strong> ${stats.p25 ?? '—'} weeks</div></div>
+                <div class="col-md-3"><div class="metric-card"><strong>P75:</strong> ${stats.p75 ?? '—'} weeks</div></div>
+                <div class="col-md-3"><div class="metric-card"><strong>P90:</strong> ${stats.p90 ?? '—'} weeks</div></div>
             </div>
         `;
         $('#mc-stats').html(html);
@@ -108,6 +117,10 @@ $(document).ready(function() {
 
         showLoading();
 
+        if (window.renderInputStats) {
+            window.renderInputStats('#advanced-input-stats', null, { showLeadTime: false });
+        }
+
         $.ajax({
             url: '/api/ml-forecast',
             method: 'POST',
@@ -130,6 +143,10 @@ $(document).ready(function() {
                 displayModelPerformance(data.model_results);
                 $('#ml-chart').attr('src', data.charts.ml_forecast);
                 $('#history-chart').attr('src', data.charts.historical_analysis);
+
+                if (window.renderInputStats) {
+                    window.renderInputStats('#advanced-input-stats', null, { showLeadTime: false });
+                }
             },
             error: function(xhr) {
                 displayError(xhr.responseJSON?.error || 'Unknown error occurred');
@@ -180,13 +197,19 @@ $(document).ready(function() {
                 $('#history-chart').attr('src', data.charts.ml_forecast);
 
                 // Display MC results
-                displayMCStats(data.monte_carlo.percentile_stats);
+                displayMCStats(data.monte_carlo);
                 $('#mc-chart').attr('src', data.charts.monte_carlo);
 
                 // Display comparison
                 $('#comparison-chart').attr('src', data.charts.comparison);
                 displayMLSummary(data.ml);
                 displayMCSummary(data.monte_carlo);
+
+                if (window.renderInputStats) {
+                    window.renderInputStats('#advanced-input-stats', data.monte_carlo.input_stats, {
+                        showLeadTime: false
+                    });
+                }
             },
             error: function(xhr) {
                 displayError(xhr.responseJSON?.error || 'Unknown error occurred');
