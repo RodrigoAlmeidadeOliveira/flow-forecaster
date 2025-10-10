@@ -8,6 +8,8 @@ $(document).ready(function() {
             .filter(n => !isNaN(n) && n >= 0);
     }
 
+    const walkForwardCharts = [];
+
     function showLoading() {
         $('#loading').show();
         $('#results-container').hide();
@@ -40,16 +42,88 @@ $(document).ready(function() {
     }
 
     function displayModelPerformance(models) {
-        let html = '<table class="table table-sm table-striped"><thead><tr><th>Model</th><th>MAE</th><th>RMSE</th><th>MAE %</th></tr></thead><tbody>';
-        models.forEach(model => {
-            html += `<tr>
-                <td>${model.model}</td>
-                <td>${model.mae}</td>
-                <td>${model.rmse}</td>
-                <td>${model.mae_percent}%</td>
-            </tr>`;
-        });
-        html += '</tbody></table>';
+        if (!models || models.length === 0) {
+            $('#model-performance').html('<div class="alert alert-warning">No model performance data available</div>');
+            return;
+        }
+
+        // Check if K-Fold CV metrics are available
+        const hasKFoldMetrics = models.some(m => m.mae_std !== undefined);
+
+        let html = `
+            <div class="alert alert-info mb-3">
+                <strong>K-Fold Cross-Validation Protocol (5-fold)</strong><br>
+                Training set: 80% | Validation set: 20% | Grid Search for hyperparameter tuning
+            </div>
+        `;
+
+        if (hasKFoldMetrics) {
+            // Display detailed K-Fold CV results
+            html += '<div class="table-responsive">';
+            html += '<table class="table table-sm table-hover">';
+            html += '<thead class="thead-dark"><tr>';
+            html += '<th>Model</th>';
+            html += '<th>CV MAE<br><small>(mean ± std)</small></th>';
+            html += '<th>CV RMSE<br><small>(mean ± std)</small></th>';
+            html += '<th>CV R²<br><small>(mean ± std)</small></th>';
+            html += '<th>Val MAE</th>';
+            html += '<th>Val R²</th>';
+            html += '<th>Best Hyperparameters</th>';
+            html += '</tr></thead><tbody>';
+
+            models.forEach(model => {
+                const mae_cv = model.mae_std ? `${model.mae} ± ${model.mae_std}` : model.mae;
+                const rmse_cv = model.rmse_std ? `${model.rmse} ± ${model.rmse_std}` : model.rmse;
+                const r2_cv = model.r2_std !== undefined ? `${model.r2_mean} ± ${model.r2_std}` : '—';
+                const val_mae = model.val_mae !== undefined ? model.val_mae : '—';
+                const val_r2 = model.val_r2 !== undefined ? model.val_r2 : '—';
+
+                let best_params = '—';
+                if (model.best_params) {
+                    best_params = Object.entries(model.best_params)
+                        .map(([key, val]) => `${key}=${val}`)
+                        .join('<br>');
+                }
+
+                html += `<tr>
+                    <td><strong>${model.model}</strong></td>
+                    <td>${mae_cv}</td>
+                    <td>${rmse_cv}</td>
+                    <td>${r2_cv}</td>
+                    <td>${val_mae}</td>
+                    <td>${val_r2}</td>
+                    <td><small>${best_params}</small></td>
+                </tr>`;
+            });
+
+            html += '</tbody></table></div>';
+
+            // Add summary statistics
+            html += '<div class="mt-3 p-3 bg-light border rounded">';
+            html += '<h6 class="font-weight-bold">Resumo do Protocolo:</h6>';
+            html += '<ul class="mb-0 small">';
+            html += '<li><strong>CV MAE:</strong> Erro Absoluto Médio na validação cruzada (menor é melhor)</li>';
+            html += '<li><strong>CV RMSE:</strong> Raiz do Erro Quadrático Médio (menor é melhor)</li>';
+            html += '<li><strong>CV R²:</strong> Coeficiente de determinação (próximo de 1 é melhor)</li>';
+            html += '<li><strong>Val MAE/R²:</strong> Métricas no conjunto de validação (20%)</li>';
+            html += '<li><strong>± std:</strong> Desvio padrão entre os 5 folds (menor indica maior estabilidade)</li>';
+            html += '</ul></div>';
+
+        } else {
+            // Display legacy format
+            html += '<table class="table table-sm table-striped">';
+            html += '<thead><tr><th>Model</th><th>MAE</th><th>RMSE</th><th>MAE %</th></tr></thead><tbody>';
+            models.forEach(model => {
+                html += `<tr>
+                    <td>${model.model}</td>
+                    <td>${model.mae}</td>
+                    <td>${model.rmse}</td>
+                    <td>${model.mae_percent}%</td>
+                </tr>`;
+            });
+            html += '</tbody></table>';
+        }
+
         $('#model-performance').html(html);
     }
 
@@ -105,6 +179,130 @@ $(document).ready(function() {
         $('#mc-summary').html(html);
     }
 
+    function clearWalkForwardCharts() {
+        while (walkForwardCharts.length) {
+            const chart = walkForwardCharts.pop();
+            if (chart && typeof chart.destroy === 'function') {
+                chart.destroy();
+            }
+        }
+    }
+
+    function displayWalkForwardResults(results, forecastSteps) {
+        const $container = $('#walk-forward-results');
+        const $metrics = $('#walk-forward-metrics');
+        const $charts = $('#walk-forward-charts');
+
+        clearWalkForwardCharts();
+        $charts.empty();
+
+        if (!results || Object.keys(results).length === 0) {
+            $metrics.empty();
+            $container.hide();
+            return;
+        }
+
+        let metricsHtml = '<table class="table table-sm table-bordered"><thead class="thead-light"><tr>' +
+            '<th>Modelo</th><th>MAE</th><th>RMSE</th><th>R²</th><th>MAPE</th><th>Origens</th><th>Pontos</th>' +
+            '</tr></thead><tbody>';
+
+        let chartIndex = 0;
+        for (const [modelName, data] of Object.entries(results)) {
+            if (data.error) {
+                metricsHtml += `<tr><td>${modelName}</td><td colspan="6">${data.error}</td></tr>`;
+                continue;
+            }
+
+            metricsHtml += `<tr>
+                <td>${modelName}</td>
+                <td>${data.mae !== undefined && data.mae !== null ? data.mae.toFixed(3) : '—'}</td>
+                <td>${data.rmse !== undefined && data.rmse !== null ? data.rmse.toFixed(3) : '—'}</td>
+                <td>${data.r2 !== undefined && data.r2 !== null ? data.r2.toFixed(3) : '—'}</td>
+                <td>${data.mape !== undefined && data.mape !== null ? data.mape.toFixed(2) + '%' : '—'}</td>
+                <td>${data.n_forecasts ?? '—'}</td>
+                <td>${data.n_points ?? '—'}</td>
+            </tr>`;
+
+            if (data.predictions && data.actuals && data.predictions.length && data.actuals.length) {
+                const canvasId = `walk-forward-chart-${chartIndex}`;
+                $charts.append(`
+                    <div class="col-lg-6 mb-3">
+                        <div class="chart-container" style="height:320px;">
+                            <h5>${modelName}</h5>
+                            <canvas id="${canvasId}"></canvas>
+                        </div>
+                    </div>
+                `);
+
+                const labels = data.actuals.map((_, idx) => idx + 1);
+                const chart = new Chart(document.getElementById(canvasId).getContext('2d'), {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [
+                            {
+                                label: 'Realizado',
+                                data: data.actuals,
+                                borderColor: 'rgba(54, 162, 235, 1)',
+                                backgroundColor: 'rgba(54, 162, 235, 0.1)',
+                                borderWidth: 2,
+                                pointRadius: 2,
+                                fill: false
+                            },
+                            {
+                                label: 'Previsto',
+                                data: data.predictions,
+                                borderColor: 'rgba(255, 99, 132, 1)',
+                                backgroundColor: 'rgba(255, 99, 132, 0.1)',
+                                borderWidth: 2,
+                                pointRadius: 2,
+                                borderDash: [5, 5],
+                                fill: false
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        title: {
+                            display: true,
+                            text: `Comparação previsto vs realizado (passo ${forecastSteps})`
+                        },
+                        tooltips: {
+                            mode: 'index',
+                            intersect: false
+                        },
+                        hover: {
+                            mode: 'nearest',
+                            intersect: true
+                        },
+                        scales: {
+                            xAxes: [{
+                                scaleLabel: {
+                                    display: true,
+                                    labelString: 'Ponto da validação'
+                                }
+                            }],
+                            yAxes: [{
+                                scaleLabel: {
+                                    display: true,
+                                    labelString: 'Itens por semana'
+                                }
+                            }]
+                        }
+                    }
+                });
+
+                walkForwardCharts.push(chart);
+                chartIndex += 1;
+            }
+        }
+
+        metricsHtml += '</tbody></table>';
+        $metrics.html(metricsHtml);
+        $container.show();
+    }
+
     $('#runML').on('click', function() {
         const tpSamples = parseSamples($('#tpSamples').val());
         const forecastSteps = parseInt($('#forecastSteps').val());
@@ -116,6 +314,10 @@ $(document).ready(function() {
         }
 
         showLoading();
+        clearWalkForwardCharts();
+        $('#walk-forward-results').hide();
+        clearWalkForwardCharts();
+        $('#walk-forward-results').hide();
 
         if (window.renderInputStats) {
             window.renderInputStats('#advanced-input-stats', null, { showLeadTime: false });
@@ -143,6 +345,7 @@ $(document).ready(function() {
                 displayModelPerformance(data.model_results);
                 $('#ml-chart').attr('src', data.charts.ml_forecast);
                 $('#history-chart').attr('src', data.charts.historical_analysis);
+                displayWalkForwardResults(data.walk_forward, forecastSteps);
 
                 if (window.renderInputStats) {
                     window.renderInputStats('#advanced-input-stats', null, { showLeadTime: false });
@@ -193,6 +396,12 @@ $(document).ready(function() {
 
                 // Display ML results
                 displayRiskAssessment(data.ml.risk_assessment);
+
+                // Display model performance if available
+                if (data.ml.model_results) {
+                    displayModelPerformance(data.ml.model_results);
+                }
+
                 $('#ml-chart').attr('src', data.charts.ml_forecast);
                 $('#history-chart').attr('src', data.charts.ml_forecast);
 
@@ -204,6 +413,7 @@ $(document).ready(function() {
                 $('#comparison-chart').attr('src', data.charts.comparison);
                 displayMLSummary(data.ml);
                 displayMCSummary(data.monte_carlo);
+                displayWalkForwardResults(data.ml.walk_forward, forecastSteps);
 
                 if (window.renderInputStats) {
                     window.renderInputStats('#advanced-input-stats', data.monte_carlo.input_stats, {

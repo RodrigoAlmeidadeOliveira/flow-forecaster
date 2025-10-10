@@ -52,8 +52,8 @@ class MLDeadlineForecaster:
         self.lt_samples = lt_samples or []
         self.split_rate_samples = split_rate_samples or []
 
-        # Initialize ML forecaster
-        self.ml_forecaster = MLForecaster(max_lag=4, n_splits=3)
+        # Initialize ML forecaster with K-Fold CV protocol
+        self.ml_forecaster = MLForecaster(max_lag=4, n_splits=5, validation_size=0.2)
 
         # Pre-calculate S-curve if needed
         if self.s_curve_size > 0:
@@ -130,8 +130,8 @@ class MLDeadlineForecaster:
         Returns:
             Dictionary with simulation results
         """
-        # Train ML models
-        self.ml_forecaster.train_models(np.array(self.tp_samples))
+        # Train ML models using K-Fold CV with Grid Search
+        self.ml_forecaster.train_models(np.array(self.tp_samples), use_kfold_cv=True)
 
         # Get ML forecast (ensemble of all models)
         ml_forecasts = self.ml_forecaster.forecast(
@@ -395,8 +395,8 @@ def ml_forecast_how_many(
         lt_samples=lt_samples
     )
 
-    # Train ML models
-    forecaster.ml_forecaster.train_models(np.array(tp_samples))
+    # Train ML models using K-Fold CV with Grid Search
+    forecaster.ml_forecaster.train_models(np.array(tp_samples), use_kfold_cv=True)
 
     # Get ML forecast
     ml_forecasts = forecaster.ml_forecaster.forecast(

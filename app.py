@@ -169,11 +169,11 @@ def ml_forecast():
         # Convert to numpy array
         tp_data = np.array(tp_samples, dtype=float)
 
-        # Initialize ML forecaster
-        forecaster = MLForecaster(max_lag=4, n_splits=3)
+        # Initialize ML forecaster with K-Fold CV protocol
+        forecaster = MLForecaster(max_lag=4, n_splits=5, validation_size=0.2)
 
-        # Train models
-        forecaster.train_models(tp_data)
+        # Train models using K-Fold CV with Grid Search
+        forecaster.train_models(tp_data, use_kfold_cv=True)
 
         # Generate forecasts
         forecasts = forecaster.forecast(tp_data, steps=forecast_steps, model_name=model_name)
@@ -183,9 +183,13 @@ def ml_forecast():
 
         # Get model results summary
         model_results = forecaster.get_results_summary()
+        walk_forward_results = forecaster.walk_forward_validation(tp_data, forecast_steps=forecast_steps)
 
         # Get risk assessment
         risk_assessment = forecaster.assess_forecast_risk(tp_data)
+
+        # Perform walk-forward validation
+        walk_forward_results = forecaster.walk_forward_validation(tp_data, forecast_steps=forecast_steps)
 
         # Generate visualization
         visualizer = ForecastVisualizer()
@@ -198,6 +202,7 @@ def ml_forecast():
                              for k, v in ensemble_stats.items()},
             'model_results': model_results,
             'risk_assessment': convert_to_native_types(risk_assessment),
+            'walk_forward': convert_to_native_types(walk_forward_results),
             'charts': {
                 'ml_forecast': chart_ml,
                 'historical_analysis': chart_history
@@ -296,12 +301,13 @@ def combined_forecast():
 
         tp_data = np.array(tp_samples, dtype=float)
 
-        # ML Forecast
-        forecaster = MLForecaster(max_lag=4, n_splits=3)
-        forecaster.train_models(tp_data)
+        # ML Forecast with K-Fold CV protocol
+        forecaster = MLForecaster(max_lag=4, n_splits=5, validation_size=0.2)
+        forecaster.train_models(tp_data, use_kfold_cv=True)
         forecasts = forecaster.forecast(tp_data, steps=forecast_steps, model_name='ensemble')
         ensemble_stats = forecaster.get_ensemble_forecast(forecasts)
         risk_assessment = forecaster.assess_forecast_risk(tp_data)
+        model_results = forecaster.get_results_summary()
 
         # Monte Carlo Forecast
         mc_results = simulate_throughput_forecast(tp_samples, backlog, n_simulations)
@@ -322,7 +328,9 @@ def combined_forecast():
                 'forecasts': {k: v.tolist() for k, v in forecasts.items()},
                 'ensemble': {k: v.tolist() if isinstance(v, np.ndarray) else v
                            for k, v in ensemble_stats.items()},
-                'risk_assessment': convert_to_native_types(risk_assessment)
+                'risk_assessment': convert_to_native_types(risk_assessment),
+                'model_results': model_results,
+                'walk_forward': convert_to_native_types(walk_forward_results)
             },
             'monte_carlo': {
                 'percentile_stats': convert_to_native_types(mc_results['percentile_stats']),
@@ -445,11 +453,14 @@ def api_deadline_analysis():
 
         weeks_to_deadline = (deadline_dt - start_dt).days / 7.0
 
+        input_stats = None
         if simulation_data:
             mc_simulation = run_monte_carlo_simulation(simulation_data)
             percentile_stats = mc_simulation.get('percentile_stats', {})
             projected_weeks_p85 = float(percentile_stats.get('p85', 0))
             projected_weeks_p50 = float(percentile_stats.get('p50', 0))
+            projected_weeks_p95 = float(percentile_stats.get('p95', projected_weeks_p85))
+            input_stats = mc_simulation.get('input_stats')
         else:
             mc_basic = analyze_deadline(
                 tp_samples=tp_samples,
@@ -461,6 +472,8 @@ def api_deadline_analysis():
             percentile_stats = mc_basic.get('percentile_stats', {})
             projected_weeks_p85 = float(percentile_stats.get('p85', 0))
             projected_weeks_p50 = float(percentile_stats.get('p50', 0))
+            projected_weeks_p95 = float(percentile_stats.get('p95', projected_weeks_p85))
+            input_stats = mc_basic.get('input_stats')
 
         can_meet_deadline = weeks_to_deadline >= projected_weeks_p85
 
@@ -474,6 +487,7 @@ def api_deadline_analysis():
             'weeks_to_deadline': round(weeks_to_deadline, 1),
             'projected_weeks_p85': round(projected_weeks_p85, 1),
             'projected_weeks_p50': round(projected_weeks_p50, 1),
+            'projected_weeks_p95': round(projected_weeks_p95, 1),
             'projected_work_p85': int(projected_work_p85),
             'backlog': backlog,
             'can_meet_deadline': can_meet_deadline,
@@ -481,7 +495,8 @@ def api_deadline_analysis():
             'deadline_completion_pct': round((weeks_to_deadline / projected_weeks_p85 * 100) if projected_weeks_p85 > 0 else 100),
             'percentile_stats': percentile_stats,
             'deadline_date_raw': deadline_dt.strftime('%Y-%m-%d'),
-            'start_date_raw': start_dt.strftime('%Y-%m-%d')
+            'start_date_raw': start_dt.strftime('%Y-%m-%d'),
+            'input_stats': input_stats
         }
 
         # Machine Learning Analysis (if enough data)

@@ -337,14 +337,27 @@ $(window).on("load", function () {
         const effort = Math.round(percentile(effortValues, reportPercentile));
         const duration = Math.round(percentile(durationValues, reportPercentile));
 
+        console.log('Monte Carlo Simulation Results:', { effort, duration, effortValues, durationValues, confidenceLevel });
+
         $('#res-summary-header').text(`Project forecast summary (with ${confidenceLevel}% of confidence):`);
-        $('#res-effort').val(effort);
-        $('#res-duration').val(duration);
 
         let endDate = '(No start date set)';
         if (simulationData.startDate) {
-            endDate = moment(simulationData.startDate).add(duration, 'weeks').format("MMM Do YYYY");
+            endDate = moment(simulationData.startDate).add(duration, 'weeks').format('MMM Do YYYY');
+        } else if (simulationData.deadlineDate) {
+            endDate = simulationData.deadlineDate;
         }
+
+        console.log('Setting Monte Carlo Results:', {
+            effort,
+            duration,
+            endDate,
+            startDate: simulationData.startDate,
+            deadlineDate: simulationData.deadlineDate
+        });
+
+        $('#res-effort').val(effort);
+        $('#res-duration').val(duration);
         $('#res-endDate').val(endDate);
 
         // Probabilities
@@ -601,28 +614,46 @@ $(window).on("load", function () {
     }
 
     function renderDeadlineSchedule(options) {
-        const $block = $('#deadline-start-guidance');
-        if (!$block.length) return;
+        const $navItem = $('#deadline-start-tab-item');
+        const $tab = $('#deadline-start-window');
+        if (!$navItem.length || !$tab.length) return;
 
-        const leadStats = options.leadStats || null;
-        if (!leadStats || !leadStats.percentiles) {
-            $block.hide();
+        // Verificar se há deadline date
+        if (!options.deadlineDate) {
+            $navItem.hide();
+            $tab.removeClass('show active');
+            $('#deadlineResultsTabs a[href=\"#deadline-results-summary\"]').tab('show');
             return;
         }
 
-        const percentiles = leadStats.percentiles;
-        const p50 = percentiles.p50;
-        const p85 = percentiles.p85;
-        const p100 = percentiles.p100;
+        // Tentar obter percentis de lead time stats, ou usar valores padrão baseados em weeks
+        const leadStats = options.leadStats || null;
+        let p50, p85, p100;
 
-        if (!options.deadlineDate || !p50 || !p85 || !p100) {
-            $block.hide();
+        if (leadStats && leadStats.percentiles) {
+            const percentiles = leadStats.percentiles;
+            p50 = percentiles.p50;
+            p85 = percentiles.p85;
+            p100 = percentiles.p100;
+        } else if (options.mcWeeks) {
+            // Usar dados de weeks do Monte Carlo como fallback
+            // Converter weeks para days (weeks * 7)
+            p50 = (options.mcWeeks.p50 || 0) * 7;
+            p85 = (options.mcWeeks.p85 || 0) * 7;
+            p100 = (options.mcWeeks.p95 || options.mcWeeks.p85 || 0) * 7; // Usar p95 ou p85 como aproximação de p100
+        }
+
+        if (!p50 || !p85 || !p100) {
+            $navItem.hide();
+            $tab.removeClass('show active');
+            $('#deadlineResultsTabs a[href=\"#deadline-results-summary\"]').tab('show');
             return;
         }
 
         const deadline = moment(options.deadlineDate, ['YYYY-MM-DD', 'DD/MM/YYYY', moment.ISO_8601], true);
         if (!deadline.isValid()) {
-            $block.hide();
+            $navItem.hide();
+            $tab.removeClass('show active');
             return;
         }
 
@@ -688,7 +719,7 @@ $(window).on("load", function () {
         $('#window-just-status').html(statusText ? `<span class="badge ${statusClass}">${statusText}</span>` : '');
         $('#window-too-late').text(umr.clone().add(1, 'days').format('DD/MM/YY'));
 
-        $block.show();
+        $navItem.show();
     }
 
     function displayDeadlineAnalysis(response) {
@@ -727,42 +758,33 @@ $(window).on("load", function () {
             p95: ml && ml.projected_weeks_p95 != null ? ml.projected_weeks_p95 : mlStats.p95
         };
 
-        const mcHtml = `
-            <div class="col-lg-6">
-                <div class="card h-100 shadow-sm">
-                    <div class="card-body text-left">
-                        <h5 class="card-title">Monte Carlo</h5>
-                        <p class="mb-1"><strong>Deadline:</strong> ${mc.deadline_date || '—'}</p>
-                        <p class="mb-1"><strong>Weeks to deadline:</strong> ${formatWeeks(mc.weeks_to_deadline)}</p>
-                        <p class="mb-1"><strong>P85 completion:</strong> ${formatWeeks(mcWeeks.p85)} weeks</p>
-                        <p class="mb-1"><strong>P50 completion:</strong> ${formatWeeks(mcWeeks.p50)} weeks</p>
-                        <p class="mb-1"><strong>Projected work (P85):</strong> ${mc.projected_work_p85 ?? '—'} tasks</p>
-                        <div class="mt-3">${verdictBadge(mc.can_meet_deadline)}</div>
-                    </div>
-                </div>
-            </div>`;
-
-        let mlHtml;
+        // Machine Learning comparison (se disponível)
+        let mlComparisonHtml = '';
         if (ml && !ml.error) {
-            mlHtml = `
-                <div class="col-lg-6 mt-3 mt-lg-0">
-                    <div class="card h-100 shadow-sm">
-                        <div class="card-body text-left">
-                            <h5 class="card-title">Machine Learning</h5>
-                            <p class="mb-1"><strong>P85 completion:</strong> ${formatWeeks(mlWeeks.p85)} weeks</p>
-                            <p class="mb-1"><strong>P50 completion:</strong> ${formatWeeks(mlWeeks.p50)} weeks</p>
-                            <p class="mb-1"><strong>Projected effort (P85):</strong> ${ml.projected_effort_p85 ?? '—'} person-weeks</p>
-                            <div class="mt-3">${verdictBadge(ml.can_meet_deadline)}</div>
+            mlComparisonHtml = `
+                <div class="col-lg-12 mt-3">
+                    <div class="card">
+                        <div class="card-header bg-success text-white">
+                            <h5 class="mb-0">Comparação Machine Learning vs Monte Carlo</h5>
                         </div>
-                    </div>
-                </div>`;
-        } else {
-            const errorMsg = ml && ml.error ? ml.error : 'ML forecast requires at least 8 throughput samples.';
-            mlHtml = `
-                <div class="col-lg-6 mt-3 mt-lg-0">
-                    <div class="alert alert-warning h-100 mb-0 text-left" role="alert">
-                        <h5 class="alert-heading">Machine Learning</h5>
-                        <p class="mb-0">${errorMsg}</p>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <h6>Monte Carlo</h6>
+                                    <p class="mb-1"><strong>P85 completion:</strong> ${formatWeeks(mcWeeks.p85)} weeks</p>
+                                    <p class="mb-1"><strong>P50 completion:</strong> ${formatWeeks(mcWeeks.p50)} weeks</p>
+                                    <p class="mb-1"><strong>Projected work (P85):</strong> ${mc.projected_work_p85 ?? '—'} tasks</p>
+                                    <div class="mt-2">${verdictBadge(mc.can_meet_deadline)}</div>
+                                </div>
+                                <div class="col-md-6">
+                                    <h6>Machine Learning</h6>
+                                    <p class="mb-1"><strong>P85 completion:</strong> ${formatWeeks(mlWeeks.p85)} weeks</p>
+                                    <p class="mb-1"><strong>P50 completion:</strong> ${formatWeeks(mlWeeks.p50)} weeks</p>
+                                    <p class="mb-1"><strong>Projected effort (P85):</strong> ${ml.projected_effort_p85 ?? '—'} person-weeks</p>
+                                    <div class="mt-2">${verdictBadge(ml.can_meet_deadline)}</div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>`;
         }
@@ -770,11 +792,13 @@ $(window).on("load", function () {
         let consensusHtml = '';
         if (consensus) {
             consensusHtml = `
-                <div class="alert ${consensus.both_agree ? 'alert-success' : 'alert-warning'} mt-4 text-left" role="alert">
-                    <h5 class="alert-heading">Consensus</h5>
-                    <p class="mb-1">Both methods agree: <strong>${consensus.both_agree ? 'Yes' : 'No'}</strong></p>
-                    <p class="mb-1">Difference between P85 projections: ${formatWeeks(consensus.difference_weeks)} weeks.</p>
-                    <p class="mb-0">${consensus.recommendation}</p>
+                <div class="col-lg-12 mt-3">
+                    <div class="alert ${consensus.both_agree ? 'alert-success' : 'alert-warning'} mb-0 text-left" role="alert">
+                        <h5 class="alert-heading">Consenso dos Métodos</h5>
+                        <p class="mb-1"><strong>Ambos os métodos concordam:</strong> ${consensus.both_agree ? 'Sim' : 'Não'}</p>
+                        <p class="mb-1"><strong>Diferença entre projeções P85:</strong> ${formatWeeks(consensus.difference_weeks)} semanas</p>
+                        <p class="mb-0"><strong>Recomendação:</strong> ${consensus.recommendation}</p>
+                    </div>
                 </div>`;
         }
 
@@ -803,22 +827,139 @@ $(window).on("load", function () {
                 </div>` : ''}
             </div>`;
 
+        // Calcular effort e delivery date
+        const simulationData = window.lastSimulationData || {};
+        const teamSize = simulationData.totalContributors || mc.backlog || 1;
+        const startDateMoment = mc.start_date_raw ? moment(mc.start_date_raw) : null;
+        const duration = Math.round(mcWeeks.p85);
+        // Effort = duration (weeks) × team size (pessoas)
+        const effort = Math.round(duration * teamSize);
+        const deliveryDate = startDateMoment ? startDateMoment.clone().add(duration, 'weeks').format('MMM Do YYYY') : '—';
+
+        console.log('Deadline Analysis Summary:', { teamSize, duration, effort, deliveryDate, mcWeeks, simulationData });
+
+        // Calcular "Quantos?" e "Quando?" com base nos dados do Monte Carlo
+        const howManyP95 = mc.projected_work_p85 || '—';
+        const howManyP85 = mc.projected_work_p85 || '—';
+        const howManyP50 = mc.projected_work_p85 || '—'; // Usar o mesmo valor se não houver outros percentis
+
+        const whenP95 = deliveryDate;
+        const whenP85 = deliveryDate;
+        const whenP50 = startDateMoment ? startDateMoment.clone().add(Math.round(mcWeeks.p50), 'weeks').format('DD/MM/YY') : '—';
+
+        const weeksToDeadline = mc.weeks_to_deadline != null ? mc.weeks_to_deadline.toFixed(1) : '—';
+        const projectedWeeks = mcWeeks.p85 != null ? mcWeeks.p85.toFixed(1) : '—';
+        const projectedWork = mc.projected_work_p85 || '—';
+        const canMeetDeadline = mc.can_meet_deadline ? 'Sim' : 'Não';
+        const scopeCompletion = mc.scope_completion_pct != null ? mc.scope_completion_pct + '%' : '—';
+        const deadlineCompletion = mc.deadline_completion_pct != null ? mc.deadline_completion_pct + '%' : '—';
+
+        const daysToDeadline = mc.weeks_to_deadline != null ? Math.round(mc.weeks_to_deadline * 7) : '—';
+        const startDateFormatted = mc.start_date || '—';
+        const deadlineDateFormatted = mc.deadline_date || '—';
+
+        const summaryHtml = `
+            <div class="row">
+                <div class="col-lg-6">
+                    <div class="card mb-3">
+                        <div class="card-header bg-primary text-white">
+                            <h5 class="mb-0">RESULTADOS DA SIMULAÇÃO</h5>
+                        </div>
+                        <div class="card-body">
+                            <table class="table table-sm table-borderless mb-0">
+                                <tbody>
+                                    <tr>
+                                        <th scope="row">DEAD LINE</th>
+                                        <td class="text-right font-weight-bold">${deadlineDateFormatted}</td>
+                                    </tr>
+                                    <tr>
+                                        <th scope="row">Semanas para Dead Line</th>
+                                        <td class="text-right font-weight-bold">${weeksToDeadline}</td>
+                                    </tr>
+                                    <tr>
+                                        <th scope="row">Semanas Projetadas (P85)</th>
+                                        <td class="text-right font-weight-bold">${projectedWeeks}</td>
+                                    </tr>
+                                    <tr>
+                                        <th scope="row">Trabalho a ser entregue (projetado) (P85)</th>
+                                        <td class="text-right font-weight-bold">${projectedWork}</td>
+                                    </tr>
+                                    <tr class="border-top">
+                                        <th scope="row">Tem chance de cumprir o Dead Line?</th>
+                                        <td class="text-right">
+                                            <span class="badge ${mc.can_meet_deadline ? 'badge-success' : 'badge-danger'} font-weight-bold">
+                                                ${canMeetDeadline}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <th scope="row">% que será cumprido do escopo</th>
+                                        <td class="text-right font-weight-bold">${scopeCompletion}</td>
+                                    </tr>
+                                    <tr>
+                                        <th scope="row">% do prazo que será cumprido</th>
+                                        <td class="text-right font-weight-bold">${deadlineCompletion}</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-6">
+                    <div class="card mb-3">
+                        <div class="card-header bg-info text-white">
+                            <h5 class="mb-0">RESPOSTAS BASEADAS NO THROUGHPUT</h5>
+                        </div>
+                        <div class="card-body">
+                            <h6 class="font-weight-bold">Quantos?</h6>
+                            <p class="small text-muted">Considerando que tenho um período de tempo, quantos itens de trabalho provavelmente serão concluídos neste período?</p>
+                            <table class="table table-sm table-bordered mb-3">
+                                <tbody>
+                                    <tr><th scope="row">INÍCIO</th><td>${startDateFormatted}</td></tr>
+                                    <tr><th scope="row">FIM</th><td>${deadlineDateFormatted}</td></tr>
+                                    <tr><th scope="row">DIAS</th><td>${daysToDeadline}</td></tr>
+                                    <tr><th scope="row">95% DE CONFIANÇA</th><td class="font-weight-bold">${howManyP95}</td></tr>
+                                    <tr><th scope="row">85% DE CONFIANÇA</th><td class="font-weight-bold">${howManyP85}</td></tr>
+                                    <tr><th scope="row">50% DE CONFIANÇA</th><td class="font-weight-bold">${howManyP50}</td></tr>
+                                </tbody>
+                            </table>
+
+                            <h6 class="font-weight-bold mt-4">Quando?</h6>
+                            <p class="small text-muted">"Dado que tenho um lote de trabalho, quando é provável que seja feito?"</p>
+                            <table class="table table-sm table-bordered mb-0">
+                                <tbody>
+                                    <tr><th scope="row">BACKLOG</th><td>${mc.backlog || '—'}</td></tr>
+                                    <tr><th scope="row">INÍCIO</th><td>${startDateFormatted}</td></tr>
+                                    <tr><th scope="row">95% de confiança</th><td class="font-weight-bold">${whenP95}</td></tr>
+                                    <tr><th scope="row">85% de confiança</th><td class="font-weight-bold">${whenP85}</td></tr>
+                                    <tr><th scope="row">50% de confiança</th><td class="font-weight-bold">${whenP50}</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>`;
+
         const html = `
             <div class="card">
                 <div class="card-header">
                     <h4 class="mb-0">Deadline Analysis Summary</h4>
                 </div>
                 <div class="card-body">
+                    ${summaryHtml}
                     <div class="row">
-                        ${mcHtml}
-                        ${mlHtml}
+                        ${mlComparisonHtml}
+                        ${consensusHtml}
                     </div>
-                    ${consensusHtml}
                     ${chartsHtml}
                 </div>
             </div>`;
 
-        $('#deadline-analysis-results').html(html).fadeIn();
+        $('#deadline-results-summary').html(html);
+        $('#deadline-analysis-panels').show();
+        $('#deadlineResultsTabs a[href="#deadline-results-summary"]').tab('show');
+
         renderDeadlineCharts({
             weeks: mcWeeks,
             projected_work_p85: mc.projected_work_p85
@@ -835,7 +976,8 @@ $(window).on("load", function () {
             today: moment().format('YYYY-MM-DD'),
             startDate: mc.start_date_raw,
             deadlineDate: mc.deadline_date_raw,
-            leadStats: leadStats
+            leadStats: leadStats,
+            mcWeeks: mcWeeks
         });
     }
 
@@ -854,8 +996,16 @@ $(window).on("load", function () {
             return;
         }
 
+        // Armazenar dados da simulação globalmente para uso posterior
+        window.lastSimulationData = simulationData;
+
         clearDeadlineCharts();
-        $('#deadline-analysis-results').hide().empty();
+        $('#deadline-analysis-panels').hide();
+        $('#deadline-results-summary').empty();
+        $('#deadline-start-window').removeClass('show active');
+        $('#deadline-start-tab-item').hide();
+        $('#window-too-early, #window-early-start, #window-early-end, #window-just-start, #window-just-end, #window-late-start, #window-late-end, #window-umr, #window-too-late').text('—');
+        $('#window-just-status').empty();
         $('#deadline-analysis-loading').show();
 
         $.ajax({
