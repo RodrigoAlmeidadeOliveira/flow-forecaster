@@ -202,13 +202,12 @@ Este projeto está sob a licença MIT. Veja [LICENSE](LICENSE) para mais detalhe
 ## 🙏 Créditos
 
 - **Conceito Original**: [Troy Magennis](https://github.com/FocusedObjective/FocusedObjective.Resources) - Throughput Forecaster
-- **Versão JavaScript**: [Rodrigo Rosauro](https://github.com/rodrigozr/ProjectForecaster) - ProjectForecaster
 - **Migração Python + ML**: Esta versão
 
 ## 📧 Contato
 
-- Issues: [GitHub Issues](https://github.com/SEU-USUARIO/project-forecaster-py/issues)
-- Documentação: [Wiki](https://github.com/rodrigozr/ProjectForecaster/wiki)
+- Issues: GitHub Issues
+- Documentação: Consulte MIGRATION_GUIDE.md e README_ADVANCED.md
 
 ## ⭐ Star History
 

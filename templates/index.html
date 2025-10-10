@@ -106,11 +106,7 @@
         <div class="collapse navbar-collapse" id="navbarsExampleDefault">
             <ul class="navbar-nav mr-auto">
                 <li class="nav-item">
-                    <a class="nav-link" href="https://github.com/rodrigozr/ProjectForecaster/wiki"
-                        target="_blank">Documentation</a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="#advanced-forecast">Advanced Forecast</a>
+                    <a class="nav-link" href="#advanced-forecast" data-target="#advanced-forecast">Advanced Forecast</a>
                 </li>
             </ul>
         </div>
@@ -118,376 +114,404 @@
 
     <main role="main" class="container">
         <br /><br /><br />
+
         <div class="container text-center">
             <h1>Project Forecaster</h1>
             <p>
-                Forecast probabilities of a project's effort and duration using Monte Carlo simulations.
+                Forecast project effort and duration using Monte Carlo simulations, or combine them with machine learning insights.
                 <br/>
-                Your data is 100% safe and never leaves your browser.
+                Your data remains local to your browser/server.
             </p>
         </div>
 
-        <div class="container-fluid bg-6 text-center">
-            <div class="row">
-                <div class="col-sm-6 text-left">
-                    <h3>Project properties</h3>
-                    <div class="input-group mb-3">
-                        <div class="input-group-prepend">
-                            <span class="input-group-text">Project name</span>
-                        </div>
-                        <input type="text" id="projectName" class="form-control" />
-                    </div>
-                    <div class="input-group mb-3">
-                        <div class="input-group-prepend">
-                            <span class="input-group-text">Team size<span style="color:red">*</span></span>
-                        </div>
-                        <input type="number" min="1" max="9999" id="totalContributors" value="1"
-                            class="form-control" required="required"
-                            title="Total number of individual contributors on this team" />
-                        <div class="input-group-append">
-                            <span class="input-group-text">contributors</span>
-                        </div>
-                    </div>
-                    <div class="input-group mb-3">
-                        <div class="input-group-prepend">
-                            <span class="input-group-text">Minimum contributors</span>
-                        </div>
-                        <input type="number" min="1" max="9999" id="minContributors" class="form-control"
-                            title="Minimum number of contributors who will start working in the project" />
-                    </div>
-                    <div class="input-group mb-3">
-                        <div class="input-group-prepend">
-                            <span class="input-group-text">Maximum contributors</span>
-                        </div>
-                        <input type="number" min="1" max="9999" id="maxContributors" class="form-control"
-                            title="Maximum number of contributors who can work in the project" />
-                    </div>
-                    <div class="input-group mb-3">
-                        <div class="input-group-prepend">
-                            <span class="input-group-text">Number of tasks<span style="color:red">*</span></span>
-                        </div>
-                        <input type="number" min="0" max="9999" id="numberOfTasks" value="1" class="form-control"
-                            required="required" title="Number of tasks planned for this project" />
-                    </div>
-                </div>
-                <div class="col-sm-6 text-left">
-                    <h3>Simulation properties</h3>
-                    <div class="input-group mb-3">
-                        <div class="input-group-prepend">
-                            <span class="input-group-text">Number of simulations<span style="color:red">*</span></span>
-                        </div>
-                        <input type="number" min="10000" max="10000000" id="numberOfSimulations" value="100000"
-                            class="form-control" required="required"
-                            title="Number of simulations to execute (Default: 100K)" />
-                    </div>
-                    <div class="input-group mb-3">
-                        <div class="input-group-prepend">
-                            <span class="input-group-text">S-Curve size</span>
-                        </div>
-                        <input type="number" min="0" max="50" id="sCurveSize" value="20" class="form-control"
-                            title="Size of the S-Curve at the beginning and end of the project (Default: 20%)" />
-                        <div class="input-group-append">
-                            <span class="input-group-text">%</span>
-                        </div>
-                    </div>
-                    <div class="input-group mb-3">
-                        <div class="input-group-prepend">
-                            <span class="input-group-text">Confidence level</span>
-                        </div>
-                        <input type="number" min="1" max="99" id="confidenceLevel" value="85" class="form-control"
-                            title="Level of confidence to report in the results (Default: 85%)" />
-                        <div class="input-group-append">
-                            <span class="input-group-text">%</span>
-                        </div>
-                    </div>
-                    <div class="input-group mb-3">
-                        <div class="input-group-prepend">
-                            <span class="input-group-text">Start date</span>
-                        </div>
-                        <input type="date" id="startDate" class="form-control"
-                            title="Planned start date for this project" />
-                    </div>
-                </div>
-            </div>
-            <p><i>(Fields marked with a red <span style="color:red">*</span> are mandatory)</i></p>
-        </div>
-
-        <div class="container-fluid bg-12 text-center">
-            <h1>Historical data</h1>
-            <div class="row">
-                <div class="col-sm-4">
-                    <h4>Weekly throughput<span style="color:red">*</span></h4>
-                    <textarea id="tpSamples" rows="4" cols="35" class="form-control text-monospace"
-                        title="Paste your historical data of weekly throughput"></textarea>
-                </div>
-                <div class="col-sm-4">
-                    <h4>Task lead-times</h4>
-                    <textarea id="ltSamples" rows="4" cols="35" class="form-control text-monospace"
-                        title="Optionally paste your historical data of tasks lead-time"></textarea>
-                </div>
-                <div class="col-sm-4">
-                    <h4>Projects split rates</h4>
-                    <textarea id="splitRateSamples" rows="4" cols="35" class="form-control text-monospace"
-                        title="Optionally paste your historical data of project's split rates"></textarea>
-                </div>
-            </div>
-        </div>
-
-        <div class="container-fluid bg-12 text-center">
-            <h2>Risks</h2>
-            <p>You can optionally model risks of your project.</p>
-            <div class="row">
-                <table id="risks" class="table table-sm">
-                    <thead>
-                        <tr class="d-flex">
-                            <th scope="col" class="col-2">Likelihood</th>
-                            <th scope="col" class="col-2">Low impact</th>
-                            <th scope="col" class="col-2">High impact</th>
-                            <th scope="col" class="col-6">Description</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr id="risk-row-template" class="d-flex risk-row">
-                            <td class="col-2">
-                                <div class="input-group mb-3">
-                                    <input type="number" min="1" max="100" class="form-control" name="likelihood">
-                                    <div class="input-group-append d-none d-md-block">
-                                        <span class="input-group-text">%</span>
-                                    </div>
-                                </div>
-                            </td>
-                            <td class="col-2">
-                                <div class="input-group mb-3">
-                                    <input type="number" min="0" max="100" class="form-control" name="lowImpact">
-                                    <div class="input-group-append d-none d-lg-block">
-                                        <span class="input-group-text">tasks</span>
-                                    </div>
-                                </div>
-                            </td>
-                            <td class="col-2">
-                                <div class="input-group mb-3">
-                                    <input type="number" min="1" max="100" class="form-control" name="highImpact">
-                                    <div class="input-group-append d-none d-lg-block">
-                                        <span class="input-group-text">tasks</span>
-                                    </div>
-                                </div>
-                            </td>
-                            <td class="col-6"><input type="text" class="form-control" name="description"></td>
-                        </tr>
-                        <tr id="add-risk-row" class="d-flex">
-                            <td class="col-2"></td>
-                            <td class="col-2"></td>
-                            <td class="col-2"></td>
-                            <td class="col-6">
-                                <button id="addRisk" type="button" class="btn btn-secondary btn-sm">Add row</button>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
-
-        <div class="container-fluid bg-12 text-center">
-            <button id="run" type="button" class="btn btn-primary">Run the simulation!</button>
-            <button id="share" type="button" class="btn btn-secondary" title="Share simulation">Share</button>
-        </div>
-
-        <div id="results-main" class="container-fluid bg-12 text-center" style="display:none">
-            <h1>Simulation results</h1>
-            <div class="col-sm-4 text-left">
-                <h4 id="res-summary-header">Project forecast summary:</h4>
-                <div class="input-group mb-1">
-                    <div class="input-group-prepend">
-                        <span class="input-group-text font-weight-bold">Effort:</span>
-                    </div>
-                    <input type="text" id="res-effort" class="form-control" readonly />
-                    <div class="input-group-append">
-                        <span class="input-group-text">person-weeks</span>
-                    </div>
-                </div>
-                <div class="input-group mb-1">
-                    <div class="input-group-prepend">
-                        <span class="input-group-text font-weight-bold">Duration:</span>
-                    </div>
-                    <input type="text" id="res-duration" class="form-control" readonly />
-                    <div class="input-group-append">
-                        <span class="input-group-text">calendar weeks</span>
-                    </div>
-                </div>
-                <div class="input-group mb-1">
-                    <div class="input-group-prepend">
-                        <span class="input-group-text font-weight-bold">Delivery date:</span>
-                    </div>
-                    <input type="text" id="res-endDate" class="form-control" readonly />
-                </div>
-            </div>
-            <h3>All probabilities</h3>
-            <div class="row">
-                <table id="probabilities" class="table table-sm">
-                    <thead>
-                        <tr class="d-flex probabilities-header">
-                            <th scope="col" class="col-2">Likelihood</th>
-                            <th scope="col" class="col-1">Effort</th>
-                            <th scope="col" class="col-1">Duration</th>
-                            <th scope="col" class="col-2">Tasks</th>
-                            <th scope="col" class="col-3">Date</th>
-                            <th scope="col" class="col-3">Comment</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr class="d-flex probabilities-row">
-                            <td class="col-2"></td>
-                            <td class="col-1"></td>
-                            <td class="col-1"></td>
-                            <td class="col-2"></td>
-                            <td class="col-3"></td>
-                            <td class="col-3"></td>
-                        </tr>
-                        <tr id="show-more-row" class="d-flex">
-                            <td class="col-2"></td>
-                            <td class="col-1"></td>
-                            <td class="col-1"></td>
-                            <td class="col-2"></td>
-                            <td class="col-3"></td>
-                            <td class="col-3">
-                                <button type="button" id="show-more" class="btn btn-secondary btn-sm">Show more...</button>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-
-            <h3>Charts</h3>
-            <canvas id="res-duration-histogram"></canvas>
-            <canvas id="res-burn-downs"></canvas>
-            <canvas id="res-effort-scatter-plot"></canvas>
-            <h3>Simulation report</h3>
-            <textarea id="results" class="col-sm-12 text-monospace" rows="23" readonly></textarea>
-        </div>
-
-        <hr class="my-5">
-
-        <section id="advanced-forecast" class="pb-5">
-            <div class="container text-center">
-                <h1>Advanced Forecasting</h1>
-                <p>
-                    Combine Machine Learning and Monte Carlo simulations for comprehensive project forecasting.
-                    <br />
-                    Use ML for trend-based predictions and Monte Carlo for probabilistic analysis.
-                </p>
-            </div>
-
-            <div class="container-fluid bg-6 text-center">
-                <div class="row">
-                    <div class="col-sm-6 text-left">
-                        <h3>Historical Data</h3>
-                        <div class="form-group">
-                            <label for="tpSamplesAdv">Weekly Throughput<span style="color:red">*</span></label>
-                            <textarea id="tpSamplesAdv" rows="6" class="form-control text-monospace"
-                                placeholder="Enter weekly throughput values (comma or line separated)&#10;Example: 5, 6, 7, 4, 8, 6, 5, 7, 6, 8"></textarea>
-                            <small class="form-text text-muted">Minimum 8 values required for ML forecasting</small>
-                        </div>
-                        <div class="form-group">
-                            <label for="startDateAdv">Start Date</label>
-                            <input type="date" id="startDateAdv" class="form-control">
-                        </div>
-                    </div>
-                    <div class="col-sm-6 text-left">
-                        <h3>Forecast Parameters</h3>
-                        <div class="form-group">
-                            <label for="forecastSteps">Forecast Steps (weeks)</label>
-                            <input type="number" min="1" max="12" id="forecastSteps" value="4" class="form-control">
-                        </div>
-                        <div class="form-group">
-                            <label for="backlog">Backlog (tasks)</label>
-                            <input type="number" min="1" max="10000" id="backlog" value="50" class="form-control">
-                        </div>
-                        <div class="form-group">
-                            <label for="nSimulations">Monte Carlo Simulations</label>
-                            <input type="number" min="1000" max="100000" id="nSimulations" value="10000" class="form-control">
-                        </div>
-                    </div>
-                </div>
-            </div>
-
+        <section class="mt-4">
             <div class="container-fluid bg-12 text-center">
-                <button id="runCombined" type="button" class="btn btn-primary btn-lg">Run Combined Forecast</button>
-                <button id="runML" type="button" class="btn btn-success">ML Forecast Only</button>
-                <button id="runMC" type="button" class="btn btn-info">Monte Carlo Only</button>
-            </div>
-
-            <div id="loading" class="container-fluid text-center" style="display:none">
-                <div class="spinner-border text-primary" role="status">
-                    <span class="sr-only">Loading...</span>
-                </div>
-                <p>Running forecast... This may take a few seconds.</p>
-            </div>
-
-            <div id="results-container" style="display:none">
-                <!-- ML Results -->
-                <div id="ml-results" class="container-fluid" style="display:none">
-                    <h2>Machine Learning Forecast Results</h2>
-
-                    <div class="results-panel">
-                        <h4>Risk Assessment</h4>
-                        <div id="risk-assessment"></div>
-                    </div>
-
-                    <div class="results-panel">
-                        <h4>Model Performance</h4>
-                        <div id="model-performance"></div>
-                    </div>
-
-                    <div class="chart-container">
-                        <h4>ML Ensemble Forecast</h4>
-                        <img id="ml-chart" src="" alt="ML Forecast Chart">
-                    </div>
-
-                    <div class="chart-container">
-                        <h4>Historical Data Analysis</h4>
-                        <img id="history-chart" src="" alt="Historical Analysis">
-                    </div>
-                </div>
-
-                <!-- Monte Carlo Results -->
-                <div id="mc-results" class="container-fluid" style="display:none">
-                    <h2>Monte Carlo Simulation Results</h2>
-
-                    <div class="results-panel">
-                        <h4>Completion Time Statistics</h4>
-                        <div id="mc-stats"></div>
-                    </div>
-
-                    <div class="chart-container">
-                        <h4>Monte Carlo Simulations</h4>
-                        <img id="mc-chart" src="" alt="Monte Carlo Chart">
-                    </div>
-                </div>
-
-                <!-- Comparison Results -->
-                <div id="comparison-results" class="container-fluid" style="display:none">
-                    <h2>Forecast Comparison</h2>
-
-                    <div class="chart-container">
-                        <h4>ML vs Monte Carlo Comparison</h4>
-                        <img id="comparison-chart" src="" alt="Comparison Chart">
-                    </div>
-
-                    <div class="results-panel">
-                        <div class="row">
-                            <div class="col-md-6">
-                                <h5>ML Forecast Summary</h5>
-                                <div id="ml-summary"></div>
-                            </div>
-                            <div class="col-md-6">
-                                <h5>Monte Carlo Summary</h5>
-                                <div id="mc-summary"></div>
-                            </div>
-                        </div>
+                <h2>Shared Throughput Data</h2>
+                <div class="row justify-content-center">
+                    <div class="col-lg-8">
+                        <textarea id="tpSamples" rows="4" class="form-control text-monospace"
+                            placeholder="Example: 5, 6, 7, 4, 8, 6, 5, 7, 6, 8"
+                            title="Historical weekly throughput used by all simulations"></textarea>
+                        <small class="form-text text-muted">
+                            Provide weekly throughput samples once and reuse them across Monte Carlo and Machine Learning simulations.
+                        </small>
                     </div>
                 </div>
             </div>
         </section>
+
+        <ul class="nav nav-tabs nav-fill mt-4" id="forecastTabs" role="tablist">
+            <li class="nav-item">
+                <a class="nav-link active" id="tab-mc-link" data-toggle="tab" href="#mc-forecast" role="tab"
+                    aria-controls="mc-forecast" aria-selected="true">Monte Carlo</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" id="tab-advanced-link" data-toggle="tab" href="#advanced-forecast" role="tab"
+                    aria-controls="advanced-forecast" aria-selected="false">Advanced (ML + MC)</a>
+            </li>
+        </ul>
+
+        <div class="tab-content" id="forecastTabsContent">
+            <div class="tab-pane fade show active" id="mc-forecast" role="tabpanel" aria-labelledby="tab-mc-link">
+                <div class="pt-4">
+                    <div class="container-fluid bg-6 text-center">
+                        <div class="row">
+                            <div class="col-sm-6 text-left">
+                                <h3>Project properties</h3>
+                                <div class="input-group mb-3">
+                                    <div class="input-group-prepend">
+                                        <span class="input-group-text">Project name</span>
+                                    </div>
+                                    <input type="text" id="projectName" class="form-control" />
+                                </div>
+                                <div class="input-group mb-3">
+                                    <div class="input-group-prepend">
+                                        <span class="input-group-text">Team size<span style="color:red">*</span></span>
+                                    </div>
+                                    <input type="number" min="1" max="9999" id="totalContributors" value="1"
+                                        class="form-control" required="required"
+                                        title="Total number of individual contributors on this team" />
+                                    <div class="input-group-append">
+                                        <span class="input-group-text">contributors</span>
+                                    </div>
+                                </div>
+                                <div class="input-group mb-3">
+                                    <div class="input-group-prepend">
+                                        <span class="input-group-text">Minimum contributors</span>
+                                    </div>
+                                    <input type="number" min="1" max="9999" id="minContributors" class="form-control"
+                                        title="Minimum number of contributors who will start working in the project" />
+                                </div>
+                                <div class="input-group mb-3">
+                                    <div class="input-group-prepend">
+                                        <span class="input-group-text">Maximum contributors</span>
+                                    </div>
+                                    <input type="number" min="1" max="9999" id="maxContributors" class="form-control"
+                                        title="Maximum number of contributors who can work in the project" />
+                                </div>
+                                <div class="input-group mb-3">
+                                    <div class="input-group-prepend">
+                                        <span class="input-group-text">Number of tasks<span style="color:red">*</span></span>
+                                    </div>
+                                    <input type="number" min="0" max="9999" id="numberOfTasks" value="1" class="form-control"
+                                        required="required" title="Number of tasks planned for this project" />
+                                </div>
+                            </div>
+                            <div class="col-sm-6 text-left">
+                                <h3>Simulation properties</h3>
+                                <div class="input-group mb-3">
+                                    <div class="input-group-prepend">
+                                        <span class="input-group-text">Number of simulations<span style="color:red">*</span></span>
+                                    </div>
+                                    <input type="number" min="10000" max="10000000" id="numberOfSimulations" value="100000"
+                                        class="form-control" required="required"
+                                        title="Number of simulations to execute (Default: 100K)" />
+                                </div>
+                                <div class="input-group mb-3">
+                                    <div class="input-group-prepend">
+                                        <span class="input-group-text">S-Curve size</span>
+                                    </div>
+                                    <input type="number" min="0" max="50" id="sCurveSize" value="20" class="form-control"
+                                        title="Size of the S-Curve at the beginning and end of the project (Default: 20%)" />
+                                    <div class="input-group-append">
+                                        <span class="input-group-text">%</span>
+                                    </div>
+                                </div>
+                                <div class="input-group mb-3">
+                                    <div class="input-group-prepend">
+                                        <span class="input-group-text">Confidence level</span>
+                                    </div>
+                                    <input type="number" min="1" max="99" id="confidenceLevel" value="85" class="form-control"
+                                        title="Level of confidence to report in the results (Default: 85%)" />
+                                    <div class="input-group-append">
+                                        <span class="input-group-text">%</span>
+                                    </div>
+                                </div>
+                                <div class="input-group mb-3">
+                                    <div class="input-group-prepend">
+                                        <span class="input-group-text">Start date</span>
+                                    </div>
+                                    <input type="date" id="startDate" class="form-control"
+                                        title="Planned start date for this project" />
+                                </div>
+                            </div>
+                        </div>
+                        <p class="mb-0"><i>(Fields marked with a red <span style="color:red">*</span> are mandatory)</i></p>
+                    </div>
+
+                    <div class="container-fluid bg-12 text-center">
+                        <h2>Historical data</h2>
+                        <p class="text-muted mb-4">Weekly throughput samples are defined in the shared section above.</p>
+                        <div class="row">
+                            <div class="col-sm-6">
+                                <h4>Task lead-times</h4>
+                                <textarea id="ltSamples" rows="4" class="form-control text-monospace"
+                                    title="Optionally paste your historical data of tasks lead-time"></textarea>
+                            </div>
+                            <div class="col-sm-6">
+                                <h4>Projects split rates</h4>
+                                <textarea id="splitRateSamples" rows="4" class="form-control text-monospace"
+                                    title="Optionally paste your historical data of project's split rates"></textarea>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="container-fluid bg-12 text-center">
+                        <h2>Risks (optional)</h2>
+                        <p class="text-muted">Model discrete risks to add probabilistic buffer to your forecast.</p>
+                        <div class="row">
+                            <table id="risks" class="table table-sm">
+                                <thead>
+                                    <tr class="d-flex">
+                                        <th scope="col" class="col-2">Likelihood</th>
+                                        <th scope="col" class="col-2">Low impact</th>
+                                        <th scope="col" class="col-2">High impact</th>
+                                        <th scope="col" class="col-6">Description</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr id="risk-row-template" class="d-flex risk-row">
+                                        <td class="col-2">
+                                            <div class="input-group mb-3">
+                                                <input type="number" min="1" max="100" class="form-control" name="likelihood">
+                                                <div class="input-group-append d-none d-md-block">
+                                                    <span class="input-group-text">%</span>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td class="col-2">
+                                            <div class="input-group mb-3">
+                                                <input type="number" min="0" max="100" class="form-control" name="lowImpact">
+                                                <div class="input-group-append d-none d-lg-block">
+                                                    <span class="input-group-text">tasks</span>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td class="col-2">
+                                            <div class="input-group mb-3">
+                                                <input type="number" min="1" max="100" class="form-control" name="highImpact">
+                                                <div class="input-group-append d-none d-lg-block">
+                                                    <span class="input-group-text">tasks</span>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td class="col-6"><input type="text" class="form-control" name="description"></td>
+                                    </tr>
+                                    <tr id="add-risk-row" class="d-flex">
+                                        <td class="col-2"></td>
+                                        <td class="col-2"></td>
+                                        <td class="col-2"></td>
+                                        <td class="col-6">
+                                            <button id="addRisk" type="button" class="btn btn-secondary btn-sm">Add row</button>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="container-fluid bg-12 text-center">
+                        <button id="run" type="button" class="btn btn-primary">Run the simulation!</button>
+                        <button id="share" type="button" class="btn btn-secondary" title="Share simulation">Share</button>
+                    </div>
+
+                    <div id="results-main" class="container-fluid bg-12 text-center" style="display:none">
+                        <h2>Simulation results</h2>
+                        <div class="col-sm-4 text-left">
+                            <h4 id="res-summary-header">Project forecast summary:</h4>
+                            <div class="input-group mb-1">
+                                <div class="input-group-prepend">
+                                    <span class="input-group-text font-weight-bold">Effort:</span>
+                                </div>
+                                <input type="text" id="res-effort" class="form-control" readonly />
+                                <div class="input-group-append">
+                                    <span class="input-group-text">person-weeks</span>
+                                </div>
+                            </div>
+                            <div class="input-group mb-1">
+                                <div class="input-group-prepend">
+                                    <span class="input-group-text font-weight-bold">Duration:</span>
+                                </div>
+                                <input type="text" id="res-duration" class="form-control" readonly />
+                                <div class="input-group-append">
+                                    <span class="input-group-text">calendar weeks</span>
+                                </div>
+                            </div>
+                            <div class="input-group mb-1">
+                                <div class="input-group-prepend">
+                                    <span class="input-group-text font-weight-bold">Delivery date:</span>
+                                </div>
+                                <input type="text" id="res-endDate" class="form-control" readonly />
+                            </div>
+                        </div>
+                        <h3>All probabilities</h3>
+                        <div class="row">
+                            <table id="probabilities" class="table table-sm">
+                                <thead>
+                                    <tr class="d-flex probabilities-header">
+                                        <th scope="col" class="col-2">Likelihood</th>
+                                        <th scope="col" class="col-1">Effort</th>
+                                        <th scope="col" class="col-1">Duration</th>
+                                        <th scope="col" class="col-2">Tasks</th>
+                                        <th scope="col" class="col-3">Date</th>
+                                        <th scope="col" class="col-3">Comment</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr class="d-flex probabilities-row">
+                                        <td class="col-2"></td>
+                                        <td class="col-1"></td>
+                                        <td class="col-1"></td>
+                                        <td class="col-2"></td>
+                                        <td class="col-3"></td>
+                                        <td class="col-3"></td>
+                                    </tr>
+                                    <tr id="show-more-row" class="d-flex">
+                                        <td class="col-2"></td>
+                                        <td class="col-1"></td>
+                                        <td class="col-1"></td>
+                                        <td class="col-2"></td>
+                                        <td class="col-3"></td>
+                                        <td class="col-3">
+                                            <button type="button" id="show-more" class="btn btn-secondary btn-sm">Show more...</button>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <h3>Charts</h3>
+                        <canvas id="res-duration-histogram"></canvas>
+                        <canvas id="res-burn-downs"></canvas>
+                        <canvas id="res-effort-scatter-plot"></canvas>
+                        <h3>Simulation report</h3>
+                        <textarea id="results" class="col-sm-12 text-monospace" rows="23" readonly></textarea>
+                    </div>
+                </div>
+            </div>
+
+            <div class="tab-pane fade" id="advanced-forecast" role="tabpanel" aria-labelledby="tab-advanced-link">
+                <div class="pt-4 pb-5">
+                    <div class="container text-center">
+                        <h2>Advanced Forecasting</h2>
+                        <p class="mb-4">
+                            Combine machine learning forecasts with Monte Carlo throughput simulations for richer outlooks.
+                            Provide at least eight throughput samples to unlock ML-based projections.
+                        </p>
+                    </div>
+
+                    <div class="container-fluid bg-6 text-center">
+                        <div class="row">
+                            <div class="col-sm-6 text-left">
+                                <h3>Historical Data</h3>
+                                <div class="form-group">
+                                    <label>Weekly Throughput<span style="color:red">*</span></label>
+                                    <div class="alert alert-secondary mb-3" role="alert">
+                                        Uses the shared throughput samples defined above.
+                                        <a href="#tpSamples" class="alert-link scroll-to-throughput">Edit data</a>
+                                    </div>
+                                    <small class="form-text text-muted">Minimum of 8 values required for ML forecasting.</small>
+                                </div>
+                                <div class="form-group">
+                                    <label for="startDateAdv">Start Date</label>
+                                    <input type="date" id="startDateAdv" class="form-control">
+                                </div>
+                            </div>
+                            <div class="col-sm-6 text-left">
+                                <h3>Forecast Parameters</h3>
+                                <div class="form-group">
+                                    <label for="forecastSteps">Forecast Steps (weeks)</label>
+                                    <input type="number" min="1" max="12" id="forecastSteps" value="4" class="form-control">
+                                </div>
+                                <div class="form-group">
+                                    <label for="backlog">Backlog (tasks)</label>
+                                    <input type="number" min="1" max="10000" id="backlog" value="50" class="form-control">
+                                </div>
+                                <div class="form-group">
+                                    <label for="nSimulations">Monte Carlo Simulations</label>
+                                    <input type="number" min="1000" max="100000" id="nSimulations" value="10000"
+                                        class="form-control">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="container-fluid bg-12 text-center">
+                        <button id="runCombined" type="button" class="btn btn-primary btn-lg">Run Combined Forecast</button>
+                        <button id="runML" type="button" class="btn btn-success">ML Forecast Only</button>
+                    </div>
+
+                    <div id="loading" class="container-fluid text-center" style="display:none">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="sr-only">Loading...</span>
+                        </div>
+                        <p>Running forecast... This may take a few seconds.</p>
+                    </div>
+
+                    <div id="results-container" style="display:none">
+                        <div id="ml-results" class="container-fluid" style="display:none">
+                            <h3>Machine Learning Forecast</h3>
+
+                            <div class="results-panel">
+                                <h4>Risk Assessment</h4>
+                                <div id="risk-assessment"></div>
+                            </div>
+
+                            <div class="results-panel">
+                                <h4>Model Performance</h4>
+                                <div id="model-performance"></div>
+                            </div>
+
+                            <div class="chart-container">
+                                <h4>ML Ensemble Forecast</h4>
+                                <img id="ml-chart" src="" alt="ML Forecast Chart">
+                            </div>
+
+                            <div class="chart-container">
+                                <h4>Historical Data Analysis</h4>
+                                <img id="history-chart" src="" alt="Historical Analysis">
+                            </div>
+                        </div>
+
+                        <div id="mc-results" class="container-fluid" style="display:none">
+                            <h3>Monte Carlo Simulation</h3>
+
+                            <div class="results-panel">
+                                <h4>Completion Time Statistics</h4>
+                                <div id="mc-stats"></div>
+                            </div>
+
+                            <div class="chart-container">
+                                <h4>Monte Carlo Simulations</h4>
+                                <img id="mc-chart" src="" alt="Monte Carlo Chart">
+                            </div>
+                        </div>
+
+                        <div id="comparison-results" class="container-fluid" style="display:none">
+                            <h3>Forecast Comparison</h3>
+
+                            <div class="chart-container">
+                                <h4>ML vs Monte Carlo Comparison</h4>
+                                <img id="comparison-chart" src="" alt="Comparison Chart">
+                            </div>
+
+                            <div class="results-panel">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <h5>ML Forecast Summary</h5>
+                                        <div id="ml-summary"></div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <h5>Monte Carlo Summary</h5>
+                                        <div id="mc-summary"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
 
         <br><br>
     </main>
@@ -508,6 +532,35 @@
     <script src="{{ url_for('static', filename='js/ui.js') }}"></script>
     <script src="{{ url_for('static', filename='js/advanced_forecast.js') }}"></script>
     <script src="{{ url_for('static', filename='js/charts.js') }}"></script>
+    <script>
+        $(function () {
+            function activateTabFromHash() {
+                const hash = window.location.hash;
+                if (hash === '#advanced-forecast') {
+                    $('#tab-advanced-link').tab('show');
+                } else if (hash === '#mc-forecast') {
+                    $('#tab-mc-link').tab('show');
+                }
+            }
+
+            activateTabFromHash();
+
+            window.addEventListener('hashchange', activateTabFromHash);
+
+            $('#navbarsExampleDefault a.nav-link[data-target="#advanced-forecast"]').on('click', function (e) {
+                e.preventDefault();
+                $('#tab-advanced-link').tab('show');
+                $('html, body').animate({ scrollTop: $('#forecastTabs').offset().top - 70 }, 300);
+            });
+
+            $('a[data-toggle="tab"]').on('shown.bs.tab', function (e) {
+                const target = $(e.target).attr('href');
+                if (target === '#advanced-forecast' || target === '#mc-forecast') {
+                    history.replaceState(null, null, target);
+                }
+            });
+        });
+    </script>
 
 </body>
 

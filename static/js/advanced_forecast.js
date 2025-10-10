@@ -97,7 +97,7 @@ $(document).ready(function() {
     }
 
     $('#runML').on('click', function() {
-        const tpSamples = parseSamples($('#tpSamplesAdv').val());
+        const tpSamples = parseSamples($('#tpSamples').val());
         const forecastSteps = parseInt($('#forecastSteps').val());
         const startDate = $('#startDateAdv').val() || undefined;
 
@@ -137,53 +137,8 @@ $(document).ready(function() {
         });
     });
 
-    $('#runMC').on('click', function() {
-        const tpSamples = parseSamples($('#tpSamplesAdv').val());
-        const backlog = parseInt($('#backlog').val());
-        const nSimulations = parseInt($('#nSimulations').val());
-        const startDate = $('#startDateAdv').val() || undefined;
-
-        if (tpSamples.length < 1) {
-            alert('Need throughput samples for Monte Carlo simulation');
-            return;
-        }
-
-        if (backlog <= 0) {
-            alert('Backlog must be greater than zero');
-            return;
-        }
-
-        showLoading();
-
-        $.ajax({
-            url: '/api/mc-throughput',
-            method: 'POST',
-            contentType: 'application/json',
-            data: JSON.stringify({
-                tpSamples: tpSamples,
-                backlog: backlog,
-                nSimulations: nSimulations,
-                startDate: startDate
-            }),
-            success: function(data) {
-                hideLoading();
-                $('#results-container').show();
-                $('#ml-results').hide();
-                $('#mc-results').show();
-                $('#comparison-results').hide();
-
-                // Display results
-                displayMCStats(data.percentile_stats);
-                $('#mc-chart').attr('src', data.charts.monte_carlo);
-            },
-            error: function(xhr) {
-                displayError(xhr.responseJSON?.error || 'Unknown error occurred');
-            }
-        });
-    });
-
     $('#runCombined').on('click', function() {
-        const tpSamples = parseSamples($('#tpSamplesAdv').val());
+        const tpSamples = parseSamples($('#tpSamples').val());
         const forecastSteps = parseInt($('#forecastSteps').val());
         const backlog = parseInt($('#backlog').val());
         const nSimulations = parseInt($('#nSimulations').val());
@@ -239,6 +194,12 @@ $(document).ready(function() {
         });
     });
 
-    // Load sample data for testing
-    $('#tpSamplesAdv').val('5, 6, 7, 4, 8, 6, 5, 7, 6, 8, 5, 7');
+    $('.scroll-to-throughput').on('click', function(e) {
+        e.preventDefault();
+        const $target = $('#tpSamples');
+        if ($target.length) {
+            $('html, body').animate({ scrollTop: $target.offset().top - 70 }, 300);
+            $target.focus();
+        }
+    });
 });

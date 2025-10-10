@@ -263,7 +263,6 @@ Configurações recomendadas:
 ## 📚 Referências
 
 - **Monte Carlo**: Troy Magennis' Throughput Forecaster
-- **Original**: Rodrigo Rosauro's ProjectForecaster
 - **ML**: scikit-learn, XGBoost documentation
 - **Kanban Metrics**: "Actionable Agile Metrics" by Daniel Vacanti
 
@@ -278,10 +277,9 @@ Pull requests são bem-vindos! Para mudanças maiores, abra uma issue primeiro.
 ## 📧 Suporte
 
 - Issues: GitHub Issues
-- Documentação original: [ProjectForecaster Wiki](https://github.com/rodrigozr/ProjectForecaster/wiki)
+- Documentação: Consulte MIGRATION_GUIDE.md para detalhes sobre a unificação dos métodos Monte Carlo
 
 ---
 
 **Versão**: 2.0.0 - Advanced ML & Monte Carlo Edition
-**Autor**: Migração Python com ML por Claude/Anthropic
-**Original**: Rodrigo Rosauro
+**Desenvolvido**: Python ML Edition

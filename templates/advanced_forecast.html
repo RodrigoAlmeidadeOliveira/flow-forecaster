@@ -79,8 +79,8 @@
                 <div class="col-sm-6 text-left">
                     <h3>Historical Data</h3>
                     <div class="form-group">
-                        <label for="tpSamplesAdv">Weekly Throughput<span style="color:red">*</span></label>
-                        <textarea id="tpSamplesAdv" rows="6" class="form-control text-monospace"
+                        <label for="tpSamples">Weekly Throughput<span style="color:red">*</span></label>
+                        <textarea id="tpSamples" rows="6" class="form-control text-monospace"
                             placeholder="Enter weekly throughput values (comma or line separated)&#10;Example: 5, 6, 7, 4, 8, 6, 5, 7, 6, 8"></textarea>
                         <small class="form-text text-muted">Minimum 8 values required for ML forecasting</small>
                     </div>
@@ -110,7 +110,6 @@
         <div class="container-fluid bg-12 text-center">
             <button id="runCombined" type="button" class="btn btn-primary btn-lg">Run Combined Forecast</button>
             <button id="runML" type="button" class="btn btn-success">ML Forecast Only</button>
-            <button id="runMC" type="button" class="btn btn-info">Monte Carlo Only</button>
         </div>
 
         <div id="loading" class="container-fluid text-center" style="display:none">
