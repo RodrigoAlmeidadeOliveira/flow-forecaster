@@ -13,6 +13,7 @@ from monte_carlo_unified import analyze_deadline, forecast_how_many, forecast_wh
 from ml_forecaster import MLForecaster
 from ml_deadline_forecaster import ml_analyze_deadline, ml_forecast_how_many, ml_forecast_when
 from visualization import ForecastVisualizer
+from cost_pert_beta import simulate_pert_beta_cost, calculate_risk_metrics
 
 app = Flask(__name__)
 
@@ -188,12 +189,14 @@ def ml_forecast():
         # Get risk assessment
         risk_assessment = forecaster.assess_forecast_risk(tp_data)
 
-        # Perform walk-forward validation
-        walk_forward_results = forecaster.walk_forward_validation(tp_data, forecast_steps=forecast_steps)
-
         # Generate visualization
         visualizer = ForecastVisualizer()
         chart_ml = visualizer.plot_ml_forecasts(tp_data, forecasts, ensemble_stats, start_date)
+        walk_forward_charts = visualizer.plot_walk_forward_forecasts(
+            tp_data,
+            walk_forward_results,
+            start_date
+        )
         chart_history = visualizer.plot_historical_analysis(tp_data, start_date)
 
         response_data = {
@@ -205,7 +208,8 @@ def ml_forecast():
             'walk_forward': convert_to_native_types(walk_forward_results),
             'charts': {
                 'ml_forecast': chart_ml,
-                'historical_analysis': chart_history
+                'historical_analysis': chart_history,
+                'walk_forward': walk_forward_charts
             }
         }
         return jsonify(response_data)
@@ -308,6 +312,7 @@ def combined_forecast():
         ensemble_stats = forecaster.get_ensemble_forecast(forecasts)
         risk_assessment = forecaster.assess_forecast_risk(tp_data)
         model_results = forecaster.get_results_summary()
+        walk_forward_results = forecaster.walk_forward_validation(tp_data, forecast_steps=forecast_steps)
 
         # Monte Carlo Forecast
         mc_results = simulate_throughput_forecast(tp_samples, backlog, n_simulations)
@@ -320,6 +325,11 @@ def combined_forecast():
             tp_data,
             ensemble_stats['mean'],
             mc_results['percentile_stats'],
+            start_date
+        )
+        walk_forward_charts = visualizer.plot_walk_forward_forecasts(
+            tp_data,
+            walk_forward_results,
             start_date
         )
 
@@ -341,7 +351,8 @@ def combined_forecast():
             'charts': {
                 'ml_forecast': chart_ml,
                 'monte_carlo': chart_mc,
-                'comparison': chart_comparison
+                'comparison': chart_comparison,
+                'walk_forward': walk_forward_charts
             }
         }
         return jsonify(response_data)
@@ -477,22 +488,51 @@ def api_deadline_analysis():
 
         can_meet_deadline = weeks_to_deadline >= projected_weeks_p85
 
-        # Work by deadline estimation uses throughput-based Monte Carlo for now
+        # "Quantos?" - How many items can be completed in the deadline period?
+        # This answers: "If I have this much time, how many items can I complete?"
         work_by_deadline = forecast_how_many(tp_samples, start_date, deadline_date, n_simulations)
-        projected_work_p85 = work_by_deadline.get('items_p85', 0)
+        items_possible_p95 = work_by_deadline.get('items_p95', 0)
+        items_possible_p85 = work_by_deadline.get('items_p85', 0)
+        items_possible_p50 = work_by_deadline.get('items_p50', 0)
+
+        # For scope completion: how many items from the backlog will be completed by the deadline?
+        # This is the MINIMUM between what's possible and what's in the backlog
+        projected_work_p95 = min(items_possible_p95, backlog)
+        projected_work_p85 = min(items_possible_p85, backlog)
+        projected_work_p50 = min(items_possible_p50, backlog)
+
+        # Get completion dates for each percentile ("Quando?")
+        completion_forecast = forecast_when(tp_samples, backlog, start_date, n_simulations)
+        completion_date_p95 = completion_forecast.get('date_p95', '')
+        completion_date_p85 = completion_forecast.get('date_p85', '')
+        completion_date_p50 = completion_forecast.get('date_p50', '')
+
+        # Calculate percentages - DON'T limit to 100% to show real values
+        scope_completion_pct_raw = (weeks_to_deadline / projected_weeks_p85 * 100) if projected_weeks_p85 > 0 else 100
+        deadline_completion_pct_raw = (projected_weeks_p85 / weeks_to_deadline * 100) if weeks_to_deadline > 0 else 100
 
         mc_result = {
-            'deadline_date': deadline_dt.strftime('%d/%m/%y'),
-            'start_date': start_dt.strftime('%d/%m/%y'),
+            'deadline_date': deadline_dt.strftime('%d/%m/%Y'),
+            'start_date': start_dt.strftime('%d/%m/%Y'),
             'weeks_to_deadline': round(weeks_to_deadline, 1),
             'projected_weeks_p85': round(projected_weeks_p85, 1),
             'projected_weeks_p50': round(projected_weeks_p50, 1),
             'projected_weeks_p95': round(projected_weeks_p95, 1),
+            'projected_work_p95': int(projected_work_p95),
             'projected_work_p85': int(projected_work_p85),
+            'projected_work_p50': int(projected_work_p50),
+            'items_possible_p95': int(items_possible_p95),
+            'items_possible_p85': int(items_possible_p85),
+            'items_possible_p50': int(items_possible_p50),
+            'completion_date_p95': completion_date_p95,
+            'completion_date_p85': completion_date_p85,
+            'completion_date_p50': completion_date_p50,
             'backlog': backlog,
             'can_meet_deadline': can_meet_deadline,
-            'scope_completion_pct': round(min(100, (projected_work_p85 / backlog * 100)) if backlog > 0 else 100),
-            'deadline_completion_pct': round((weeks_to_deadline / projected_weeks_p85 * 100) if projected_weeks_p85 > 0 else 100),
+            'scope_completion_pct': round(min(100, scope_completion_pct_raw)),
+            'scope_completion_pct_raw': round(scope_completion_pct_raw, 1),
+            'deadline_completion_pct': round(min(100, deadline_completion_pct_raw)),
+            'deadline_completion_pct_raw': round(deadline_completion_pct_raw, 1),
             'percentile_stats': percentile_stats,
             'deadline_date_raw': deadline_dt.strftime('%Y-%m-%d'),
             'start_date_raw': start_dt.strftime('%Y-%m-%d'),
@@ -681,6 +721,80 @@ def api_forecast_when():
             'monte_carlo': convert_to_native_types(mc_result),
             'machine_learning': convert_to_native_types(ml_result) if ml_result else None
         })
+
+    except Exception as e:
+        import traceback
+        return jsonify({'error': str(e), 'trace': traceback.format_exc()}), 500
+
+
+@app.route('/api/cost-analysis', methods=['POST'])
+def api_cost_analysis():
+    """
+    Execute cost analysis using PERT-Beta distribution.
+
+    Expected JSON payload:
+    {
+        "optimistic": float (custo otimista por item),
+        "mostLikely": float (custo mais provável por item),
+        "pessimistic": float (custo pessimista por item),
+        "backlog": int (número de itens),
+        "nSimulations": int (optional, default: 10000),
+        "avgCostPerItem": float (optional, custo médio histórico)
+    }
+
+    Returns:
+        JSON with cost analysis results
+    """
+    try:
+        data = request.json
+
+        optimistic = data.get('optimistic')
+        most_likely = data.get('mostLikely')
+        pessimistic = data.get('pessimistic')
+        backlog = data.get('backlog')
+        n_simulations = data.get('nSimulations', 10000)
+        avg_cost_per_item = data.get('avgCostPerItem')
+
+        # Validation
+        if not all([optimistic, most_likely, pessimistic, backlog]):
+            return jsonify({
+                'error': 'Optimistic, most likely, pessimistic costs and backlog are required'
+            }), 400
+
+        if optimistic < 0 or most_likely < 0 or pessimistic < 0:
+            return jsonify({'error': 'Cost values must be non-negative'}), 400
+
+        if not (optimistic < most_likely < pessimistic):
+            return jsonify({
+                'error': 'Must have: Optimistic < Most Likely < Pessimistic'
+            }), 400
+
+        if backlog <= 0:
+            return jsonify({'error': 'Backlog must be greater than zero'}), 400
+
+        if n_simulations < 10000:
+            return jsonify({'error': 'Minimum 10,000 simulations required'}), 400
+
+        # Run PERT-Beta simulation
+        results = simulate_pert_beta_cost(
+            optimistic=float(optimistic),
+            most_likely=float(most_likely),
+            pessimistic=float(pessimistic),
+            backlog=int(backlog),
+            n_simulations=int(n_simulations),
+            avg_cost_per_item=float(avg_cost_per_item) if avg_cost_per_item else None
+        )
+
+        # Calculate risk metrics
+        risk_metrics = calculate_risk_metrics(results)
+
+        # Combine results
+        response_data = {
+            'simulation_results': results,
+            'risk_metrics': risk_metrics
+        }
+
+        return jsonify(convert_to_native_types(response_data))
 
     except Exception as e:
         import traceback

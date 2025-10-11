@@ -970,21 +970,23 @@ def analyze_deadline(
     work_by_deadline_result = forecast_how_many(tp_samples, start_date, deadline_date, n_simulations)
     projected_work_p85 = work_by_deadline_result['items_p85']
 
-    # Calculate percentages
-    scope_completion_pct = min(100, (projected_work_p85 / backlog * 100)) if backlog > 0 else 100
-    deadline_completion_pct = (weeks_to_deadline / projected_weeks_p85 * 100) if projected_weeks_p85 > 0 else 100
+    # Calculate percentages - DON'T limit to 100% to show real values
+    scope_completion_pct_raw = (weeks_to_deadline / projected_weeks_p85 * 100) if projected_weeks_p85 > 0 else 100
+    deadline_completion_pct_raw = (projected_weeks_p85 / weeks_to_deadline * 100) if weeks_to_deadline > 0 else 100
 
     return {
-        'deadline_date': deadline.strftime('%d/%m/%y'),
-        'start_date': start.strftime('%d/%m/%y'),
+        'deadline_date': deadline.strftime('%d/%m/%Y'),
+        'start_date': start.strftime('%d/%m/%Y'),
         'weeks_to_deadline': round(weeks_to_deadline, 1),
         'projected_weeks_p85': round(projected_weeks_p85, 1),
         'projected_weeks_p50': round(projected_weeks_p50, 1),
         'projected_work_p85': int(projected_work_p85),
         'backlog': backlog,
         'can_meet_deadline': can_meet_deadline,
-        'scope_completion_pct': round(scope_completion_pct),
-        'deadline_completion_pct': round(deadline_completion_pct),
+        'scope_completion_pct': round(min(100, scope_completion_pct_raw)),
+        'scope_completion_pct_raw': round(scope_completion_pct_raw, 1),
+        'deadline_completion_pct': round(min(100, deadline_completion_pct_raw)),
+        'deadline_completion_pct_raw': round(deadline_completion_pct_raw, 1),
         'percentile_stats': result['percentile_stats']
     }
 
@@ -1126,10 +1128,10 @@ def forecast_when(
 
     return {
         'backlog': backlog,
-        'start_date': start.strftime('%d/%m/%y'),
-        'date_p95': date_p95.strftime('%d/%m/%y'),
-        'date_p85': date_p85.strftime('%d/%m/%y'),
-        'date_p50': date_p50.strftime('%d/%m/%y'),
+        'start_date': start.strftime('%d/%m/%Y'),
+        'date_p95': date_p95.strftime('%d/%m/%Y'),
+        'date_p85': date_p85.strftime('%d/%m/%Y'),
+        'date_p50': date_p50.strftime('%d/%m/%Y'),
         'weeks_p95': round(weeks_p95, 1),
         'weeks_p85': round(weeks_p85, 1),
         'weeks_p50': round(weeks_p50, 1),

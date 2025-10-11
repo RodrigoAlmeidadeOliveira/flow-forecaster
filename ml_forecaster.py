@@ -420,16 +420,25 @@ class MLForecaster:
         return forecasts
 
     def _forecast_recursive(self, model_name: str, last_values: np.ndarray, steps: int) -> np.ndarray:
-        """Make recursive multi-step forecast."""
+        """Make recursive multi-step forecast using a stored model."""
         model = self.models[model_name]
+        return self._forecast_with_model(model, last_values, steps)
+
+    def _forecast_with_model(self, model, last_values: np.ndarray, steps: int) -> np.ndarray:
+        """Run recursive multi-step forecast with a provided estimator."""
+        history = list(np.asarray(last_values, dtype=float))
+
+        if len(history) < self.max_lag + 2:
+            raise ValueError(
+                f"Need at least {self.max_lag + 2} historical points, got {len(history)}")
+
         predictions = []
-        history = list(last_values)
 
         for _ in range(steps):
-            # Prepare features
             recent = np.array(history[-self.max_lag:])
-            rolling_mean = np.mean(history[-(self.max_lag+2):-1])
-            rolling_std = np.std(history[-(self.max_lag+2):-1])
+            rolling_window = history[-(self.max_lag + 2):-1] if len(history) >= self.max_lag + 2 else history
+            rolling_mean = float(np.mean(rolling_window))
+            rolling_std = float(np.std(rolling_window))
 
             features = list(recent) + [rolling_mean, rolling_std]
             X_step = pd.DataFrame([features], columns=[
@@ -437,13 +446,12 @@ class MLForecaster:
                 'rolling_mean_3', 'rolling_std_3'
             ])
 
-            # Make prediction
-            pred = model.predict(X_step)[0]
-            pred = max(0, pred)  # Ensure non-negative
+            pred = float(model.predict(X_step)[0])
+            pred = max(0.0, pred)
             predictions.append(pred)
             history.append(pred)
 
-        return np.array(predictions)
+        return np.array(predictions, dtype=float)
 
     def get_ensemble_forecast(self, forecasts: Dict[str, np.ndarray]) -> Dict[str, np.ndarray]:
         """
@@ -515,111 +523,180 @@ class MLForecaster:
         if not self.trained:
             raise ValueError("Models must be trained before performing walk-forward validation")
 
-        # Calculate split point (use last 20% for testing)
+        data = np.asarray(data, dtype=float)
         n_samples = len(data)
-        n_test = max(forecast_steps, int(n_samples * test_size))
+
+        max_test_points = n_samples - (self.max_lag + 3)
+        if max_test_points <= 0:
+            raise ValueError(
+                f"Insufficient data for walk-forward validation. Need at least {self.max_lag + 4} samples.")
+
+        if forecast_steps > max_test_points:
+            raise ValueError(
+                f"Forecast steps ({forecast_steps}) exceed available test window ({max_test_points}).")
+
+        n_test = max(forecast_steps, int(np.ceil(n_samples * test_size)))
+        n_test = min(n_test, max_test_points)
         n_train = n_samples - n_test
 
         if n_train < self.max_lag + 3:
-            raise ValueError(f"Insufficient training data. Need at least {self.max_lag + 3} samples for training.")
+            raise ValueError(
+                f"Insufficient training data. Need at least {self.max_lag + 3} samples for training.")
 
-        print(f"\n{'='*60}")
-        print(f"WALK-FORWARD VALIDATION")
-        print(f"{'='*60}")
+        train_ratio = (n_train / n_samples) * 100
+        test_ratio = (n_test / n_samples) * 100
+
+        print(f"\n{'=' * 60}")
+        print("WALK-FORWARD VALIDATION")
+        print(f"{'=' * 60}")
         print(f"Total samples: {n_samples}")
-        print(f"Training samples: {n_train} (80%)")
-        print(f"Test samples: {n_test} (20%)")
-        print(f"Forecast steps: {forecast_steps}")
-        print(f"{'='*60}\n")
+        print(f"Training samples: {n_train} ({train_ratio:.1f}%)")
+        print(f"Test samples: {n_test} ({test_ratio:.1f}%)")
+        print(f"Forecast horizon per origin: {forecast_steps}")
+        print(f"{'=' * 60}\n")
 
-        wf_results = {}
+        wf_results: Dict[str, Dict] = {}
 
-        # Perform walk-forward for each model
-        for model_name in self.models.keys():
+        for model_name, base_model in self.models.items():
             print(f"\n{model_name} - Walk-Forward Validation:")
             print("-" * 60)
 
-            predictions = []
-            actuals = []
-            forecast_origins = []
+            predictions: List[float] = []
+            actuals: List[float] = []
+            indices: List[int] = []
+            forecast_origins: List[int] = []
+            per_origin: List[Dict] = []
 
-            # Walk forward through the test set
-            for i in range(n_train, n_samples, forecast_steps):
-                # Use data up to current point for training
-                train_data = data[:i]
+            for origin in range(n_train, n_samples, forecast_steps):
+                train_data = data[:origin]
 
-                # Determine how many steps we can actually forecast
-                remaining_samples = n_samples - i
-                steps_to_forecast = min(forecast_steps, remaining_samples)
-
-                if steps_to_forecast == 0:
-                    break
-
-                # Get actual values for this forecast window
-                actual_values = data[i:i + steps_to_forecast]
-
-                # Make forecast
-                try:
-                    last_values = train_data[-self.max_lag - 3:]
-                    forecast = self._forecast_recursive(model_name, last_values, steps_to_forecast)
-
-                    predictions.extend(forecast)
-                    actuals.extend(actual_values)
-                    forecast_origins.append(i)
-
-                    print(f"Origin {i}: Forecasted {steps_to_forecast} steps - MAE: {mean_absolute_error([actual_values], [forecast[:steps_to_forecast]]):.3f}")
-
-                except Exception as e:
-                    print(f"Warning: Forecast failed at origin {i}: {str(e)}")
+                if len(train_data) < self.max_lag + 3:
+                    print(f"Skipping origin {origin}: insufficient training history.")
                     continue
 
-            # Calculate metrics for this model
-            if len(predictions) > 0 and len(actuals) > 0:
-                predictions = np.array(predictions)
-                actuals = np.array(actuals)
+                remaining_samples = n_samples - origin
+                steps_to_forecast = min(forecast_steps, remaining_samples)
+                if steps_to_forecast <= 0:
+                    break
 
-                mae = mean_absolute_error(actuals, predictions)
-                rmse = np.sqrt(mean_squared_error(actuals, predictions))
-                r2 = r2_score(actuals, predictions)
-                mape = np.mean(np.abs((actuals - predictions) / np.maximum(actuals, 0.1))) * 100  # Avoid division by zero
+                actual_values = data[origin:origin + steps_to_forecast]
+                origin_indices = list(range(origin, origin + steps_to_forecast))
+
+                try:
+                    X_train, y_train = self.prepare_features(train_data)
+                    if len(X_train) == 0:
+                        print(f"Skipping origin {origin}: no features after lag preparation.")
+                        continue
+
+                    wf_model = clone(base_model)
+                    wf_model.fit(X_train, y_train)
+
+                    history_slice = train_data[-(self.max_lag + 3):]
+                    forecast_values = self._forecast_with_model(
+                        wf_model,
+                        history_slice,
+                        steps_to_forecast
+                    )
+
+                    origin_mae = mean_absolute_error(actual_values, forecast_values)
+                    origin_rmse = np.sqrt(mean_squared_error(actual_values, forecast_values))
+                    origin_mape = float(np.mean(
+                        np.abs(actual_values - forecast_values) /
+                        np.maximum(np.abs(actual_values), 1e-3)
+                    ) * 100)
+
+                    predictions.extend(forecast_values.tolist())
+                    actuals.extend(actual_values.tolist())
+                    indices.extend(origin_indices)
+                    forecast_origins.append(origin)
+                    per_origin.append({
+                        'origin': origin,
+                        'indices': origin_indices,
+                        'steps': steps_to_forecast,
+                        'actual': actual_values.tolist(),
+                        'predicted': forecast_values.tolist(),
+                        'mae': float(origin_mae),
+                        'rmse': float(origin_rmse),
+                        'mape': origin_mape
+                    })
+
+                    print(f"Origin {origin}: steps={steps_to_forecast} | MAE={origin_mae:.3f} | RMSE={origin_rmse:.3f} | MAPE={origin_mape:.2f}%")
+
+                except Exception as exc:
+                    print(f"Warning: Forecast failed at origin {origin}: {exc}")
+                    continue
+
+            if predictions and actuals:
+                predictions_np = np.array(predictions, dtype=float)
+                actuals_np = np.array(actuals, dtype=float)
+
+                mae = mean_absolute_error(actuals_np, predictions_np)
+                rmse = np.sqrt(mean_squared_error(actuals_np, predictions_np))
+                r2 = r2_score(actuals_np, predictions_np)
+                mape = float(np.mean(
+                    np.abs(actuals_np - predictions_np) /
+                    np.maximum(np.abs(actuals_np), 1e-3)
+                ) * 100)
+                smape_denominator = np.abs(actuals_np) + np.abs(predictions_np)
+                smape = float(np.mean(
+                    np.where(smape_denominator == 0, 0,
+                             2 * np.abs(actuals_np - predictions_np) /
+                             np.maximum(smape_denominator, 1e-3))
+                ) * 100)
+                median_ae = float(np.median(np.abs(actuals_np - predictions_np)))
 
                 wf_results[model_name] = {
-                    'predictions': predictions.tolist(),
-                    'actuals': actuals.tolist(),
+                    'predictions': predictions,
+                    'actuals': actuals,
+                    'indices': indices,
                     'forecast_origins': forecast_origins,
-                    'mae': mae,
-                    'rmse': rmse,
-                    'r2': r2,
+                    'mae': float(mae),
+                    'rmse': float(rmse),
+                    'r2': float(r2),
                     'mape': mape,
+                    'smape': smape,
+                    'median_ae': median_ae,
                     'n_forecasts': len(forecast_origins),
-                    'n_points': len(predictions)
+                    'n_points': len(predictions),
+                    'train_size': int(n_train),
+                    'test_size': int(n_test),
+                    'test_start_index': int(n_train),
+                    'per_origin': per_origin
                 }
 
-                print(f"\nSummary Statistics:")
+                print("\nSummary Statistics:")
                 print(f"  MAE:  {mae:.3f}")
                 print(f"  RMSE: {rmse:.3f}")
                 print(f"  R²:   {r2:.3f}")
                 print(f"  MAPE: {mape:.2f}%")
-                print(f"  Number of forecast origins: {len(forecast_origins)}")
-                print(f"  Total predicted points: {len(predictions)}")
+                print(f"  sMAPE:{smape:.2f}%")
+                print(f"  Forecast origins: {len(forecast_origins)}")
+                print(f"  Total evaluated points: {len(predictions)}")
             else:
                 print(f"Warning: No valid predictions for {model_name}")
                 wf_results[model_name] = {
                     'error': 'No valid predictions generated',
                     'predictions': [],
                     'actuals': [],
+                    'indices': [],
                     'forecast_origins': [],
                     'mae': None,
                     'rmse': None,
                     'r2': None,
                     'mape': None,
+                    'smape': None,
+                    'median_ae': None,
                     'n_forecasts': 0,
-                    'n_points': 0
+                    'n_points': 0,
+                    'train_size': int(n_train),
+                    'test_size': int(n_test),
+                    'test_start_index': int(n_train),
+                    'per_origin': []
                 }
 
-        print(f"\n{'='*60}")
-        print(f"WALK-FORWARD VALIDATION COMPLETE")
-        print(f"{'='*60}\n")
+        print(f"\n{'=' * 60}")
+        print("WALK-FORWARD VALIDATION COMPLETE")
+        print(f"{'=' * 60}\n")
 
         return wf_results
 

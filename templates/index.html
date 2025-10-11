@@ -158,6 +158,9 @@
 <li class="nav-item">
 <a aria-controls="deadline-analysis" aria-selected="false" class="nav-link" data-toggle="tab" href="#deadline-analysis" id="tab-deadline-link" role="tab">Deadline Analysis</a>
 </li>
+<li class="nav-item">
+<a aria-controls="cost-analysis" aria-selected="false" class="nav-link" data-toggle="tab" href="#cost-analysis" id="tab-cost-link" role="tab">Cost Analysis</a>
+</li>
 </ul>
 <div class="tab-content" id="forecastTabsContent">
 <div aria-labelledby="tab-mc-link" class="tab-pane fade show active" id="mc-forecast" role="tabpanel">
@@ -547,6 +550,11 @@
 <div class="tab-content">
 <div class="tab-pane fade show active" id="deadline-results-summary" role="tabpanel"></div>
 <div class="tab-pane fade" id="deadline-start-window" role="tabpanel">
+<div class="mb-3">
+<div class="alert alert-secondary d-inline-block">
+<strong>Hoje:</strong> <span id="current-date-display" class="font-weight-bold"></span>
+</div>
+</div>
 <div class="table-responsive">
 <table class="table table-sm table-bordered">
 <thead class="table-light">
@@ -561,13 +569,14 @@
 <tr class="table-warning">
 <th scope="row">Muito cedo</th>
 <td id="window-too-early"></td>
-<td colspan="2"></td>
+<td colspan="1"></td>
+<td id="window-too-early-status"></td>
 </tr>
 <tr class="table-warning">
 <th scope="row">Cedo</th>
 <td id="window-early-start"></td>
 <td id="window-early-end"></td>
-<td></td>
+<td id="window-early-status"></td>
 </tr>
 <tr class="table-success">
 <th scope="row">Just in time</th>
@@ -579,21 +588,191 @@
 <th scope="row">Tarde</th>
 <td id="window-late-start"></td>
 <td id="window-late-end"></td>
-<td></td>
+<td id="window-late-status"></td>
 </tr>
 <tr class="table-danger">
 <th scope="row">Último momento responsável (UMR)</th>
 <td id="window-umr"></td>
-<td colspan="2"></td>
+<td colspan="1"></td>
+<td id="window-umr-status"></td>
 </tr>
 <tr class="table-danger">
 <th scope="row">Irresponsavelmente atrasado</th>
-<td colspan="3" id="window-too-late"></td>
+<td colspan="2" id="window-too-late"></td>
+<td id="window-too-late-status"></td>
 </tr>
 </tbody>
 </table>
 </div>
 <small class="text-muted d-block text-left">DDE = Data Desejada de Entrega · UMR = Último Momento Responsável</small>
+</div>
+</div>
+</div>
+<div aria-labelledby="tab-cost-link" class="tab-pane fade" id="cost-analysis" role="tabpanel">
+<div class="pt-4 pb-5">
+<div class="container text-center">
+<h2>Análise de Custos com PERT-Beta</h2>
+<p class="mb-4">
+                            Simule custos do projeto usando distribuição PERT-Beta com estimativas otimista, mais provável e pessimista.
+                            A simulação Monte Carlo com 10.000+ iterações fornece projeções realistas de custo.
+                        </p>
+</div>
+<div class="container-fluid bg-6 text-center">
+<div class="row">
+<div class="col-md-6 text-left">
+<h3>Custo por Item</h3>
+<div class="form-group">
+<label for="avgCostPerItem">Custo Médio por Item</label>
+<div class="input-group">
+<div class="input-group-prepend">
+<span class="input-group-text">R$</span>
+</div>
+<input class="form-control" id="avgCostPerItem" min="0" step="0.01" type="number" placeholder="Ex: 5000.00"/>
+</div>
+<small class="form-text text-muted">Custo médio histórico por item de trabalho</small>
+</div>
+</div>
+<div class="col-md-6 text-left">
+<h3>Estimativas PERT</h3>
+<div class="form-group">
+<label for="optimisticCost">Custo Otimista (a)</label>
+<div class="input-group">
+<div class="input-group-prepend">
+<span class="input-group-text">R$</span>
+</div>
+<input class="form-control" id="optimisticCost" min="0" step="0.01" type="number" placeholder="Melhor cenário"/>
+</div>
+</div>
+<div class="form-group">
+<label for="mostLikelyCost">Custo Mais Provável (m)</label>
+<div class="input-group">
+<div class="input-group-prepend">
+<span class="input-group-text">R$</span>
+</div>
+<input class="form-control" id="mostLikelyCost" min="0" step="0.01" type="number" placeholder="Cenário mais realista"/>
+</div>
+</div>
+<div class="form-group">
+<label for="pessimisticCost">Custo Pessimista (b)</label>
+<div class="input-group">
+<div class="input-group-prepend">
+<span class="input-group-text">R$</span>
+</div>
+<input class="form-control" id="pessimisticCost" min="0" step="0.01" type="number" placeholder="Pior cenário"/>
+</div>
+</div>
+</div>
+</div>
+<div class="row mt-3">
+<div class="col-md-6 text-left">
+<div class="form-group">
+<label for="costSimulations">Número de Simulações</label>
+<input class="form-control" id="costSimulations" max="100000" min="10000" type="number" value="10000"/>
+<small class="form-text text-muted">Mínimo: 10.000 simulações</small>
+</div>
+</div>
+<div class="col-md-6 text-left">
+<div class="form-group">
+<label>Backlog</label>
+<div class="alert alert-secondary mb-0" role="alert">
+                                        Usa o backlog definido na aba Monte Carlo
+                                    </div>
+</div>
+</div>
+</div>
+</div>
+<div class="container-fluid bg-12 text-center mt-4">
+<button class="btn btn-primary btn-lg" id="runCostAnalysis" type="button">
+                                Executar Análise de Custos
+                            </button>
+</div>
+<div class="mt-4" id="cost-analysis-loading" style="display:none">
+<div class="spinner-border text-primary" role="status">
+<span class="sr-only">Loading...</span>
+</div>
+<p class="mt-2">Executando simulações de custo...</p>
+</div>
+<div class="mt-4" id="cost-analysis-results" style="display:none">
+<div class="container-fluid">
+<h3>Resultados da Simulação</h3>
+<div class="row">
+<div class="col-lg-6">
+<div class="card mb-3">
+<div class="card-header bg-primary text-white">
+<h5 class="mb-0">Estatísticas de Custo</h5>
+</div>
+<div class="card-body">
+<table class="table table-sm table-borderless mb-0">
+<tbody id="cost-stats-table">
+</tbody>
+</table>
+</div>
+</div>
+</div>
+<div class="col-lg-6">
+<div class="card mb-3">
+<div class="card-header bg-success text-white">
+<h5 class="mb-0">Cenários</h5>
+</div>
+<div class="card-body">
+<table class="table table-sm table-borderless mb-0">
+<tbody id="cost-scenarios-table">
+</tbody>
+</table>
+</div>
+</div>
+</div>
+</div>
+<div class="row mt-4">
+<div class="col-12">
+<div class="card">
+<div class="card-header bg-info text-white">
+<h5 class="mb-0">Distribuição de Custos</h5>
+</div>
+<div class="card-body">
+<div class="chart-container">
+<canvas id="cost-histogram-chart"></canvas>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="row mt-4">
+<div class="col-md-6">
+<div class="card">
+<div class="card-header bg-warning">
+<h5 class="mb-0">Percentis de Custo</h5>
+</div>
+<div class="card-body">
+<table class="table table-sm table-bordered">
+<thead>
+<tr>
+<th>Percentil</th>
+<th>Custo (R$)</th>
+<th>Probabilidade</th>
+</tr>
+</thead>
+<tbody id="cost-percentiles-table">
+</tbody>
+</table>
+</div>
+</div>
+</div>
+<div class="col-md-6">
+<div class="card">
+<div class="card-header bg-secondary text-white">
+<h5 class="mb-0">Parâmetros PERT-Beta</h5>
+</div>
+<div class="card-body">
+<table class="table table-sm table-borderless">
+<tbody id="pert-params-table">
+</tbody>
+</table>
+</div>
+</div>
+</div>
+</div>
+</div>
 </div>
 </div>
 </div>
@@ -632,6 +811,7 @@
 <script src="{{ url_for('static', filename='js/ui.js') }}"></script>
 <script src="{{ url_for('static', filename='js/advanced_forecast.js') }}"></script>
 <script src="{{ url_for('static', filename='js/charts.js') }}"></script>
+<script src="{{ url_for('static', filename='js/cost_analysis.js') }}"></script>
 <script>
         $(function () {
             function activateTabFromHash() {
@@ -640,6 +820,8 @@
                     $('#tab-advanced-link').tab('show');
                 } else if (hash === '#deadline-analysis') {
                     $('#tab-deadline-link').tab('show');
+                } else if (hash === '#cost-analysis') {
+                    $('#tab-cost-link').tab('show');
                 } else if (hash === '#mc-forecast') {
                     $('#tab-mc-link').tab('show');
                 }

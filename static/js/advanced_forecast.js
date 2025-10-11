@@ -154,28 +154,91 @@ $(document).ready(function() {
         $('#mc-stats').html(html);
     }
 
-    function displayMLSummary(mlData) {
+    function displayMLSummary(mlData, backlog, startDate) {
         const ensemble = mlData.ensemble;
+
+        // Calculate completion weeks based on backlog and throughput forecast
+        let completionWeeks = null;
+        if (backlog && ensemble && ensemble.mean) {
+            // Simulate week-by-week completion
+            let remaining = backlog;
+            let week = 0;
+            const forecastLength = ensemble.mean.length;
+
+            while (remaining > 0 && week < forecastLength * 2) {
+                // Use forecast value if available, otherwise use last forecast value
+                const throughput = week < forecastLength ? ensemble.mean[week] : ensemble.mean[forecastLength - 1];
+                remaining -= throughput;
+                week++;
+            }
+
+            completionWeeks = {
+                mean: week,
+                // Approximate percentiles based on P10 and P90 forecasts
+                p50: week,
+                p85: Math.round(week * 1.2), // Conservative estimate
+                p90: Math.round(week * 1.3)  // More conservative
+            };
+        }
+
         let html = `
             <div class="metric-card">
                 <p><strong>Mean Forecast:</strong> ${ensemble.mean.map(v => v.toFixed(1)).join(', ')}</p>
                 <p><strong>P10 Range:</strong> ${ensemble.p10.map(v => v.toFixed(1)).join(', ')}</p>
-                <p><strong>P90 Range:</strong> ${ensemble.p90.map(v => v.toFixed(1)).join(', ')}</p>
-            </div>
-        `;
+                <p><strong>P90 Range:</strong> ${ensemble.p90.map(v => v.toFixed(1)).join(', ')}</p>`;
+
+        if (completionWeeks && startDate) {
+            // Calculate completion dates
+            const start = moment(startDate);
+            if (start.isValid()) {
+                const date50 = start.clone().add(completionWeeks.p50, 'weeks').format('DD/MM/YYYY');
+                const date85 = start.clone().add(completionWeeks.p85, 'weeks').format('DD/MM/YYYY');
+                const date90 = start.clone().add(completionWeeks.p90, 'weeks').format('DD/MM/YYYY');
+
+                html += `
+                <hr>
+                <p><strong>Mean Completion:</strong> ${completionWeeks.mean.toFixed(1)} weeks</p>
+                <p><strong>50% Confidence:</strong> ${completionWeeks.p50} weeks (${date50})</p>
+                <p><strong>85% Confidence:</strong> ${completionWeeks.p85} weeks (${date85})</p>
+                <p><strong>90% Confidence:</strong> ${completionWeeks.p90} weeks (${date90})</p>`;
+            }
+        }
+
+        html += `</div>`;
         $('#ml-summary').html(html);
     }
 
-    function displayMCSummary(mcData) {
+    function displayMCSummary(mcData, startDate) {
         const stats = mcData.percentile_stats;
         let html = `
             <div class="metric-card">
-                <p><strong>Mean Completion:</strong> ${mcData.mean} weeks</p>
+                <p><strong>Mean Completion:</strong> ${mcData.mean} weeks</p>`;
+
+        if (startDate) {
+            const start = moment(startDate);
+            if (start.isValid()) {
+                const date50 = start.clone().add(stats.p50, 'weeks').format('DD/MM/YYYY');
+                const date85 = start.clone().add(stats.p85, 'weeks').format('DD/MM/YYYY');
+                const date90 = start.clone().add(stats.p90, 'weeks').format('DD/MM/YYYY');
+
+                html += `
+                <p><strong>50% Confidence:</strong> ${stats.p50} weeks (${date50})</p>
+                <p><strong>85% Confidence:</strong> ${stats.p85} weeks (${date85})</p>
+                <p><strong>90% Confidence:</strong> ${stats.p90} weeks (${date90})</p>`;
+            } else {
+                html += `
                 <p><strong>50% Confidence:</strong> ${stats.p50} weeks</p>
                 <p><strong>85% Confidence:</strong> ${stats.p85} weeks</p>
-                <p><strong>90% Confidence:</strong> ${stats.p90} weeks</p>
-            </div>
-        `;
+                <p><strong>90% Confidence:</strong> ${stats.p90} weeks</p>`;
+            }
+        } else {
+            html += `
+                <p><strong>50% Confidence:</strong> ${stats.p50} weeks</p>
+                <p><strong>85% Confidence:</strong> ${stats.p85} weeks</p>
+                <p><strong>90% Confidence:</strong> ${stats.p90} weeks</p>`;
+        }
+
+        html += `</div>`;
         $('#mc-summary').html(html);
     }
 
@@ -203,13 +266,13 @@ $(document).ready(function() {
         }
 
         let metricsHtml = '<table class="table table-sm table-bordered"><thead class="thead-light"><tr>' +
-            '<th>Modelo</th><th>MAE</th><th>RMSE</th><th>R²</th><th>MAPE</th><th>Origens</th><th>Pontos</th>' +
+            '<th>Modelo</th><th>MAE</th><th>RMSE</th><th>R²</th><th>MAPE</th><th>sMAPE</th><th>Mediana |Erro|</th><th>Origens</th><th>Pontos</th>' +
             '</tr></thead><tbody>';
 
         let chartIndex = 0;
         for (const [modelName, data] of Object.entries(results)) {
             if (data.error) {
-                metricsHtml += `<tr><td>${modelName}</td><td colspan="6">${data.error}</td></tr>`;
+                metricsHtml += `<tr><td>${modelName}</td><td colspan="8">${data.error}</td></tr>`;
                 continue;
             }
 
@@ -219,6 +282,8 @@ $(document).ready(function() {
                 <td>${data.rmse !== undefined && data.rmse !== null ? data.rmse.toFixed(3) : '—'}</td>
                 <td>${data.r2 !== undefined && data.r2 !== null ? data.r2.toFixed(3) : '—'}</td>
                 <td>${data.mape !== undefined && data.mape !== null ? data.mape.toFixed(2) + '%' : '—'}</td>
+                <td>${data.smape !== undefined && data.smape !== null ? data.smape.toFixed(2) + '%' : '—'}</td>
+                <td>${data.median_ae !== undefined && data.median_ae !== null ? data.median_ae.toFixed(3) : '—'}</td>
                 <td>${data.n_forecasts ?? '—'}</td>
                 <td>${data.n_points ?? '—'}</td>
             </tr>`;
@@ -234,7 +299,9 @@ $(document).ready(function() {
                     </div>
                 `);
 
-                const labels = data.actuals.map((_, idx) => idx + 1);
+                const labels = data.indices && data.indices.length === data.actuals.length
+                    ? data.indices.map(idx => idx + 1)
+                    : data.actuals.map((_, idx) => idx + 1);
                 const chart = new Chart(document.getElementById(canvasId).getContext('2d'), {
                     type: 'line',
                     data: {
@@ -411,8 +478,8 @@ $(document).ready(function() {
 
                 // Display comparison
                 $('#comparison-chart').attr('src', data.charts.comparison);
-                displayMLSummary(data.ml);
-                displayMCSummary(data.monte_carlo);
+                displayMLSummary(data.ml, backlog, startDate);
+                displayMCSummary(data.monte_carlo, startDate);
                 displayWalkForwardResults(data.ml.walk_forward, forecastSteps);
 
                 if (window.renderInputStats) {

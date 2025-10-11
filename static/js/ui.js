@@ -343,7 +343,7 @@ $(window).on("load", function () {
 
         let endDate = '(No start date set)';
         if (simulationData.startDate) {
-            endDate = moment(simulationData.startDate).add(duration, 'weeks').format('MMM Do YYYY');
+            endDate = moment(simulationData.startDate).add(duration, 'weeks').format('DD/MM/YYYY');
         } else if (simulationData.deadlineDate) {
             endDate = simulationData.deadlineDate;
         }
@@ -380,7 +380,7 @@ $(window).on("load", function () {
             $cells.eq(2).text(res.Duration.toString());
             $cells.eq(3).text(res.TotalTasks.toString());
             if (simulationData.startDate) {
-                $cells.eq(4).text(moment(simulationData.startDate).add(res.Duration, 'weeks').format("MMM Do YYYY"));
+                $cells.eq(4).text(moment(simulationData.startDate).add(res.Duration, 'weeks').format("DD/MM/YYYY"));
             }
             $cells.eq(5).text(comment);
         };
@@ -660,6 +660,11 @@ $(window).on("load", function () {
         const today = moment(options.today, ['YYYY-MM-DD', moment.ISO_8601], true);
         const startDate = options.startDate ? moment(options.startDate, ['YYYY-MM-DD', 'DD/MM/YYYY', moment.ISO_8601], true) : null;
 
+        // Display current date
+        if (today && today.isValid()) {
+            $('#current-date-display').text(today.format('DD/MM/YYYY'));
+        }
+
         const tooEarly = deadline.clone().subtract(p100 * 2, 'days');
         const earlyStart = deadline.clone().subtract(p100 * 2, 'days');
         const earlyEnd = deadline.clone().subtract(p100, 'days');
@@ -669,55 +674,52 @@ $(window).on("load", function () {
         const lateEnd = deadline.clone().subtract(p50, 'days');
         const umr = deadline.clone().subtract(p50, 'days');
 
-        $('#window-too-early').text(tooEarly.format('DD/MM/YY'));
-        $('#window-early-start').text(earlyStart.format('DD/MM/YY'));
-        $('#window-early-end').text(earlyEnd.format('DD/MM/YY'));
-        $('#window-just-start').text(justStart.format('DD/MM/YY'));
-        $('#window-just-end').text(justEnd.format('DD/MM/YY'));
-        $('#window-late-start').text(lateStart.format('DD/MM/YY'));
-        $('#window-late-end').text(lateEnd.format('DD/MM/YY'));
-        $('#window-umr').text(umr.format('DD/MM/YY'));
+        $('#window-too-early').text(tooEarly.format('DD/MM/YYYY'));
+        $('#window-early-start').text(earlyStart.format('DD/MM/YYYY'));
+        $('#window-early-end').text(earlyEnd.format('DD/MM/YYYY'));
+        $('#window-just-start').text(justStart.format('DD/MM/YYYY'));
+        $('#window-just-end').text(justEnd.format('DD/MM/YYYY'));
+        $('#window-late-start').text(lateStart.format('DD/MM/YYYY'));
+        $('#window-late-end').text(lateEnd.format('DD/MM/YYYY'));
+        $('#window-umr').text(umr.format('DD/MM/YYYY'));
 
+        // Calculate status based on TODAY (not start date) and place badge in correct row
+        let statusElementId = '';
         let statusText = '';
         let statusClass = '';
-        if (startDate && startDate.isValid()) {
-            if (startDate.isBefore(earlyStart)) {
-                statusText = 'Muito cedo';
-                statusClass = 'badge-warning';
-            } else if (startDate.isBefore(earlyEnd)) {
-                statusText = 'Cedo';
-                statusClass = 'badge-warning';
-            } else if (startDate.isBetween(justStart, justEnd, undefined, '[]')) {
-                statusText = 'OK';
-                statusClass = 'badge-success';
-            } else if (startDate.isBetween(lateStart, lateEnd, undefined, '[]')) {
-                statusText = 'Tarde';
-                statusClass = 'badge-warning';
-            } else if (startDate.isAfter(umr)) {
-                statusText = 'Atrasado';
-                statusClass = 'badge-danger';
-            }
-        } else if (today && today.isValid()) {
+        if (today && today.isValid()) {
             if (today.isBefore(earlyStart)) {
+                statusElementId = '#window-too-early-status';
                 statusText = 'Muito cedo';
                 statusClass = 'badge-warning';
-            } else if (today.isBefore(earlyEnd)) {
+            } else if (today.isBetween(earlyStart, justStart, undefined, '[)')) {
+                statusElementId = '#window-early-status';
                 statusText = 'Cedo';
                 statusClass = 'badge-warning';
-            } else if (today.isBetween(justStart, justEnd, undefined, '[]')) {
+            } else if (today.isBetween(justStart, lateStart, undefined, '[)')) {
+                statusElementId = '#window-just-status';
                 statusText = 'OK';
                 statusClass = 'badge-success';
-            } else if (today.isBetween(lateStart, lateEnd, undefined, '[]')) {
+            } else if (today.isBetween(lateStart, umr, undefined, '[)')) {
+                statusElementId = '#window-late-status';
                 statusText = 'Tarde';
                 statusClass = 'badge-warning';
-            } else if (today.isAfter(umr)) {
+            } else if (today.isSameOrAfter(umr)) {
+                statusElementId = '#window-too-late-status';
                 statusText = 'Atrasado';
                 statusClass = 'badge-danger';
             }
         }
 
-        $('#window-just-status').html(statusText ? `<span class="badge ${statusClass}">${statusText}</span>` : '');
-        $('#window-too-late').text(umr.clone().add(1, 'days').format('DD/MM/YY'));
+        // Clear all status cells
+        $('#window-too-early-status, #window-early-status, #window-just-status, #window-late-status, #window-umr-status, #window-too-late-status').empty();
+
+        // Place the status badge in the correct row
+        if (statusElementId) {
+            $(statusElementId).html(`<span class="badge ${statusClass}">${statusText}</span>`);
+        }
+
+        $('#window-too-late').text(umr.clone().add(1, 'days').format('DD/MM/YYYY'));
 
         $navItem.show();
     }
@@ -834,25 +836,38 @@ $(window).on("load", function () {
         const duration = Math.round(mcWeeks.p85);
         // Effort = duration (weeks) × team size (pessoas)
         const effort = Math.round(duration * teamSize);
-        const deliveryDate = startDateMoment ? startDateMoment.clone().add(duration, 'weeks').format('MMM Do YYYY') : '—';
+        const deliveryDate = startDateMoment ? startDateMoment.clone().add(duration, 'weeks').format('DD/MM/YYYY') : '—';
 
         console.log('Deadline Analysis Summary:', { teamSize, duration, effort, deliveryDate, mcWeeks, simulationData });
 
-        // Calcular "Quantos?" e "Quando?" com base nos dados do Monte Carlo
-        const howManyP95 = mc.projected_work_p85 || '—';
-        const howManyP85 = mc.projected_work_p85 || '—';
-        const howManyP50 = mc.projected_work_p85 || '—'; // Usar o mesmo valor se não houver outros percentis
+        // "Quantos?" - Items that CAN be completed in the deadline period (capacity)
+        const howManyP95 = mc.items_possible_p95 || '—';
+        const howManyP85 = mc.items_possible_p85 || '—';
+        const howManyP50 = mc.items_possible_p50 || '—';
 
-        const whenP95 = deliveryDate;
-        const whenP85 = deliveryDate;
-        const whenP50 = startDateMoment ? startDateMoment.clone().add(Math.round(mcWeeks.p50), 'weeks').format('DD/MM/YY') : '—';
+        // "Quando?" - Dates when the BACKLOG will be completed
+        const whenP95 = mc.completion_date_p95 || '—';
+        const whenP85 = mc.completion_date_p85 || '—';
+        const whenP50 = mc.completion_date_p50 || '—';
+
+        // Scope that WILL be completed from the backlog by the deadline
+        const scopeCompletedP95 = mc.projected_work_p95 || '—';
+        const scopeCompletedP85 = mc.projected_work_p85 || '—';
+        const scopeCompletedP50 = mc.projected_work_p50 || '—';
 
         const weeksToDeadline = mc.weeks_to_deadline != null ? mc.weeks_to_deadline.toFixed(1) : '—';
         const projectedWeeks = mcWeeks.p85 != null ? mcWeeks.p85.toFixed(1) : '—';
         const projectedWork = mc.projected_work_p85 || '—';
         const canMeetDeadline = mc.can_meet_deadline ? 'Sim' : 'Não';
-        const scopeCompletion = mc.scope_completion_pct != null ? mc.scope_completion_pct + '%' : '—';
-        const deadlineCompletion = mc.deadline_completion_pct != null ? mc.deadline_completion_pct + '%' : '—';
+
+        // Format scope completion with raw value if > 100%
+        let scopeCompletion = mc.scope_completion_pct != null ? mc.scope_completion_pct + '%' : '—';
+
+        // Format deadline completion with raw value and explanation if > 100%
+        let deadlineCompletion = mc.deadline_completion_pct != null ? mc.deadline_completion_pct + '%' : '—';
+        if (mc.deadline_completion_pct_raw != null && mc.deadline_completion_pct_raw > 100) {
+            deadlineCompletion = `100% <small class="text-danger">(precisa ${mc.deadline_completion_pct_raw.toFixed(1)}% do prazo)</small>`;
+        }
 
         const daysToDeadline = mc.weeks_to_deadline != null ? Math.round(mc.weeks_to_deadline * 7) : '—';
         const startDateFormatted = mc.start_date || '—';
@@ -919,9 +934,14 @@ $(window).on("load", function () {
                                     <tr><th scope="row">INÍCIO</th><td>${startDateFormatted}</td></tr>
                                     <tr><th scope="row">FIM</th><td>${deadlineDateFormatted}</td></tr>
                                     <tr><th scope="row">DIAS</th><td>${daysToDeadline}</td></tr>
+                                    <tr class="table-secondary"><th scope="row" colspan="2">Capacidade (sem limite de backlog)</th></tr>
                                     <tr><th scope="row">95% DE CONFIANÇA</th><td class="font-weight-bold">${howManyP95}</td></tr>
                                     <tr><th scope="row">85% DE CONFIANÇA</th><td class="font-weight-bold">${howManyP85}</td></tr>
                                     <tr><th scope="row">50% DE CONFIANÇA</th><td class="font-weight-bold">${howManyP50}</td></tr>
+                                    <tr class="table-warning"><th scope="row" colspan="2">Escopo que será entregue (do backlog de ${mc.backlog})</th></tr>
+                                    <tr><th scope="row">95% DE CONFIANÇA</th><td class="font-weight-bold">${scopeCompletedP95}</td></tr>
+                                    <tr><th scope="row">85% DE CONFIANÇA</th><td class="font-weight-bold">${scopeCompletedP85}</td></tr>
+                                    <tr><th scope="row">50% DE CONFIANÇA</th><td class="font-weight-bold">${scopeCompletedP50}</td></tr>
                                 </tbody>
                             </table>
 
@@ -1005,7 +1025,7 @@ $(window).on("load", function () {
         $('#deadline-start-window').removeClass('show active');
         $('#deadline-start-tab-item').hide();
         $('#window-too-early, #window-early-start, #window-early-end, #window-just-start, #window-just-end, #window-late-start, #window-late-end, #window-umr, #window-too-late').text('—');
-        $('#window-just-status').empty();
+        $('#window-too-early-status, #window-early-status, #window-just-status, #window-late-status, #window-umr-status, #window-too-late-status').empty();
         $('#deadline-analysis-loading').show();
 
         $.ajax({

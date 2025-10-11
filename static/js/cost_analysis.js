@@ -1,0 +1,365 @@
+$(document).ready(function() {
+    let costChart = null;
+
+    $('#runCostAnalysis').on('click', function() {
+        runCostAnalysis();
+    });
+
+    function formatCurrency(value) {
+        if (value === null || value === undefined) return '—';
+        return new Intl.NumberFormat('pt-BR', {
+            style: 'currency',
+            currency: 'BRL'
+        }).format(value);
+    }
+
+    function formatNumber(value, decimals = 2) {
+        if (value === null || value === undefined) return '—';
+        return value.toFixed(decimals);
+    }
+
+    function formatPercent(value) {
+        if (value === null || value === undefined) return '—';
+        return (value * 100).toFixed(2) + '%';
+    }
+
+    function runCostAnalysis() {
+        // Get input values
+        const optimistic = parseFloat($('#optimisticCost').val());
+        const mostLikely = parseFloat($('#mostLikelyCost').val());
+        const pessimistic = parseFloat($('#pessimisticCost').val());
+        const backlog = parseInt($('#numberOfTasks').val());
+        const nSimulations = parseInt($('#costSimulations').val());
+        const avgCostPerItem = parseFloat($('#avgCostPerItem').val()) || null;
+
+        // Validation
+        if (!optimistic || !mostLikely || !pessimistic) {
+            alert('Por favor, preencha todas as estimativas de custo (otimista, mais provável e pessimista).');
+            return;
+        }
+
+        if (!(optimistic < mostLikely && mostLikely < pessimistic)) {
+            alert('Os valores devem seguir: Otimista < Mais Provável < Pessimista');
+            return;
+        }
+
+        if (!backlog || backlog <= 0) {
+            alert('Por favor, defina um backlog válido na aba Monte Carlo.');
+            return;
+        }
+
+        // Show loading
+        $('#cost-analysis-loading').show();
+        $('#cost-analysis-results').hide();
+
+        // Prepare request data
+        const requestData = {
+            optimistic: optimistic,
+            mostLikely: mostLikely,
+            pessimistic: pessimistic,
+            backlog: backlog,
+            nSimulations: nSimulations,
+            avgCostPerItem: avgCostPerItem
+        };
+
+        // Call API
+        $.ajax({
+            url: '/api/cost-analysis',
+            method: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify(requestData),
+            success: function(response) {
+                displayCostResults(response);
+            },
+            error: function(xhr) {
+                $('#cost-analysis-loading').hide();
+                alert('Erro na análise de custos: ' + (xhr.responseJSON?.error || 'Erro desconhecido'));
+            }
+        });
+    }
+
+    function displayCostResults(response) {
+        $('#cost-analysis-loading').hide();
+        $('#cost-analysis-results').show();
+
+        const results = response.simulation_results;
+        const riskMetrics = response.risk_metrics;
+
+        // Display statistics
+        let statsHtml = `
+            <tr>
+                <th scope="row">Custo Médio Total</th>
+                <td class="text-right font-weight-bold">${formatCurrency(results.mean)}</td>
+            </tr>
+            <tr>
+                <th scope="row">Desvio Padrão</th>
+                <td class="text-right">${formatCurrency(results.std)}</td>
+            </tr>
+            <tr>
+                <th scope="row">Custo Mínimo</th>
+                <td class="text-right text-success">${formatCurrency(results.min)}</td>
+            </tr>
+            <tr>
+                <th scope="row">Custo Máximo</th>
+                <td class="text-right text-danger">${formatCurrency(results.max)}</td>
+            </tr>
+            <tr class="border-top">
+                <th scope="row">Mediana (P50)</th>
+                <td class="text-right font-weight-bold">${formatCurrency(results.percentiles.p50)}</td>
+            </tr>
+            <tr>
+                <th scope="row">Amplitude (Range)</th>
+                <td class="text-right">${formatCurrency(riskMetrics.range)}</td>
+            </tr>
+            <tr>
+                <th scope="row">Coef. de Variação</th>
+                <td class="text-right">${formatNumber(riskMetrics.coefficient_of_variation, 2)}%</td>
+            </tr>
+        `;
+        $('#cost-stats-table').html(statsHtml);
+
+        // Display scenarios
+        let scenariosHtml = `
+            <tr>
+                <th scope="row">Cenário Otimista (P10)</th>
+                <td class="text-right text-success font-weight-bold">${formatCurrency(results.percentiles.p10)}</td>
+            </tr>
+            <tr>
+                <th scope="row">Cenário Realista (P50)</th>
+                <td class="text-right text-primary font-weight-bold">${formatCurrency(results.percentiles.p50)}</td>
+            </tr>
+            <tr>
+                <th scope="row">Cenário Conservador (P85)</th>
+                <td class="text-right text-warning font-weight-bold">${formatCurrency(results.percentiles.p85)}</td>
+            </tr>
+            <tr>
+                <th scope="row">Cenário Pessimista (P95)</th>
+                <td class="text-right text-danger font-weight-bold">${formatCurrency(results.percentiles.p95)}</td>
+            </tr>
+            <tr class="border-top">
+                <th scope="row">Assimetria</th>
+                <td class="text-right">${riskMetrics.skewness_indicator}</td>
+            </tr>
+            <tr>
+                <th scope="row">Intervalo Interquartil</th>
+                <td class="text-right">${formatCurrency(riskMetrics.iqr)}</td>
+            </tr>
+        `;
+
+        if (results.prob_below_avg !== null) {
+            scenariosHtml += `
+                <tr class="border-top">
+                    <th scope="row">Prob. abaixo da média histórica</th>
+                    <td class="text-right">${formatPercent(results.prob_below_avg)}</td>
+                </tr>
+            `;
+        }
+
+        $('#cost-scenarios-table').html(scenariosHtml);
+
+        // Display percentiles table
+        let percentilesHtml = '';
+        const percentileLabels = {
+            'p10': '10% (Otimista)',
+            'p25': '25%',
+            'p50': '50% (Mediana)',
+            'p75': '75%',
+            'p85': '85% (Recomendado)',
+            'p90': '90%',
+            'p95': '95% (Conservador)'
+        };
+
+        for (const [key, label] of Object.entries(percentileLabels)) {
+            const cost = results.percentiles[key];
+            const prob = parseInt(key.substring(1));
+            percentilesHtml += `
+                <tr>
+                    <td>${label}</td>
+                    <td class="text-right font-weight-bold">${formatCurrency(cost)}</td>
+                    <td class="text-right">${prob}%</td>
+                </tr>
+            `;
+        }
+        $('#cost-percentiles-table').html(percentilesHtml);
+
+        // Display PERT parameters
+        let pertParamsHtml = `
+            <tr>
+                <th scope="row">Alpha (α)</th>
+                <td class="text-right">${formatNumber(results.alpha, 4)}</td>
+            </tr>
+            <tr>
+                <th scope="row">Beta (β)</th>
+                <td class="text-right">${formatNumber(results.beta, 4)}</td>
+            </tr>
+            <tr class="border-top">
+                <th scope="row">Média PERT por item</th>
+                <td class="text-right">${formatCurrency(results.pert_mean_per_item)}</td>
+            </tr>
+            <tr>
+                <th scope="row">Desvio Padrão por item</th>
+                <td class="text-right">${formatCurrency(results.pert_std_per_item)}</td>
+            </tr>
+            <tr class="border-top">
+                <th scope="row">Otimista (a)</th>
+                <td class="text-right">${formatCurrency(results.optimistic)}</td>
+            </tr>
+            <tr>
+                <th scope="row">Mais Provável (m)</th>
+                <td class="text-right">${formatCurrency(results.most_likely)}</td>
+            </tr>
+            <tr>
+                <th scope="row">Pessimista (b)</th>
+                <td class="text-right">${formatCurrency(results.pessimistic)}</td>
+            </tr>
+            <tr class="border-top">
+                <th scope="row">Backlog</th>
+                <td class="text-right">${results.backlog} itens</td>
+            </tr>
+            <tr>
+                <th scope="row">Simulações</th>
+                <td class="text-right">${results.n_simulations.toLocaleString()}</td>
+            </tr>
+        `;
+        $('#pert-params-table').html(pertParamsHtml);
+
+        // Draw histogram
+        drawCostHistogram(results);
+
+        // Scroll to results
+        $('html, body').animate({
+            scrollTop: $('#cost-analysis-results').offset().top - 70
+        }, 300);
+    }
+
+    function drawCostHistogram(results) {
+        const ctx = document.getElementById('cost-histogram-chart').getContext('2d');
+
+        // Destroy previous chart if exists
+        if (costChart) {
+            costChart.destroy();
+        }
+
+        // Prepare data
+        const histogram = results.histogram;
+        const labels = histogram.bin_centers.map(c => formatCurrency(c));
+
+        // Calculate cumulative percentage
+        const totalCount = histogram.counts.reduce((a, b) => a + b, 0);
+        let cumulative = 0;
+        const cumulativeData = histogram.counts.map(count => {
+            cumulative += count;
+            return (cumulative / totalCount) * 100;
+        });
+
+        costChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Frequência',
+                    data: histogram.counts,
+                    backgroundColor: 'rgba(54, 162, 235, 0.6)',
+                    borderColor: 'rgba(54, 162, 235, 1)',
+                    borderWidth: 1,
+                    yAxisID: 'y-frequency'
+                }, {
+                    label: '% Cumulativo',
+                    data: cumulativeData,
+                    type: 'line',
+                    borderColor: 'rgba(255, 99, 132, 1)',
+                    backgroundColor: 'rgba(255, 99, 132, 0.1)',
+                    borderWidth: 2,
+                    fill: false,
+                    yAxisID: 'y-cumulative',
+                    pointRadius: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                title: {
+                    display: true,
+                    text: 'Distribuição de Custos (PERT-Beta)'
+                },
+                scales: {
+                    xAxes: [{
+                        scaleLabel: {
+                            display: true,
+                            labelString: 'Custo Total'
+                        },
+                        ticks: {
+                            maxRotation: 45,
+                            minRotation: 45,
+                            callback: function(value, index, values) {
+                                // Show only every 5th label
+                                return index % 5 === 0 ? value : '';
+                            }
+                        }
+                    }],
+                    yAxes: [{
+                        id: 'y-frequency',
+                        type: 'linear',
+                        position: 'left',
+                        scaleLabel: {
+                            display: true,
+                            labelString: 'Frequência'
+                        },
+                        ticks: {
+                            beginAtZero: true
+                        }
+                    }, {
+                        id: 'y-cumulative',
+                        type: 'linear',
+                        position: 'right',
+                        scaleLabel: {
+                            display: true,
+                            labelString: '% Cumulativo'
+                        },
+                        ticks: {
+                            beginAtZero: true,
+                            max: 100,
+                            callback: function(value) {
+                                return value + '%';
+                            }
+                        },
+                        gridLines: {
+                            drawOnChartArea: false
+                        }
+                    }]
+                },
+                tooltips: {
+                    mode: 'index',
+                    intersect: false,
+                    callbacks: {
+                        label: function(tooltipItem, data) {
+                            const datasetLabel = data.datasets[tooltipItem.datasetIndex].label || '';
+                            const value = tooltipItem.yLabel;
+                            if (datasetLabel === '% Cumulativo') {
+                                return datasetLabel + ': ' + value.toFixed(2) + '%';
+                            }
+                            return datasetLabel + ': ' + value;
+                        }
+                    }
+                },
+                annotation: {
+                    annotations: [
+                        {
+                            type: 'line',
+                            mode: 'vertical',
+                            scaleID: 'x-axis-0',
+                            value: formatCurrency(results.percentiles.p50),
+                            borderColor: 'red',
+                            borderWidth: 2,
+                            label: {
+                                enabled: true,
+                                content: 'P50',
+                                position: 'top'
+                            }
+                        }
+                    ]
+                }
+            }
+        });
+    }
+});

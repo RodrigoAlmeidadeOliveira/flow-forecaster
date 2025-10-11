@@ -100,6 +100,79 @@ class ForecastVisualizer:
 
         return self._fig_to_base64(fig)
 
+    def plot_walk_forward_forecasts(self, historical_data: np.ndarray,
+                                    walk_forward_results: Dict[str, Dict],
+                                    start_date: Optional[str] = None) -> Dict[str, str]:
+        """
+        Plot walk-forward validation results for each model.
+
+        Args:
+            historical_data: Complete historical throughput series
+            walk_forward_results: Metrics and predictions per model
+            start_date: Optional reference date for the first observation
+
+        Returns:
+            Dictionary mapping model name to base64-encoded image
+        """
+        if not walk_forward_results:
+            return {}
+
+        charts: Dict[str, str] = {}
+        n_samples = len(historical_data)
+
+        use_dates = False
+        if start_date:
+            try:
+                base_date = datetime.strptime(start_date, '%Y-%m-%d')
+                x_axis = [base_date + timedelta(weeks=i) for i in range(n_samples)]
+                use_dates = True
+            except ValueError:
+                x_axis = list(range(n_samples))
+        else:
+            x_axis = list(range(n_samples))
+
+        for model_name, result in walk_forward_results.items():
+            predictions = result.get('predictions') or []
+            actuals = result.get('actuals') or []
+            indices = result.get('indices') or []
+
+            if not predictions or not actuals or not indices:
+                continue
+
+            paired = sorted(zip(indices, actuals, predictions), key=lambda x: x[0])
+            sorted_indices, sorted_actuals, sorted_predictions = zip(*paired)
+
+            fig, ax = plt.subplots(figsize=(12, 6))
+
+            ax.plot(x_axis, historical_data, color='#2E86AB', linewidth=1.8,
+                    alpha=0.6, label='Histórico completo')
+
+            x_test = [x_axis[idx] for idx in sorted_indices]
+            ax.plot(x_test, sorted_actuals, 'o-', color='#1B998B', linewidth=2,
+                    markersize=4, label='Realizado (validação)', zorder=3)
+            ax.plot(x_test, sorted_predictions, 's--', color='#E63946', linewidth=2,
+                    markersize=5, label='Previsto', zorder=4)
+
+            test_start = result.get('test_start_index')
+            if isinstance(test_start, int) and 0 <= test_start < len(x_axis):
+                split_value = x_axis[test_start]
+                ax.axvline(split_value, color='#666', linestyle=':', linewidth=1.5,
+                           label='Início da validação', zorder=2)
+
+            ax.set_xlabel('Semana' if not use_dates else 'Data', fontsize=11, fontweight='bold')
+            ax.set_ylabel('Throughput', fontsize=11, fontweight='bold')
+            ax.set_title(f'Walk-forward validation - {model_name}', fontsize=13, fontweight='bold')
+            ax.legend(loc='best', framealpha=0.9)
+            ax.grid(True, alpha=0.3)
+
+            if use_dates:
+                plt.xticks(rotation=45, ha='right')
+
+            plt.tight_layout()
+            charts[model_name] = self._fig_to_base64(fig)
+
+        return charts
+
     def plot_monte_carlo_results(self, historical_data: np.ndarray,
                                 mc_results: Dict,
                                 start_date: Optional[str] = None) -> str:
