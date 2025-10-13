@@ -17,6 +17,12 @@ from cost_pert_beta import simulate_pert_beta_cost, calculate_risk_metrics
 
 app = Flask(__name__)
 
+# Debugging: Print routes at startup
+print("="*60)
+print("Flask app created successfully!")
+print(f"App name: {app.name}")
+print("="*60)
+
 
 def convert_to_native_types(obj):
     """Convert numpy types to native Python types for JSON serialization."""
@@ -866,6 +872,14 @@ def api_cost_analysis():
     except Exception as e:
         import traceback
         return jsonify({'error': str(e), 'trace': traceback.format_exc()}), 500
+
+
+# Print registered routes for debugging
+print("="*60)
+print(f"Total routes registered: {len(list(app.url_map.iter_rules()))}")
+for rule in app.url_map.iter_rules():
+    print(f"  {rule.endpoint:30s} {rule.rule}")
+print("="*60)
 
 
 if __name__ == '__main__':
