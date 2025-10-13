@@ -708,8 +708,8 @@ Forneça amostras de tempo de lead para visualizar o gráfico de controle.
 <div aria-labelledby="tab-cost-link" class="tab-pane fade" id="cost-analysis" role="tabpanel">
 <div class="pt-4 pb-5">
 <div class="container text-center">
-<h2>Análise de Custos com PERT-Beta</h2>
-<p class="mb-4">
+<h2 data-i18n="cost_analysis_title">Análise de Custos com PERT-Beta</h2>
+<p class="mb-4" data-i18n="cost_analysis_desc">
                             Simule custos do projeto usando distribuição PERT-Beta com estimativas otimista, mais provável e pessimista.
                             A simulação Monte Carlo com 10.000+ iterações fornece projeções realistas de custo.
                         </p>
@@ -717,45 +717,45 @@ Forneça amostras de tempo de lead para visualizar o gráfico de controle.
 <div class="container-fluid bg-6 text-center">
 <div class="row">
 <div class="col-md-6 text-left">
-<h3>Custo por Item</h3>
+<h3 data-i18n="cost_per_item">Custo por Item</h3>
 <div class="form-group">
-<label for="avgCostPerItem">Custo Médio por Item</label>
+<label for="avgCostPerItem" data-i18n="avg_cost_per_item">Custo Médio por Item</label>
 <div class="input-group">
 <div class="input-group-prepend">
 <span class="input-group-text">R$</span>
 </div>
 <input class="form-control" id="avgCostPerItem" min="0" step="0.01" type="number" placeholder="Ex: 5000.00"/>
 </div>
-<small class="form-text text-muted">Custo médio histórico por item de trabalho</small>
+<small class="form-text text-muted" data-i18n="avg_cost_help">Custo médio histórico por item de trabalho</small>
 </div>
 </div>
 <div class="col-md-6 text-left">
-<h3>Estimativas PERT</h3>
+<h3 data-i18n="pert_estimates">Estimativas PERT</h3>
 <div class="form-group">
-<label for="optimisticCost">Custo Otimista (a)</label>
+<label for="optimisticCost" data-i18n="optimistic_cost">Custo Otimista (a)</label>
 <div class="input-group">
 <div class="input-group-prepend">
 <span class="input-group-text">R$</span>
 </div>
-<input class="form-control" id="optimisticCost" min="0" step="0.01" type="number" placeholder="Melhor cenário"/>
+<input class="form-control" id="optimisticCost" min="0" step="0.01" type="number" data-i18n-placeholder="best_scenario"/>
 </div>
 </div>
 <div class="form-group">
-<label for="mostLikelyCost">Custo Mais Provável (m)</label>
+<label for="mostLikelyCost" data-i18n="most_likely_cost">Custo Mais Provável (m)</label>
 <div class="input-group">
 <div class="input-group-prepend">
 <span class="input-group-text">R$</span>
 </div>
-<input class="form-control" id="mostLikelyCost" min="0" step="0.01" type="number" placeholder="Cenário mais realista"/>
+<input class="form-control" id="mostLikelyCost" min="0" step="0.01" type="number" data-i18n-placeholder="realistic_scenario"/>
 </div>
 </div>
 <div class="form-group">
-<label for="pessimisticCost">Custo Pessimista (b)</label>
+<label for="pessimisticCost" data-i18n="pessimistic_cost">Custo Pessimista (b)</label>
 <div class="input-group">
 <div class="input-group-prepend">
 <span class="input-group-text">R$</span>
 </div>
-<input class="form-control" id="pessimisticCost" min="0" step="0.01" type="number" placeholder="Pior cenário"/>
+<input class="form-control" id="pessimisticCost" min="0" step="0.01" type="number" data-i18n-placeholder="worst_scenario"/>
 </div>
 </div>
 </div>
@@ -763,15 +763,15 @@ Forneça amostras de tempo de lead para visualizar o gráfico de controle.
 <div class="row mt-3">
 <div class="col-md-6 text-left">
 <div class="form-group">
-<label for="costSimulations">Número de Simulações</label>
+<label for="costSimulations" data-i18n="num_sims">Número de Simulações</label>
 <input class="form-control" id="costSimulations" max="100000" min="10000" type="number" value="10000"/>
-<small class="form-text text-muted">Mínimo: 10.000 simulações</small>
+<small class="form-text text-muted" data-i18n="min_simulations">Mínimo: 10.000 simulações</small>
 </div>
 </div>
 <div class="col-md-6 text-left">
 <div class="form-group">
-<label>Backlog</label>
-<div class="alert alert-secondary mb-0" role="alert">
+<label data-i18n="backlog">Backlog</label>
+<div class="alert alert-secondary mb-0" role="alert" data-i18n="uses_backlog">
                                         Usa o backlog definido na aba Monte Carlo
                                     </div>
 </div>
@@ -779,24 +779,24 @@ Forneça amostras de tempo de lead para visualizar o gráfico de controle.
 </div>
 </div>
 <div class="container-fluid bg-12 text-center mt-4">
-<button class="btn btn-primary btn-lg" id="runCostAnalysis" type="button">
+<button class="btn btn-primary btn-lg" id="runCostAnalysis" type="button" data-i18n="run_cost_analysis">
                                 Executar Análise de Custos
                             </button>
 </div>
 <div class="mt-4" id="cost-analysis-loading" style="display:none">
 <div class="spinner-border text-primary" role="status">
-<span class="sr-only">Loading...</span>
+<span class="sr-only" data-i18n="loading">Carregando...</span>
 </div>
-<p class="mt-2">Executando simulações de custo...</p>
+<p class="mt-2" data-i18n="running_cost_sims">Executando simulações de custo...</p>
 </div>
 <div class="mt-4" id="cost-analysis-results" style="display:none">
 <div class="container-fluid">
-<h3>Resultados da Simulação</h3>
+<h3 data-i18n="cost_results_title">Resultados da Simulação</h3>
 <div class="row">
 <div class="col-lg-6">
 <div class="card mb-3">
 <div class="card-header bg-primary text-white">
-<h5 class="mb-0">Estatísticas de Custo</h5>
+<h5 class="mb-0" data-i18n="cost_statistics">Estatísticas de Custo</h5>
 </div>
 <div class="card-body">
 <table class="table table-sm table-borderless mb-0">
@@ -809,7 +809,7 @@ Forneça amostras de tempo de lead para visualizar o gráfico de controle.
 <div class="col-lg-6">
 <div class="card mb-3">
 <div class="card-header bg-success text-white">
-<h5 class="mb-0">Cenários</h5>
+<h5 class="mb-0" data-i18n="scenarios">Cenários</h5>
 </div>
 <div class="card-body">
 <table class="table table-sm table-borderless mb-0">
@@ -824,7 +824,7 @@ Forneça amostras de tempo de lead para visualizar o gráfico de controle.
 <div class="col-12">
 <div class="card">
 <div class="card-header bg-info text-white">
-<h5 class="mb-0">Distribuição de Custos</h5>
+<h5 class="mb-0" data-i18n="cost_distribution">Distribuição de Custos</h5>
 </div>
 <div class="card-body">
 <div class="chart-container">
@@ -838,15 +838,15 @@ Forneça amostras de tempo de lead para visualizar o gráfico de controle.
 <div class="col-md-6">
 <div class="card">
 <div class="card-header bg-warning">
-<h5 class="mb-0">Percentis de Custo</h5>
+<h5 class="mb-0" data-i18n="cost_percentiles">Percentis de Custo</h5>
 </div>
 <div class="card-body">
 <table class="table table-sm table-bordered">
 <thead>
 <tr>
-<th>Percentil</th>
-<th>Custo (R$)</th>
-<th>Probabilidade</th>
+<th data-i18n="percentile">Percentil</th>
+<th data-i18n="cost_currency">Custo (R$)</th>
+<th data-i18n="probability">Probabilidade</th>
 </tr>
 </thead>
 <tbody id="cost-percentiles-table">
@@ -858,7 +858,7 @@ Forneça amostras de tempo de lead para visualizar o gráfico de controle.
 <div class="col-md-6">
 <div class="card">
 <div class="card-header bg-secondary text-white">
-<h5 class="mb-0">Parâmetros PERT-Beta</h5>
+<h5 class="mb-0" data-i18n="pert_beta_params">Parâmetros PERT-Beta</h5>
 </div>
 <div class="card-body">
 <table class="table table-sm table-borderless">

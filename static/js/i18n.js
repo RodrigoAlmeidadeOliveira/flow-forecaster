@@ -146,6 +146,17 @@
             uses_backlog: 'Usa o backlog definido na aba Monte Carlo',
             running_cost_sims: 'Executando simulações de custo...',
 
+            // Cost analysis results
+            cost_results_title: 'Resultados da Simulação',
+            cost_statistics: 'Estatísticas de Custo',
+            scenarios: 'Cenários',
+            cost_distribution: 'Distribuição de Custos',
+            cost_percentiles: 'Percentis de Custo',
+            percentile: 'Percentil',
+            cost_currency: 'Custo (R$)',
+            probability: 'Probabilidade',
+            pert_beta_params: 'Parâmetros PERT-Beta',
+
             // Rodapé e outros
             mandatory_fields: 'Campos marcados com um',
             are_mandatory: 'são obrigatórios',
@@ -379,6 +390,17 @@
             uses_backlog: 'Uses the backlog defined in the Monte Carlo tab',
             running_cost_sims: 'Running cost simulations...',
 
+            // Cost analysis results
+            cost_results_title: 'Simulation Results',
+            cost_statistics: 'Cost Statistics',
+            scenarios: 'Scenarios',
+            cost_distribution: 'Cost Distribution',
+            cost_percentiles: 'Cost Percentiles',
+            percentile: 'Percentile',
+            cost_currency: 'Cost (R$)',
+            probability: 'Probability',
+            pert_beta_params: 'PERT-Beta Parameters',
+
             // Footer and others
             mandatory_fields: 'Fields marked with a red',
             are_mandatory: 'are mandatory',
@@ -604,6 +626,17 @@
             min_simulations: 'Mínimo: 10,000 simulaciones',
             uses_backlog: 'Utiliza el backlog definido en la pestaña Monte Carlo',
             running_cost_sims: 'Ejecutando simulaciones de costos...',
+
+            // Cost analysis results
+            cost_results_title: 'Resultados de la Simulación',
+            cost_statistics: 'Estadísticas de Costo',
+            scenarios: 'Escenarios',
+            cost_distribution: 'Distribución de Costos',
+            cost_percentiles: 'Percentiles de Costo',
+            percentile: 'Percentil',
+            cost_currency: 'Costo (R$)',
+            probability: 'Probabilidad',
+            pert_beta_params: 'Parámetros PERT-Beta',
 
             // Pie de página y otros
             mandatory_fields: 'Los campos marcados con un',
