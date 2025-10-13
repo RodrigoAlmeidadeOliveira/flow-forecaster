@@ -42,10 +42,29 @@ def convert_to_native_types(obj):
         return obj
 
 
+@app.route('/health')
+def health():
+    """Health check endpoint."""
+    return {"status": "ok", "routes": len(list(app.url_map.iter_rules()))}
+
+
 @app.route('/')
 def index():
     """Render the main page."""
-    return render_template('index.html')
+    try:
+        return render_template('index.html')
+    except Exception as e:
+        # Fallback if template rendering fails
+        return f"""
+        <html>
+        <head><title>Flow Forecasting - Error</title></head>
+        <body>
+            <h1>Template Error</h1>
+            <p>Error loading template: {str(e)}</p>
+            <p>Template path: {app.template_folder}</p>
+        </body>
+        </html>
+        """, 500
 
 
 @app.route('/advanced')
