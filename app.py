@@ -18,10 +18,14 @@ from cost_pert_beta import simulate_pert_beta_cost, calculate_risk_metrics
 app = Flask(__name__)
 
 # Debugging: Print routes at startup
-print("="*60)
-print("Flask app created successfully!")
-print(f"App name: {app.name}")
-print("="*60)
+import sys
+print("="*60, flush=True)
+print("Flask app created successfully!", flush=True)
+print(f"App name: {app.name}", flush=True)
+print(f"Template folder: {app.template_folder}", flush=True)
+print(f"Root path: {app.root_path}", flush=True)
+print("="*60, flush=True)
+sys.stdout.flush()
 
 
 def convert_to_native_types(obj):
@@ -894,11 +898,12 @@ def api_cost_analysis():
 
 
 # Print registered routes for debugging
-print("="*60)
-print(f"Total routes registered: {len(list(app.url_map.iter_rules()))}")
+print("="*60, flush=True)
+print(f"Total routes registered: {len(list(app.url_map.iter_rules()))}", flush=True)
 for rule in app.url_map.iter_rules():
-    print(f"  {rule.endpoint:30s} {rule.rule}")
-print("="*60)
+    print(f"  {rule.endpoint:30s} {rule.rule}", flush=True)
+print("="*60, flush=True)
+sys.stdout.flush()
 
 
 if __name__ == '__main__':
