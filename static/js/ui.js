@@ -270,6 +270,7 @@ $(window).on("load", function () {
             minContributors: parseInt($('#minContributors').val()) || parseInt($('#totalContributors').val()),
             maxContributors: parseInt($('#maxContributors').val()) || parseInt($('#totalContributors').val()),
             sCurveSize: parseInt($('#sCurveSize').val()),
+            historical_team_size: parseInt($('#historicalTeamSize').val()) || 1,
             startDate: $('#startDate').val() || undefined,
             deadlineDate: $('#deadlineDate').val() || undefined
         };
@@ -873,6 +874,59 @@ $(window).on("load", function () {
         const startDateFormatted = mc.start_date || '—';
         const deadlineDateFormatted = mc.deadline_date || '—';
 
+        // Generate visual forecast summary
+        function generateProgressBar(completed, total, label, percentage) {
+            const filledBlocks = Math.round((completed / total) * 24);
+            const emptyBlocks = 24 - filledBlocks;
+            const filled = '█'.repeat(filledBlocks);
+            const empty = '░'.repeat(emptyBlocks);
+            return `${label}: ${filled}${empty} ${completed} itens (${percentage}%)`;
+        }
+
+        function generateConclusion(backlog, p85Value, canMeet) {
+            if (canMeet) {
+                return `✅ <strong>Conclusão:</strong> Com os dados atuais, você <strong>CONSEGUIRÁ</strong> completar os ${backlog} itens no prazo. A equipe tem capacidade para entregar o backlog completo.`;
+            } else {
+                const percentageP85 = Math.round((p85Value / backlog) * 100);
+                let fractionText = '';
+                if (percentageP85 >= 90) fractionText = 'praticamente todo o backlog';
+                else if (percentageP85 >= 75) fractionText = 'aproximadamente 3/4 do backlog';
+                else if (percentageP85 >= 66) fractionText = 'aproximadamente 2/3 do backlog';
+                else if (percentageP85 >= 50) fractionText = 'aproximadamente metade do backlog';
+                else if (percentageP85 >= 33) fractionText = 'aproximadamente 1/3 do backlog';
+                else fractionText = 'menos de 1/3 do backlog';
+
+                return `⚠️ <strong>Conclusão:</strong> Com os dados atuais, você <strong>NÃO conseguirá</strong> completar os ${backlog} itens em ${daysToDeadline} dias. Prepare-se para entregar ${fractionText} com boa confiança.`;
+            }
+        }
+
+        const backlog = mc.backlog || 0;
+        const p95Items = parseInt(scopeCompletedP95) || 0;
+        const p85Items = parseInt(scopeCompletedP85) || 0;
+        const p50Items = parseInt(scopeCompletedP50) || 0;
+
+        const visualSummaryHtml = backlog > 0 ? `
+            <div class="col-lg-12 mt-3">
+                <div class="card">
+                    <div class="card-header bg-secondary text-white">
+                        <h5 class="mb-0">📊 Visualização Rápida</h5>
+                    </div>
+                    <div class="card-body">
+                        <pre class="mb-0" style="font-family: 'Courier New', monospace; font-size: 13px; line-height: 1.6; background-color: #f8f9fa; padding: 15px; border-radius: 4px; overflow-x: auto;">
+${generateProgressBar(backlog, backlog, 'Backlog total    ', 100)}
+
+${generateProgressBar(p95Items, backlog, 'P95 (conservador)', Math.round((p95Items/backlog)*100))}
+${generateProgressBar(p85Items, backlog, 'P85 (recomendado)', Math.round((p85Items/backlog)*100))}
+${generateProgressBar(p50Items, backlog, 'P50 (arriscado)  ', Math.round((p50Items/backlog)*100))}
+</pre>
+                        <div class="alert alert-${mc.can_meet_deadline ? 'success' : 'warning'} mb-0 mt-3">
+                            ${generateConclusion(backlog, p85Items, mc.can_meet_deadline)}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        ` : '';
+
         const summaryHtml = `
             <div class="row">
                 <div class="col-lg-6">
@@ -969,6 +1023,7 @@ $(window).on("load", function () {
                 <div class="card-body">
                     ${summaryHtml}
                     <div class="row">
+                        ${visualSummaryHtml}
                         ${mlComparisonHtml}
                         ${consensusHtml}
                     </div>

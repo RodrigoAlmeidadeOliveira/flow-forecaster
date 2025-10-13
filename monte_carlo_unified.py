@@ -403,8 +403,15 @@ def simulate_burn_down(simulation_data: Dict[str, Any]) -> Dict[str, Any]:
         percent_complete = max(0, min(99, round((total_tasks - remaining_tasks) / total_tasks * 100)))
         contributors_this_week = contributors_distribution[percent_complete]
 
-        # Adjust throughput based on active contributors
-        adjusted_tp = random_tp * (contributors_this_week / total_contributors)
+        # FIXED: Adjust throughput based on active contributors
+        # IMPORTANT: Historical throughput is assumed to be from a baseline team
+        # We get the baseline from simulation data, default to 1 if not specified
+        baseline_team_size = simulation_data.get('historical_team_size', 1)
+
+        # Scale throughput: if historical data is from 1 person doing X items/week,
+        # and we now have N contributors active, they should do N * X items/week
+        throughput_per_contributor = random_tp / baseline_team_size
+        adjusted_tp = throughput_per_contributor * contributors_this_week
 
         remaining_tasks -= adjusted_tp
         duration_in_calendar_weeks += 1

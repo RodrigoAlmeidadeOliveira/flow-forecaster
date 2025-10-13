@@ -32,6 +32,14 @@ $(document).ready(function() {
         const nSimulations = parseInt($('#costSimulations').val());
         const avgCostPerItem = parseFloat($('#avgCostPerItem').val()) || null;
 
+        // Get Monte Carlo parameters for team configuration
+        const teamSize = parseInt($('#totalContributors').val()) || 1;
+        const minContributors = parseInt($('#minContributors').val()) || null;
+        const maxContributors = parseInt($('#maxContributors').val()) || null;
+
+        // Get throughput samples
+        const tpSamples = $('#tpSamples').val().trim();
+
         // Validation
         if (!optimistic || !mostLikely || !pessimistic) {
             alert('Por favor, preencha todas as estimativas de custo (otimista, mais provável e pessimista).');
@@ -48,6 +56,11 @@ $(document).ready(function() {
             return;
         }
 
+        if (!tpSamples) {
+            alert('Por favor, forneça os dados de throughput na seção "Shared Throughput Data".');
+            return;
+        }
+
         // Show loading
         $('#cost-analysis-loading').show();
         $('#cost-analysis-results').hide();
@@ -59,7 +72,11 @@ $(document).ready(function() {
             pessimistic: pessimistic,
             backlog: backlog,
             nSimulations: nSimulations,
-            avgCostPerItem: avgCostPerItem
+            avgCostPerItem: avgCostPerItem,
+            teamSize: teamSize,
+            minContributors: minContributors,
+            maxContributors: maxContributors,
+            tpSamples: tpSamples
         };
 
         // Call API
@@ -201,17 +218,64 @@ $(document).ready(function() {
                 <td class="text-right">${formatCurrency(results.pert_std_per_item)}</td>
             </tr>
             <tr class="border-top">
-                <th scope="row">Otimista (a)</th>
+                <th scope="row">Otimista (a) - Ajustado</th>
                 <td class="text-right">${formatCurrency(results.optimistic)}</td>
             </tr>
             <tr>
-                <th scope="row">Mais Provável (m)</th>
+                <th scope="row">Mais Provável (m) - Ajustado</th>
                 <td class="text-right">${formatCurrency(results.most_likely)}</td>
             </tr>
             <tr>
-                <th scope="row">Pessimista (b)</th>
+                <th scope="row">Pessimista (b) - Ajustado</th>
                 <td class="text-right">${formatCurrency(results.pessimistic)}</td>
             </tr>
+        `;
+
+        // Add team efficiency metrics if available
+        if (results.team_size && results.team_efficiency) {
+            pertParamsHtml += `
+                <tr class="border-top">
+                    <th scope="row">Tamanho da Equipe</th>
+                    <td class="text-right">${results.team_size} ${results.team_size === 1 ? 'pessoa' : 'pessoas'}</td>
+                </tr>
+                <tr>
+                    <th scope="row">Fator de Eficiência</th>
+                    <td class="text-right">${formatNumber(results.team_efficiency, 4)}</td>
+                </tr>
+            `;
+
+            if (results.avg_throughput_per_contributor) {
+                pertParamsHtml += `
+                    <tr>
+                        <th scope="row">Throughput Médio/Pessoa</th>
+                        <td class="text-right">${formatNumber(results.avg_throughput_per_contributor, 2)} itens/semana</td>
+                    </tr>
+                `;
+            }
+        }
+
+        // Show original estimates if they were adjusted
+        if (results.original_optimistic && results.team_efficiency !== 1.0) {
+            pertParamsHtml += `
+                <tr class="border-top">
+                    <th scope="row" colspan="2" class="text-center"><em>Estimativas Originais (sem ajuste)</em></th>
+                </tr>
+                <tr>
+                    <th scope="row">Otimista Original</th>
+                    <td class="text-right">${formatCurrency(results.original_optimistic)}</td>
+                </tr>
+                <tr>
+                    <th scope="row">Mais Provável Original</th>
+                    <td class="text-right">${formatCurrency(results.original_most_likely)}</td>
+                </tr>
+                <tr>
+                    <th scope="row">Pessimista Original</th>
+                    <td class="text-right">${formatCurrency(results.original_pessimistic)}</td>
+                </tr>
+            `;
+        }
+
+        pertParamsHtml += `
             <tr class="border-top">
                 <th scope="row">Backlog</th>
                 <td class="text-right">${results.backlog} itens</td>

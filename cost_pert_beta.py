@@ -76,7 +76,9 @@ def simulate_pert_beta_cost(
     pessimistic: float,
     backlog: int,
     n_simulations: int = 10000,
-    avg_cost_per_item: float = None
+    avg_cost_per_item: float = None,
+    team_size: int = 1,
+    throughput_samples: List[float] = None
 ) -> Dict[str, Any]:
     """
     Run Monte Carlo simulation for cost estimation using PERT-Beta distribution.
@@ -88,6 +90,8 @@ def simulate_pert_beta_cost(
         backlog: Number of items in backlog
         n_simulations: Number of Monte Carlo simulations (default: 10000)
         avg_cost_per_item: Average historical cost per item (optional)
+        team_size: Size of the team (default: 1)
+        throughput_samples: Historical throughput samples for calculating team efficiency (optional)
 
     Returns:
         Dictionary with simulation results including:
@@ -99,9 +103,23 @@ def simulate_pert_beta_cost(
         - beta: PERT-Beta beta parameter
         - pert_mean: PERT distribution mean per item
         - pert_std: PERT distribution std per item
+        - team_efficiency: Calculated team efficiency metric
     """
     if n_simulations < 10000:
         raise ValueError("Minimum 10,000 simulations required for accurate results")
+
+    # Calculate team efficiency factor based on throughput and team size
+    team_efficiency = 1.0
+    avg_throughput_per_contributor = None
+
+    if throughput_samples and len(throughput_samples) > 0:
+        # Calculate average throughput per contributor
+        avg_throughput = np.mean(throughput_samples)
+        avg_throughput_per_contributor = avg_throughput / team_size if team_size > 0 else avg_throughput
+
+        # Team efficiency affects the cost: higher efficiency = lower relative cost
+        # Normalize efficiency (throughput per contributor becomes a multiplier)
+        team_efficiency = 1.0 / (1.0 + avg_throughput_per_contributor * 0.1)  # Scaling factor
 
     # Calculate PERT-Beta parameters
     alpha, beta = calculate_pert_beta_parameters(optimistic, most_likely, pessimistic)
@@ -109,10 +127,18 @@ def simulate_pert_beta_cost(
     # Calculate PERT mean and std
     pert_mean, pert_std = pert_beta_mean_std(optimistic, most_likely, pessimistic, alpha, beta)
 
+    # Adjust costs based on team efficiency
+    # Higher efficiency (more throughput per person) means better cost effectiveness
+    adjusted_optimistic = optimistic * team_efficiency
+    adjusted_most_likely = most_likely * team_efficiency
+    adjusted_pessimistic = pessimistic * team_efficiency
+    adjusted_pert_mean = pert_mean * team_efficiency
+    adjusted_pert_std = pert_std * team_efficiency
+
     # Run Monte Carlo simulation
     # Generate random samples from Beta(alpha, beta) and scale to [a, b]
     beta_samples = stats.beta.rvs(alpha, beta, size=n_simulations * backlog)
-    cost_per_item_samples = optimistic + beta_samples * (pessimistic - optimistic)
+    cost_per_item_samples = adjusted_optimistic + beta_samples * (adjusted_pessimistic - adjusted_optimistic)
 
     # Reshape to (n_simulations, backlog) and sum across items
     cost_matrix = cost_per_item_samples.reshape(n_simulations, backlog)
@@ -158,8 +184,8 @@ def simulate_pert_beta_cost(
         'max': float(max_total),
         'alpha': float(alpha),
         'beta': float(beta),
-        'pert_mean_per_item': float(pert_mean),
-        'pert_std_per_item': float(pert_std),
+        'pert_mean_per_item': float(adjusted_pert_mean),
+        'pert_std_per_item': float(adjusted_pert_std),
         'histogram': {
             'counts': hist.tolist(),
             'bin_centers': bin_centers.tolist(),
@@ -172,9 +198,15 @@ def simulate_pert_beta_cost(
         'prob_below_avg': prob_below_avg,
         'n_simulations': n_simulations,
         'backlog': backlog,
-        'optimistic': optimistic,
-        'most_likely': most_likely,
-        'pessimistic': pessimistic
+        'optimistic': float(adjusted_optimistic),
+        'most_likely': float(adjusted_most_likely),
+        'pessimistic': float(adjusted_pessimistic),
+        'original_optimistic': optimistic,
+        'original_most_likely': most_likely,
+        'original_pessimistic': pessimistic,
+        'team_size': team_size,
+        'team_efficiency': float(team_efficiency),
+        'avg_throughput_per_contributor': float(avg_throughput_per_contributor) if avg_throughput_per_contributor else None
     }
 
 

@@ -739,7 +739,11 @@ def api_cost_analysis():
         "pessimistic": float (custo pessimista por item),
         "backlog": int (número de itens),
         "nSimulations": int (optional, default: 10000),
-        "avgCostPerItem": float (optional, custo médio histórico)
+        "avgCostPerItem": float (optional, custo médio histórico),
+        "teamSize": int (optional, tamanho da equipe),
+        "minContributors": int (optional, contribuidores mínimos),
+        "maxContributors": int (optional, contribuidores máximos),
+        "tpSamples": str or list (optional, amostras de throughput)
     }
 
     Returns:
@@ -754,6 +758,22 @@ def api_cost_analysis():
         backlog = data.get('backlog')
         n_simulations = data.get('nSimulations', 10000)
         avg_cost_per_item = data.get('avgCostPerItem')
+        team_size = data.get('teamSize', 1)
+        min_contributors = data.get('minContributors')
+        max_contributors = data.get('maxContributors')
+        tp_samples_raw = data.get('tpSamples')
+
+        # Parse throughput samples
+        throughput_samples = None
+        if tp_samples_raw:
+            if isinstance(tp_samples_raw, str):
+                # Parse string format "5, 6, 7, 4, 8"
+                try:
+                    throughput_samples = [float(x.strip()) for x in tp_samples_raw.split(',') if x.strip()]
+                except ValueError:
+                    return jsonify({'error': 'Invalid throughput samples format'}), 400
+            elif isinstance(tp_samples_raw, list):
+                throughput_samples = [float(x) for x in tp_samples_raw]
 
         # Validation
         if not all([optimistic, most_likely, pessimistic, backlog]):
@@ -775,14 +795,16 @@ def api_cost_analysis():
         if n_simulations < 10000:
             return jsonify({'error': 'Minimum 10,000 simulations required'}), 400
 
-        # Run PERT-Beta simulation
+        # Run PERT-Beta simulation with team parameters
         results = simulate_pert_beta_cost(
             optimistic=float(optimistic),
             most_likely=float(most_likely),
             pessimistic=float(pessimistic),
             backlog=int(backlog),
             n_simulations=int(n_simulations),
-            avg_cost_per_item=float(avg_cost_per_item) if avg_cost_per_item else None
+            avg_cost_per_item=float(avg_cost_per_item) if avg_cost_per_item else None,
+            team_size=int(team_size),
+            throughput_samples=throughput_samples
         )
 
         # Calculate risk metrics
