@@ -216,11 +216,11 @@
 </div>
 <div class="input-group mb-3">
 <div class="input-group-prepend">
-<span class="input-group-text" title="Team size when historical throughput data was collected">Historical team size</span>
+<span class="input-group-text" data-i18n="historical_team_size_label" data-i18n-title="historical_team_size_tooltip">Tamanho histórico da equipe</span>
 </div>
 <input class="form-control" id="historicalTeamSize" max="9999" min="1" title="Number of contributors when historical throughput data was collected (default: 1)" type="number" value="1" placeholder="1"/>
 <div class="input-group-append">
-<span class="input-group-text">contributors</span>
+<span class="input-group-text" data-i18n="contributors">contribuidores</span>
 </div>
 </div>
 </div>
@@ -264,33 +264,33 @@
 </div>
 </div>
 </div>
-<p class="mb-0"><i>(Fields marked with a red <span style="color:red">*</span> are mandatory)</i></p>
+<p class="mb-0"><i>(<span data-i18n="fields_mandatory">Campos marcados com um</span> <span style="color:red">*</span> <span data-i18n="are_mandatory">vermelho são obrigatórios</span>)</i></p>
 </div>
 <div class="container-fluid bg-12 text-center">
 <h2 data-i18n="historical_data">Dados históricos</h2>
 <p class="text-muted mb-4" data-i18n="weekly_throughput_note">As amostras de throughput semanais são definidas na seção compartilhada acima.</p>
 <div class="row">
 <div class="col-sm-6">
-<h4>Task lead-times</h4>
+<h4 data-i18n="task_lead_times">Tempos de lead de tarefas</h4>
 <textarea class="form-control text-monospace" id="ltSamples" rows="4" title="Optionally paste your historical data of tasks lead-time"></textarea>
 </div>
 <div class="col-sm-6">
-<h4>Projects split rates</h4>
+<h4 data-i18n="projects_split_rates">Taxas de divisão de projetos</h4>
 <textarea class="form-control text-monospace" id="splitRateSamples" rows="4" title="Optionally paste your historical data of project's split rates"></textarea>
 </div>
 </div>
 </div>
 <div class="container-fluid bg-12 text-center">
-<h2>Risks (optional)</h2>
-<p class="text-muted">Model discrete risks to add probabilistic buffer to your forecast.</p>
+<h2 data-i18n="risks_optional">Riscos (opcional)</h2>
+<p class="text-muted" data-i18n="risks_description">Modele riscos discretos para adicionar buffer probabilístico à sua previsão.</p>
 <div class="row">
 <table class="table table-sm" id="risks">
 <thead>
 <tr class="d-flex">
-<th class="col-2" scope="col">Likelihood</th>
-<th class="col-2" scope="col">Low impact</th>
-<th class="col-2" scope="col">High impact</th>
-<th class="col-6" scope="col">Description</th>
+<th class="col-2" scope="col" data-i18n="likelihood">Probabilidade</th>
+<th class="col-2" scope="col" data-i18n="low_impact">Impacto baixo</th>
+<th class="col-2" scope="col" data-i18n="high_impact">Impacto alto</th>
+<th class="col-6" scope="col" data-i18n="description">Descrição</th>
 </tr>
 </thead>
 <tbody>
@@ -307,7 +307,7 @@
 <div class="input-group mb-3">
 <input class="form-control" max="100" min="0" name="lowImpact" type="number"/>
 <div class="input-group-append d-none d-lg-block">
-<span class="input-group-text">tasks</span>
+<span class="input-group-text" data-i18n="tasks">tarefas</span>
 </div>
 </div>
 </td>
@@ -315,7 +315,7 @@
 <div class="input-group mb-3">
 <input class="form-control" max="100" min="1" name="highImpact" type="number"/>
 <div class="input-group-append d-none d-lg-block">
-<span class="input-group-text">tasks</span>
+<span class="input-group-text" data-i18n="tasks">tarefas</span>
 </div>
 </div>
 </td>
@@ -326,7 +326,7 @@
 <td class="col-2"></td>
 <td class="col-2"></td>
 <td class="col-6">
-<button class="btn btn-secondary btn-sm" id="addRisk" type="button">Add row</button>
+<button class="btn btn-secondary btn-sm" id="addRisk" type="button" data-i18n="add_row">Adicionar linha</button>
 </td>
 </tr>
 </tbody>
@@ -340,43 +340,43 @@
 <div class="container-fluid bg-12 text-center" id="results-main" style="display:none">
 <h2 data-i18n="results_title">Resultados da Simulação</h2>
 <div class="col-sm-4 text-left">
-<h4 id="res-summary-header">Project forecast summary:</h4>
+<h4 id="res-summary-header" data-i18n="forecast_summary">Resumo da previsão do projeto:</h4>
 <div class="input-group mb-1">
 <div class="input-group-prepend">
-<span class="input-group-text font-weight-bold">Effort:</span>
+<span class="input-group-text font-weight-bold" data-i18n="effort">Esforço:</span>
 </div>
 <input class="form-control" id="res-effort" readonly="" type="text"/>
 <div class="input-group-append">
-<span class="input-group-text">person-weeks</span>
+<span class="input-group-text" data-i18n="person_weeks">pessoa-semanas</span>
 </div>
 </div>
 <div class="input-group mb-1">
 <div class="input-group-prepend">
-<span class="input-group-text font-weight-bold">Duration:</span>
+<span class="input-group-text font-weight-bold" data-i18n="duration">Duração:</span>
 </div>
 <input class="form-control" id="res-duration" readonly="" type="text"/>
 <div class="input-group-append">
-<span class="input-group-text">calendar weeks</span>
+<span class="input-group-text" data-i18n="calendar_weeks">semanas corridas</span>
 </div>
 </div>
 <div class="input-group mb-1">
 <div class="input-group-prepend">
-<span class="input-group-text font-weight-bold">Delivery date:</span>
+<span class="input-group-text font-weight-bold" data-i18n="delivery_date">Data de entrega:</span>
 </div>
 <input class="form-control" id="res-endDate" readonly="" type="text"/>
 </div>
 </div>
-<h3>All probabilities</h3>
+<h3 data-i18n="all_probabilities">Todas as probabilidades</h3>
 <div class="row">
 <table class="table table-sm" id="probabilities">
 <thead>
 <tr class="d-flex probabilities-header">
-<th class="col-2" scope="col">Likelihood</th>
-<th class="col-1" scope="col">Effort</th>
-<th class="col-1" scope="col">Duration</th>
-<th class="col-2" scope="col">Tasks</th>
-<th class="col-3" scope="col">Date</th>
-<th class="col-3" scope="col">Comment</th>
+<th class="col-2" scope="col" data-i18n="likelihood">Probabilidade</th>
+<th class="col-1" scope="col" data-i18n="effort">Esforço</th>
+<th class="col-1" scope="col" data-i18n="duration">Duração</th>
+<th class="col-2" scope="col" data-i18n="num_tasks">Número de tarefas</th>
+<th class="col-3" scope="col" data-i18n="date">Data</th>
+<th class="col-3" scope="col" data-i18n="comment">Comentário</th>
 </tr>
 </thead>
 <tbody>
@@ -395,21 +395,21 @@
 <td class="col-2"></td>
 <td class="col-3"></td>
 <td class="col-3">
-<button class="btn btn-secondary btn-sm" id="show-more" type="button">Show more...</button>
+<button class="btn btn-secondary btn-sm" id="show-more" type="button" data-i18n="show_more">Mostrar mais...</button>
 </td>
 </tr>
 </tbody>
 </table>
 </div>
-<h3>Charts</h3>
+<h3 data-i18n="charts">Gráficos</h3>
 <canvas id="res-duration-histogram"></canvas>
 <canvas id="res-burn-downs"></canvas>
 <canvas id="res-effort-scatter-plot"></canvas>
-<h3>Simulation report</h3>
+<h3 data-i18n="simulation_report">Relatório da simulação</h3>
 <textarea class="col-sm-12 text-monospace" id="results" readonly="" rows="23"></textarea>
 </div>
 <div class="container-fluid bg-12 text-left mt-4" id="input-stats" style="display:none">
-<h3 class="input-stats-title">Input statistics</h3>
+<h3 class="input-stats-title" data-i18n="input_stats">Estatísticas de entrada</h3>
 <div class="input-stats-content"></div>
 </div>
 </div>
@@ -417,112 +417,112 @@
 <div aria-labelledby="tab-advanced-link" class="tab-pane fade" id="advanced-forecast" role="tabpanel">
 <div class="pt-4 pb-5">
 <div class="container text-center">
-<h2>Advanced Forecasting</h2>
-<p class="mb-4">
-                            Combine machine learning forecasts with Monte Carlo throughput simulations for richer outlooks.
-                            Provide at least eight throughput samples to unlock ML-based projections.
+<h2 data-i18n="advanced_forecasting">Previsão Avançada</h2>
+<p class="mb-4" data-i18n="advanced_description">
+                            Combine previsões de aprendizado de máquina com simulações de throughput Monte Carlo para perspectivas mais ricas.
+                            Forneça pelo menos oito amostras de throughput para desbloquear projeções baseadas em ML.
                         </p>
 </div>
 <div class="container-fluid bg-6 text-center">
 <div class="row">
 <div class="col-sm-6 text-left">
-<h3>Historical Data</h3>
+<h3 data-i18n="historical_data_title">Dados Históricos</h3>
 <div class="form-group">
-<label>Weekly Throughput<span style="color:red">*</span></label>
+<label><span data-i18n="weekly_throughput_label">Throughput Semanal</span><span style="color:red">*</span></label>
 <div class="alert alert-secondary mb-3" role="alert">
-                                        Uses the shared throughput samples defined above.
-                                        <a class="alert-link scroll-to-throughput" href="#tpSamples">Edit data</a>
+                                        <span data-i18n="uses_shared_samples">Usa as amostras de throughput compartilhadas definidas acima.</span>
+                                        <a class="alert-link scroll-to-throughput" href="#tpSamples" data-i18n="edit_data_link">Editar dados</a>
 </div>
-<small class="form-text text-muted">Minimum of 8 values required for ML forecasting.</small>
+<small class="form-text text-muted" data-i18n="min_8_ml">Mínimo de 8 valores necessários para previsão ML.</small>
 </div>
 <div class="form-group">
-<label for="startDateAdv">Start Date</label>
+<label for="startDateAdv" data-i18n="start_date_label">Data de Início</label>
 <input class="form-control" id="startDateAdv" type="date"/>
 </div>
 </div>
 <div class="col-sm-6 text-left">
-<h3>Forecast Parameters</h3>
+<h3 data-i18n="forecast_params">Parâmetros de Previsão</h3>
 <div class="form-group">
-<label for="forecastSteps">Forecast Steps (weeks)</label>
+<label for="forecastSteps" data-i18n="forecast_steps_label">Passos de Previsão (semanas)</label>
 <input class="form-control" id="forecastSteps" max="12" min="1" type="number" value="4"/>
 </div>
 <div class="form-group">
-<label for="backlog">Backlog (tasks)</label>
+<label for="backlog" data-i18n="backlog_tasks_label">Backlog (tarefas)</label>
 <input class="form-control" id="backlog" max="10000" min="1" type="number" value="50"/>
 </div>
 <div class="form-group">
-<label for="nSimulations">Monte Carlo Simulations</label>
+<label for="nSimulations" data-i18n="mc_simulations_label">Simulações Monte Carlo</label>
 <input class="form-control" id="nSimulations" max="100000" min="1000" type="number" value="10000"/>
 </div>
 </div>
 </div>
 </div>
 <div class="container-fluid bg-12 text-center">
-<button class="btn btn-primary btn-lg" id="runCombined" type="button">Run Combined Forecast</button>
-<button class="btn btn-success" id="runML" type="button">ML Forecast Only</button>
+<button class="btn btn-primary btn-lg" id="runCombined" type="button" data-i18n="run_combined">Executar Previsão Combinada</button>
+<button class="btn btn-success" id="runML" type="button" data-i18n="ml_only">Apenas Previsão ML</button>
 </div>
 <div class="container-fluid text-center" id="loading" style="display:none">
 <div class="spinner-border text-primary" role="status">
-<span class="sr-only">Loading...</span>
+<span class="sr-only" data-i18n="loading">Carregando...</span>
 </div>
-<p>Running forecast... This may take a few seconds.</p>
+<p data-i18n="running_forecast">Executando previsão... Isso pode levar alguns segundos.</p>
 </div>
 <div id="results-container" style="display:none">
 <div class="container-fluid" id="ml-results" style="display:none">
-<h3>Machine Learning Forecast</h3>
+<h3 data-i18n="ml_forecast_title">Previsão de Aprendizado de Máquina</h3>
 <div class="results-panel">
-<h4>Risk Assessment</h4>
+<h4 data-i18n="risk_assessment_title">Avaliação de Risco</h4>
 <div id="risk-assessment"></div>
 </div>
 <div class="results-panel">
-<h4>Model Performance</h4>
+<h4 data-i18n="model_performance_title">Desempenho do Modelo</h4>
 <div id="model-performance"></div>
 </div>
 <div class="chart-container">
-<h4>ML Ensemble Forecast</h4>
+<h4 data-i18n="ml_ensemble_forecast">Previsão de Ensemble ML</h4>
 <img alt="ML Forecast Chart" id="ml-chart" src=""/>
 </div>
 <div class="chart-container">
-<h4>Historical Data Analysis</h4>
+<h4 data-i18n="historical_data_analysis">Análise de Dados Históricos</h4>
 <img alt="Historical Analysis" id="history-chart" src=""/>
 </div>
 </div>
 <div class="container-fluid" id="mc-results" style="display:none">
-<h3>Monte Carlo Simulation</h3>
+<h3 data-i18n="monte_carlo_simulation">Simulação Monte Carlo</h3>
 <div class="results-panel">
-<h4>Completion Time Statistics</h4>
+<h4 data-i18n="completion_time_stats">Estatísticas de Tempo de Conclusão</h4>
 <div id="mc-stats"></div>
 </div>
 <div class="chart-container">
-<h4>Monte Carlo Simulations</h4>
+<h4 data-i18n="monte_carlo_simulations">Simulações Monte Carlo</h4>
 <img alt="Monte Carlo Chart" id="mc-chart" src=""/>
 </div>
 </div>
 <div class="container-fluid" id="comparison-results" style="display:none">
-<h3>Forecast Comparison</h3>
+<h3 data-i18n="forecast_comparison">Comparação de Previsão</h3>
 <div class="chart-container">
-<h4>ML vs Monte Carlo Comparison</h4>
+<h4 data-i18n="ml_vs_mc">ML vs Monte Carlo Comparação</h4>
 <img alt="Comparison Chart" id="comparison-chart" src=""/>
 </div>
 <div class="results-panel">
 <div class="row">
 <div class="col-md-6">
-<h5>ML Forecast Summary</h5>
+<h5 data-i18n="ml_forecast_summary">Resumo de Previsão ML</h5>
 <div id="ml-summary"></div>
 </div>
 <div class="col-md-6">
-<h5>Monte Carlo Summary</h5>
+<h5 data-i18n="mc_summary">Resumo Monte Carlo</h5>
 <div id="mc-summary"></div>
 </div>
 </div>
 </div>
 </div>
 <div class="mt-4" id="advanced-input-stats" style="display:none">
-<h4 class="input-stats-title">Input statistics</h4>
+<h4 class="input-stats-title" data-i18n="input_stats">Estatísticas de entrada</h4>
 <div class="input-stats-content"></div>
 </div>
 <div class="container-fluid mt-4" id="walk-forward-results" style="display:none">
-<h3>Walk-forward Validation</h3>
+<h3 data-i18n="walk_forward_validation">Validação Walk-forward</h3>
 <div class="alert alert-info small">
                                 Validação com janela deslizante utilizando os últimos 20% das amostras. Os erros são calculados a cada origem de previsão respeitando o parâmetro <strong>Forecast Steps</strong>.
                             </div>
@@ -634,18 +634,18 @@
 <div aria-labelledby="tab-historical-link" class="tab-pane fade" id="historical-charts" role="tabpanel">
 <div class="pt-4 pb-5">
 <div class="container text-center">
-<h2>Historical Throughput &amp; Lead Time Charts</h2>
-<p class="mb-4">Visualize the distribution and stability of the samples you provided. Update the fields above to refresh these charts.</p>
+<h2 data-i18n="historical_throughput_lead">Gráficos Históricos de Throughput e Tempo de Lead</h2>
+<p class="mb-4" data-i18n="visualize_distribution">Visualize a distribuição e estabilidade das amostras fornecidas. Atualize os campos acima para atualizar esses gráficos.</p>
 </div>
 <div class="container-fluid">
 <div class="row">
 <div class="col-lg-6 mb-4">
 <div class="card h-100">
 <div class="card-header bg-primary text-white">
-<h5 class="mb-0">Throughput Histogram</h5>
+<h5 class="mb-0" data-i18n="throughput_histogram_title">Histograma de Throughput</h5>
 </div>
 <div class="card-body">
-<div class="alert alert-info" id="tp-histogram-empty" role="alert" style="display:none;">
+<div class="alert alert-info" id="tp-histogram-empty" role="alert" style="display:none;" data-i18n="min_3_samples_histogram">
 Forneça ao menos 3 amostras de throughput para gerar o histograma.
 </div>
 <div class="chart-container" id="tp-histogram-container">
@@ -657,11 +657,11 @@ Forneça ao menos 3 amostras de throughput para gerar o histograma.
 <div class="col-lg-6 mb-4">
 <div class="card h-100">
 <div class="card-header bg-secondary text-white">
-<h5 class="mb-0">Throughput Control Chart</h5>
+<h5 class="mb-0" data-i18n="throughput_control_title">Gráfico de Controle de Throughput</h5>
 </div>
 <div class="card-body">
-<div class="alert alert-info" id="tp-control-empty" role="alert" style="display:none;">
-Forneça amostras de throughput para visualizar o control chart.
+<div class="alert alert-info" id="tp-control-empty" role="alert" style="display:none;" data-i18n="min_samples_control">
+Forneça amostras de throughput para visualizar o gráfico de controle.
 </div>
 <div class="chart-container" id="tp-control-container">
 <canvas id="tp-control-chart"></canvas>
@@ -674,11 +674,11 @@ Forneça amostras de throughput para visualizar o control chart.
 <div class="col-lg-6 mb-4">
 <div class="card h-100">
 <div class="card-header bg-success text-white">
-<h5 class="mb-0">Lead Time Histogram</h5>
+<h5 class="mb-0" data-i18n="lead_time_histogram_title">Histograma de Tempo de Lead</h5>
 </div>
 <div class="card-body">
-<div class="alert alert-info" id="lt-histogram-empty" role="alert" style="display:none;">
-Forneça ao menos 3 amostras de lead time para gerar o histograma.
+<div class="alert alert-info" id="lt-histogram-empty" role="alert" style="display:none;" data-i18n="min_3_samples_lt_histogram">
+Forneça ao menos 3 amostras de tempo de lead para gerar o histograma.
 </div>
 <div class="chart-container" id="lt-histogram-container">
 <canvas id="lt-histogram-chart"></canvas>
@@ -689,11 +689,11 @@ Forneça ao menos 3 amostras de lead time para gerar o histograma.
 <div class="col-lg-6 mb-4">
 <div class="card h-100">
 <div class="card-header bg-dark text-white">
-<h5 class="mb-0">Lead Time Control Chart</h5>
+<h5 class="mb-0" data-i18n="lead_time_control_title">Gráfico de Controle de Tempo de Lead</h5>
 </div>
 <div class="card-body">
-<div class="alert alert-info" id="lt-control-empty" role="alert" style="display:none;">
-Forneça amostras de lead time para visualizar o control chart.
+<div class="alert alert-info" id="lt-control-empty" role="alert" style="display:none;" data-i18n="min_samples_lt_control">
+Forneça amostras de tempo de lead para visualizar o gráfico de controle.
 </div>
 <div class="chart-container" id="lt-control-container">
 <canvas id="lt-control-chart"></canvas>

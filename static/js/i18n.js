@@ -206,6 +206,34 @@
             throughput_control_title: 'Gráfico de Controle de Throughput',
             lead_time_histogram_title: 'Histograma de Tempo de Lead',
             lead_time_control_title: 'Gráfico de Controle de Tempo de Lead',
+
+            // Additional fields
+            task_lead_times: 'Tempos de lead de tarefas',
+            projects_split_rates: 'Taxas de divisão de projetos',
+            risks_optional: 'Riscos (opcional)',
+            risks_description: 'Modele riscos discretos para adicionar buffer probabilístico à sua previsão.',
+            add_row: 'Adicionar linha',
+            fields_mandatory: 'Campos marcados com um',
+            are_mandatory: 'vermelho são obrigatórios',
+
+            // Results section
+            all_probabilities: 'Todas as probabilidades',
+            charts: 'Gráficos',
+            simulation_report: 'Relatório da simulação',
+            input_stats: 'Estatísticas de entrada',
+            running_forecast: 'Executando previsão... Isso pode levar alguns segundos.',
+
+            // ML Results section titles
+            ml_forecast: 'Previsão de Aprendizado de Máquina',
+            risk_assessment: 'Avaliação de Risco',
+            model_performance: 'Desempenho do Modelo',
+            ml_ensemble: 'Previsão de Ensemble ML',
+            historical_analysis: 'Análise de Dados Históricos',
+            mc_simulation: 'Simulação Monte Carlo',
+            completion_stats: 'Estatísticas de Tempo de Conclusão',
+            forecast_compare: 'Comparação de Previsão',
+            ml_vs_mc_comparison: 'Comparação ML vs Monte Carlo',
+            walk_forward: 'Validação Walk-forward',
         },
 
         en: {
@@ -411,6 +439,27 @@
             throughput_control_title: 'Throughput Control Chart',
             lead_time_histogram_title: 'Lead Time Histogram',
             lead_time_control_title: 'Lead Time Control Chart',
+
+            // Additional fields
+            task_lead_times: 'Task lead-times',
+            projects_split_rates: 'Projects split rates',
+            risks_optional: 'Risks (optional)',
+            risks_description: 'Model discrete risks to add probabilistic buffer to your forecast.',
+            add_row: 'Add row',
+            fields_mandatory: 'Fields marked with a',
+            are_mandatory: 'are mandatory',
+
+            // Results section
+            all_probabilities: 'All probabilities',
+            charts: 'Charts',
+            simulation_report: 'Simulation report',
+            input_stats: 'Input statistics',
+            running_forecast: 'Running forecast... This may take a few seconds.',
+
+            // ML Results section titles
+            ml_forecast: 'Machine Learning Forecast',
+            risk_assessment: 'Risk Assessment',
+            model_performance: 'Model Performance',
         },
 
         es: {
@@ -616,6 +665,27 @@
             throughput_control_title: 'Gráfico de Control de Rendimiento',
             lead_time_histogram_title: 'Histograma de Tiempo de Entrega',
             lead_time_control_title: 'Gráfico de Control de Tiempo de Entrega',
+
+            // Additional fields
+            task_lead_times: 'Tiempos de entrega de tareas',
+            projects_split_rates: 'Tasas de división de proyectos',
+            risks_optional: 'Riesgos (opcional)',
+            risks_description: 'Modele riesgos discretos para agregar un búfer probabilístico a su pronóstico.',
+            add_row: 'Agregar fila',
+            fields_mandatory: 'Los campos marcados con un',
+            are_mandatory: 'son obligatorios',
+
+            // Results section
+            all_probabilities: 'Todas las probabilidades',
+            charts: 'Gráficos',
+            simulation_report: 'Informe de simulación',
+            input_stats: 'Estadísticas de entrada',
+            running_forecast: 'Ejecutando pronóstico... Esto puede tomar unos segundos.',
+
+            // ML Results section titles
+            ml_forecast: 'Pronóstico de Aprendizaje Automático',
+            risk_assessment: 'Evaluación de Riesgo',
+            model_performance: 'Rendimiento del Modelo',
         }
     };
 
