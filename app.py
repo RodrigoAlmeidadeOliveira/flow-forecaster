@@ -574,10 +574,55 @@ def api_deadline_analysis():
             mc_weeks = mc_result_native.get('projected_weeks_p85')
             ml_weeks = ml_result_native.get('projected_weeks_p85')
 
+            # Calculate difference in weeks
+            weeks_diff = abs((mc_weeks or 0) - (ml_weeks or 0))
+
+            # Calculate percentage difference (use average as base to avoid division by zero)
+            avg_weeks = (mc_weeks + ml_weeks) / 2 if (mc_weeks and ml_weeks) else 1
+            pct_diff = (weeks_diff / avg_weeks * 100) if avg_weeks > 0 else 0
+
+            # Determine if methods agree based on multiple criteria:
+            # 1. Both must agree on deadline outcome (can/cannot meet)
+            # 2. Week difference must be less than 20% of average (or less than 4 weeks for small projects)
+            deadline_outcome_match = mc_can_meet == ml_can_meet
+            weeks_close = weeks_diff < 4 or pct_diff < 20
+            both_agree = deadline_outcome_match and weeks_close
+
+            # Generate contextual recommendation
+            if both_agree:
+                recommendation = 'Ambos os métodos concordam. Alta confiabilidade na previsão.'
+            elif not deadline_outcome_match:
+                recommendation = 'Divergência crítica: Um método indica sucesso e outro indica risco. Revise os dados e considere coletar mais amostras.'
+            elif weeks_diff >= 10:
+                recommendation = f'Grande divergência temporal ({weeks_diff:.1f} semanas, {pct_diff:.0f}%). Monte Carlo tende a ser mais conservador com incertezas. Considere usar MC como referência principal.'
+            elif weeks_diff >= 4:
+                recommendation = f'Divergência moderada ({weeks_diff:.1f} semanas, {pct_diff:.0f}%). Use a previsão mais conservadora (maior) como referência.'
+            else:
+                recommendation = f'Pequena divergência ({weeks_diff:.1f} semanas). Ambos os métodos fornecem previsões similares.'
+
+            # Explain why they might differ
+            explanation = []
+            if weeks_diff > 2:
+                explanation.append('🔍 <strong>Por que há diferença?</strong>')
+                if mc_weeks > ml_weeks:
+                    explanation.append('• <strong>Monte Carlo é mais conservador:</strong> Considera toda a variabilidade histórica e incertezas dos dados')
+                    explanation.append('• <strong>Machine Learning é mais otimista:</strong> Identifica padrões e tendências nos dados históricos')
+                else:
+                    explanation.append('• <strong>Machine Learning é mais conservador:</strong> Pode ter detectado tendência de queda no throughput')
+                    explanation.append('• <strong>Monte Carlo é mais otimista:</strong> Baseia-se na distribuição histórica completa')
+
+                if pct_diff > 50:
+                    explanation.append('• ⚠️ <strong>Divergência muito alta sugere:</strong> Dados insuficientes, alta volatilidade ou mudanças recentes no processo')
+
             response_data['consensus'] = {
-                'both_agree': mc_can_meet == ml_can_meet,
-                'difference_weeks': abs((mc_weeks or 0) - (ml_weeks or 0)),
-                'recommendation': 'Ambos os métodos concordam' if mc_can_meet == ml_can_meet else 'Resultados divergentes - revise os dados'
+                'both_agree': both_agree,
+                'deadline_outcome_match': deadline_outcome_match,
+                'weeks_close': weeks_close,
+                'difference_weeks': round(weeks_diff, 1),
+                'percentage_difference': round(pct_diff, 1),
+                'recommendation': recommendation,
+                'explanation': '<br>'.join(explanation) if explanation else None,
+                'mc_more_conservative': mc_weeks > ml_weeks if (mc_weeks and ml_weeks) else None
             }
 
         return jsonify(convert_to_native_types(response_data))

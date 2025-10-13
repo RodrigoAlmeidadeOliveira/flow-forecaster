@@ -11,9 +11,14 @@ from datetime import datetime, timedelta
 
 # ML imports
 from sklearn.ensemble import RandomForestRegressor, HistGradientBoostingRegressor
+from sklearn.linear_model import Ridge, Lasso
 from sklearn.model_selection import TimeSeriesSplit, RandomizedSearchCV, KFold, train_test_split, GridSearchCV
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 from sklearn.base import clone
+from sklearn.neighbors import KNeighborsRegressor
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler
+from sklearn.svm import SVR
 
 try:
     from xgboost import XGBRegressor
@@ -133,7 +138,23 @@ class MLForecaster:
                 max_iter=100,
                 max_depth=5,
                 random_state=42
-            )
+            ),
+            'Ridge': Pipeline([
+                ('scaler', StandardScaler()),
+                ('ridge', Ridge())
+            ]),
+            'Lasso': Pipeline([
+                ('scaler', StandardScaler()),
+                ('lasso', Lasso(max_iter=5000))
+            ]),
+            'KNN': Pipeline([
+                ('scaler', StandardScaler()),
+                ('knn', KNeighborsRegressor(n_neighbors=5))
+            ]),
+            'SVR_RBF': Pipeline([
+                ('scaler', StandardScaler()),
+                ('svr', SVR(kernel='rbf', C=1.0, epsilon=0.1, gamma='scale'))
+            ])
         }
 
         # Add XGBoost if available
@@ -156,6 +177,7 @@ class MLForecaster:
 
                     # Train final model on ALL data (train + validation) with best hyperparameters
                     final_model = clone(best_model)
+                    self._ensure_valid_neighbors(final_model, len(X))
                     final_model.fit(X, y)
 
                     self.models[name] = final_model
@@ -247,8 +269,48 @@ class MLForecaster:
                 'max_depth': [3, 5, 7],
                 'learning_rate': [0.01, 0.05, 0.1]
             }
+        elif 'Ridge' in model_name:
+            return {
+                'ridge__alpha': [0.1, 1.0, 10.0, 25.0]
+            }
+        elif 'Lasso' in model_name:
+            return {
+                'lasso__alpha': [0.001, 0.01, 0.1, 1.0],
+                'lasso__max_iter': [2000, 5000, 10000]
+            }
+        elif 'KNN' in model_name:
+            return {
+                'knn__n_neighbors': [1, 2, 3, 4, 5, 7, 9],
+                'knn__weights': ['uniform', 'distance']
+            }
+        elif 'SVR' in model_name:
+            return {
+                'svr__C': [0.5, 1.0, 5.0, 10.0],
+                'svr__epsilon': [0.01, 0.05, 0.1, 0.5],
+                'svr__gamma': ['scale', 'auto']
+            }
         else:
             return {}
+
+    def _ensure_valid_neighbors(self, estimator, sample_size: int):
+        """Ensure kNN-based estimators respect available sample size."""
+        if sample_size <= 0 or estimator is None:
+            return
+
+        max_neighbors = max(1, sample_size)
+
+        try:
+            if hasattr(estimator, 'named_steps') and 'knn' in estimator.named_steps:
+                current = estimator.named_steps['knn'].n_neighbors
+                if current > max_neighbors and hasattr(estimator, 'set_params'):
+                    estimator.set_params(knn__n_neighbors=max_neighbors)
+            elif hasattr(estimator, 'n_neighbors'):
+                current = getattr(estimator, 'n_neighbors', max_neighbors)
+                if current > max_neighbors and hasattr(estimator, 'set_params'):
+                    estimator.set_params(n_neighbors=max_neighbors)
+        except Exception:
+            # Silently ignore adjustments if the estimator does not support them
+            pass
 
     def _cross_validate_with_kfold(self, model, X: pd.DataFrame, y: pd.Series,
                                     model_name: str) -> Tuple[Dict[str, float], any]:
@@ -282,12 +344,22 @@ class MLForecaster:
         best_params = None
 
         if param_grid:
-            print(f"\nPerforming Grid Search for hyperparameter tuning...")
-            print(f"Parameter grid: {param_grid}")
-
             try:
                 # Use K-Fold on training set for Grid Search
                 kfold_gs = KFold(n_splits=min(3, self.n_splits), shuffle=True, random_state=42)
+
+                if 'KNN' in model_name and 'knn__n_neighbors' in param_grid:
+                    min_train_size = len(X_train)
+                    for train_idx, _ in kfold_gs.split(X_train):
+                        min_train_size = min(min_train_size, len(train_idx))
+                    feasible_neighbors = sorted({n for n in param_grid['knn__n_neighbors'] if n <= min_train_size})
+                    if not feasible_neighbors:
+                        feasible_neighbors = [max(1, min_train_size)]
+                    param_grid['knn__n_neighbors'] = feasible_neighbors
+                    print(f"Adjusted kNN neighbor grid based on available samples: {feasible_neighbors}")
+
+                print(f"\nPerforming Grid Search for hyperparameter tuning...")
+                print(f"Parameter grid: {param_grid}")
 
                 grid_search = GridSearchCV(
                     estimator=model,
@@ -337,6 +409,7 @@ class MLForecaster:
             # Train model on this fold with best hyperparameters
             # Clone the best_model to avoid modifying the original
             fold_model = clone(best_model)
+            self._ensure_valid_neighbors(fold_model, len(X_fold_train))
             fold_model.fit(X_fold_train, y_fold_train)
             y_pred = fold_model.predict(X_fold_test)
 
@@ -369,6 +442,7 @@ class MLForecaster:
         print(f"  R²:   {cv_results['r2_mean']:.3f} ± {cv_results['r2_std']:.3f}")
 
         # Step 5: Train final model on full training set and evaluate on validation set
+        self._ensure_valid_neighbors(best_model, len(X_train))
         best_model.fit(X_train, y_train)
         y_val_pred = best_model.predict(X_val)
 
@@ -589,6 +663,7 @@ class MLForecaster:
                         continue
 
                     wf_model = clone(base_model)
+                    self._ensure_valid_neighbors(wf_model, len(X_train))
                     wf_model.fit(X_train, y_train)
 
                     history_slice = train_data[-(self.max_lag + 3):]

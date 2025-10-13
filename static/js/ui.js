@@ -24,6 +24,11 @@
         return `${num.toFixed(decimals)}%`;
     }
 
+    window.__PF_isFiniteNumber = isFiniteNumber;
+    window.__PF_formatNumber = formatNumber;
+    window.__PF_formatInteger = formatInteger;
+    window.__PF_formatPercent = formatPercent;
+
     function buildThroughputStatsHtml(stats) {
         if (!stats) return '';
         const percentiles = stats.percentiles || {};
@@ -182,7 +187,555 @@ $(window).on("load", function () {
             .filter(n => n >= 0);
     }
 
+    const isFiniteNumberLocal = window.__PF_isFiniteNumber || function(value) {
+        return typeof value === 'number' && isFinite(value);
+    };
+
+    const formatNumber = window.__PF_formatNumber || function(value, decimals = 2) {
+        if (value === null || value === undefined) return '—';
+        const num = Number(value);
+        if (!isFiniteNumberLocal(num)) return '—';
+        return num.toFixed(decimals);
+    };
+
+    const formatInteger = window.__PF_formatInteger || function(value) {
+        if (value === null || value === undefined) return '—';
+        const num = Number(value);
+        if (!isFiniteNumberLocal(num)) return '—';
+        return Math.round(num).toString();
+    };
+
     const deadlineCharts = [];
+    const historicalCharts = {
+        throughputHistogram: null,
+        throughputControl: null,
+        leadHistogram: null,
+        leadControl: null
+    };
+    let historicalChartsDirty = true;
+    let historicalChartsUpdateTimer = null;
+
+    const chartColors = {
+        throughput: {
+            barBg: 'rgba(46, 134, 171, 0.35)',
+            barBorder: '#2E86AB',
+            series: '#2E86AB',
+            seriesFill: 'rgba(46, 134, 171, 0.10)'
+        },
+        leadTime: {
+            barBg: 'rgba(106, 153, 78, 0.35)',
+            barBorder: '#6A994E',
+            series: '#6A994E',
+            seriesFill: 'rgba(106, 153, 78, 0.10)'
+        },
+        percentiles: {
+            p15: '#1D3557',
+            p85: '#F18F01',
+            p95: '#C73E1D'
+        }
+    };
+
+    function destroyHistoricalChart(key) {
+        if (historicalCharts[key]) {
+            historicalCharts[key].destroy();
+            historicalCharts[key] = null;
+        }
+    }
+
+    function percentileValue(sorted, percentile) {
+        if (!sorted.length) return null;
+        if (percentile <= 0) return sorted[0];
+        if (percentile >= 1) return sorted[sorted.length - 1];
+
+        const index = (sorted.length - 1) * percentile;
+        const lower = Math.floor(index);
+        const upper = Math.ceil(index);
+        const weight = index - lower;
+
+        if (lower === upper) return sorted[lower];
+        return sorted[lower] * (1 - weight) + sorted[upper] * weight;
+    }
+
+    function computePercentileStats(values) {
+        if (!values || !values.length) return null;
+        const sorted = values.slice().sort((a, b) => a - b);
+        const sum = sorted.reduce((acc, val) => acc + val, 0);
+        return {
+            sorted,
+            count: sorted.length,
+            min: sorted[0],
+            max: sorted[sorted.length - 1],
+            mean: sum / sorted.length,
+            p15: percentileValue(sorted, 0.15),
+            p85: percentileValue(sorted, 0.85),
+            p95: percentileValue(sorted, 0.95)
+        };
+    }
+
+    function buildHistogramSeries(values) {
+        const stats = computePercentileStats(values);
+        if (!stats) return null;
+
+        const { min, max, sorted } = stats;
+        const count = sorted.length;
+
+        if (count === 0) return null;
+
+        if (max === min) {
+            const rangePadding = Math.abs(max) * 0.1 || 1;
+            const start = max - rangePadding;
+            const end = max + rangePadding;
+            return {
+                stats,
+                histogramData: [{
+                    x: max,
+                    y: count,
+                    binStart: start,
+                    binEnd: end
+                }],
+                lineMax: Math.max(1, count * 1.1)
+            };
+        }
+
+        let binCount = Math.round(Math.sqrt(count));
+        binCount = Math.max(5, Math.min(20, binCount));
+
+        const range = max - min;
+        const binSize = range / binCount;
+        const bins = [];
+
+        for (let i = 0; i < binCount; i++) {
+            const start = min + (i * binSize);
+            const end = (i === binCount - 1) ? max : start + binSize;
+            bins.push({ start, end, count: 0 });
+        }
+
+        const lastIndex = binCount - 1;
+        sorted.forEach((value) => {
+            const relative = (value - min) / binSize;
+            let index = Math.floor(relative);
+            if (!isFinite(index) || index < 0) index = 0;
+            if (index > lastIndex) index = lastIndex;
+            bins[index].count += 1;
+        });
+
+        const histogramData = bins.map(({ start, end, count: binCountValue }) => ({
+            x: (start + end) / 2,
+            y: binCountValue,
+            binStart: start,
+            binEnd: end
+        }));
+
+        const maxCount = bins.reduce((maxValue, bin) => Math.max(maxValue, bin.count), 0);
+
+        return {
+            stats,
+            histogramData,
+            lineMax: Math.max(1, maxCount * 1.1)
+        };
+    }
+
+    function toggleChartVisibility(hasData, emptySelector, containerSelector) {
+        if (hasData) {
+            $(emptySelector).hide();
+            $(containerSelector).show();
+        } else {
+            $(emptySelector).show();
+            $(containerSelector).hide();
+        }
+    }
+
+    function createVerticalLineDataset(label, value, color, maxY, dashPattern) {
+        if (!isFiniteNumberLocal(value)) return null;
+        return {
+            type: 'line',
+            label,
+            data: [
+                { x: value, y: 0 },
+                { x: value, y: maxY }
+            ],
+            borderColor: color,
+            borderWidth: 2,
+            borderDash: dashPattern || [],
+            fill: false,
+            pointRadius: 0,
+            pointHitRadius: 0,
+            pointHoverRadius: 0,
+            tension: 0
+        };
+    }
+
+    function createHorizontalLineDataset(label, value, color, length, dashPattern) {
+        if (!isFiniteNumberLocal(value)) return null;
+        return {
+            label,
+            data: new Array(length).fill(value),
+            borderColor: color,
+            borderWidth: 2,
+            borderDash: dashPattern || [],
+            fill: false,
+            pointRadius: 0,
+            pointHitRadius: 0,
+            pointHoverRadius: 0,
+            lineTension: 0,
+            spanGaps: true
+        };
+    }
+
+    function buildHistogramAnnotation(bins, percentileValue, label, color, dash = [6, 4]) {
+        if (!isFiniteNumberLocal(percentileValue) || !bins.length) return null;
+
+        let index = bins.findIndex(bin => percentileValue <= bin.binEnd + 1e-9);
+        if (index === -1) index = bins.length - 1;
+
+        const bin = bins[index];
+        let relative = 0.5;
+        if (isFiniteNumberLocal(bin.binEnd) && isFiniteNumberLocal(bin.binStart) && bin.binEnd !== bin.binStart) {
+            relative = (percentileValue - bin.binStart) / (bin.binEnd - bin.binStart);
+            relative = Math.min(1, Math.max(0, relative));
+        }
+
+        const value = index + relative;
+
+        return {
+            type: 'line',
+            mode: 'vertical',
+            scaleID: 'x-axis-0',
+            value,
+            borderColor: color,
+            borderDash: dash,
+            borderWidth: 2,
+            label: {
+                enabled: true,
+                content: `${label}: ${formatNumber(percentileValue)}`,
+                position: 'top',
+                yAdjust: 12,
+                backgroundColor: color,
+                fontColor: '#fff',
+                fontSize: 10,
+                padding: 4
+            }
+        };
+    }
+
+    function buildHorizontalAnnotation(value, label, color, dash = [6, 4]) {
+        if (!isFiniteNumberLocal(value)) return null;
+
+        return {
+            type: 'line',
+            mode: 'horizontal',
+            scaleID: 'y-axis-0',
+            value,
+            borderColor: color,
+            borderDash: dash,
+            borderWidth: 2,
+            label: {
+                enabled: true,
+                content: `${label}: ${formatNumber(value)}`,
+                position: 'right',
+                xAdjust: -6,
+                backgroundColor: color,
+                fontColor: '#fff',
+                fontSize: 10,
+                padding: 4
+            }
+        };
+    }
+
+    function renderHistogramChart(config) {
+        const values = Array.isArray(config.values) ? config.values : [];
+        const hasData = values.length >= 3;
+
+        toggleChartVisibility(hasData, config.emptySelector, config.containerSelector);
+        destroyHistoricalChart(config.chartKey);
+
+        if (!hasData || !config.allowRender) {
+            return;
+        }
+
+        const histogram = buildHistogramSeries(values);
+        if (!histogram) return;
+
+        const ctxElement = document.getElementById(config.canvasId);
+        if (!ctxElement) return;
+
+        const labels = histogram.histogramData.map((bin) => {
+            const start = formatNumber(bin.binStart);
+            const end = formatNumber(bin.binEnd);
+            return start === end ? `${start}` : `${start} – ${end}`;
+        });
+        const counts = histogram.histogramData.map(bin => bin.y);
+
+        const annotations = [
+            buildHistogramAnnotation(histogram.histogramData, histogram.stats.p15, 'P15', chartColors.percentiles.p15, [12, 6]),
+            buildHistogramAnnotation(histogram.histogramData, histogram.stats.p85, 'P85', chartColors.percentiles.p85, [8, 6]),
+            buildHistogramAnnotation(histogram.histogramData, histogram.stats.p95, 'P95', chartColors.percentiles.p95, [6, 4]),
+            buildHistogramAnnotation(histogram.histogramData, histogram.stats.mean, 'Média', '#6c757d', [4, 2])
+        ].filter(Boolean);
+
+        historicalCharts[config.chartKey] = new Chart(ctxElement.getContext('2d'), {
+            type: 'bar',
+            data: {
+                labels,
+                datasets: [{
+                    label: 'Frequência',
+                    data: counts,
+                    backgroundColor: config.colors.barBg,
+                    borderColor: config.colors.barBorder,
+                    borderWidth: 1,
+                    barPercentage: 0.95,
+                    categoryPercentage: 0.95
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                layout: {
+                    padding: {
+                        top: 12,
+                        right: 12,
+                        bottom: 12,
+                        left: 12
+                    }
+                },
+                legend: { display: false },
+                tooltips: {
+                    backgroundColor: 'rgba(0,0,0,0.75)',
+                    titleFontSize: 13,
+                    bodyFontSize: 12,
+                    mode: 'nearest',
+                    intersect: true,
+                    callbacks: {
+                        title: function(items) {
+                            const item = items[0];
+                            const bin = histogram.histogramData[item.index];
+                            if (bin) {
+                                const start = formatNumber(bin.binStart);
+                                const end = formatNumber(bin.binEnd);
+                                return start === end ? `${start}` : `${start} – ${end}`;
+                            }
+                            return labels[item.index] || '';
+                        },
+                        label: function(tooltipItem) {
+                            return `Frequência: ${formatInteger(tooltipItem.yLabel)}`;
+                        }
+                    }
+                },
+                scales: {
+                    xAxes: [{
+                        scaleLabel: {
+                            display: true,
+                            labelString: config.xLabel || 'Valor'
+                        },
+                        ticks: {
+                            autoSkip: false,
+                            maxRotation: 45,
+                            fontSize: 11
+                        },
+                        gridLines: {
+                            drawOnChartArea: false
+                        }
+                    }],
+                    yAxes: [{
+                        ticks: {
+                            beginAtZero: true,
+                            precision: 0,
+                            fontSize: 11
+                        },
+                        scaleLabel: {
+                            display: true,
+                            labelString: 'Frequência'
+                        }
+                    }]
+                },
+                annotation: {
+                    drawTime: 'afterDatasetsDraw',
+                    annotations
+                }
+            }
+        });
+    }
+
+    function renderControlChart(config) {
+        const values = Array.isArray(config.values) ? config.values : [];
+        const hasData = values.length >= 1;
+
+        toggleChartVisibility(hasData, config.emptySelector, config.containerSelector);
+        destroyHistoricalChart(config.chartKey);
+
+        if (!hasData || !config.allowRender) {
+            return;
+        }
+
+        const stats = computePercentileStats(values);
+        if (!stats) return;
+
+        const ctxElement = document.getElementById(config.canvasId);
+        if (!ctxElement) return;
+
+        const labels = values.map((_value, index) => index + 1);
+        const annotations = [
+            buildHorizontalAnnotation(stats.p15, 'P15', chartColors.percentiles.p15, [12, 6]),
+            buildHorizontalAnnotation(stats.p85, 'P85', chartColors.percentiles.p85, [8, 6]),
+            buildHorizontalAnnotation(stats.p95, 'P95', chartColors.percentiles.p95, [6, 4]),
+            buildHorizontalAnnotation(stats.mean, 'Média', '#6c757d', [4, 2])
+        ].filter(Boolean);
+
+        historicalCharts[config.chartKey] = new Chart(ctxElement.getContext('2d'), {
+            type: 'line',
+            data: {
+                labels,
+                datasets: [{
+                    label: config.seriesLabel,
+                    data: values,
+                    borderColor: config.colors.series,
+                    backgroundColor: config.colors.seriesFill,
+                    fill: false,
+                    lineTension: 0.2,
+                    pointRadius: 4,
+                    pointBackgroundColor: '#ffffff',
+                    pointBorderColor: config.colors.series,
+                    pointHoverRadius: 6,
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                layout: {
+                    padding: {
+                        top: 12,
+                        right: 12,
+                        bottom: 12,
+                        left: 12
+                    }
+                },
+                tooltips: {
+                    backgroundColor: 'rgba(0,0,0,0.75)',
+                    titleFontSize: 13,
+                    bodyFontSize: 12,
+                    mode: 'index',
+                    intersect: false,
+                    callbacks: {
+                        label: function(tooltipItem, data) {
+                            const datasetLabel = data.datasets[tooltipItem.datasetIndex].label || '';
+                            return `${datasetLabel}: ${formatNumber(tooltipItem.yLabel)}`;
+                        }
+                    }
+                },
+                hover: {
+                    mode: 'nearest',
+                    intersect: true
+                },
+                legend: { display: false },
+                scales: {
+                    xAxes: [{
+                        scaleLabel: {
+                            display: true,
+                            labelString: config.xLabel || 'Observação'
+                        },
+                        ticks: {
+                            beginAtZero: true,
+                            precision: 0,
+                            fontSize: 11
+                        }
+                    }],
+                    yAxes: [{
+                        scaleLabel: {
+                            display: true,
+                            labelString: config.yLabel || 'Valor'
+                        },
+                        ticks: {
+                            beginAtZero: true,
+                            fontSize: 11
+                        }
+                    }]
+                },
+                annotation: {
+                    drawTime: 'afterDatasetsDraw',
+                    annotations
+                }
+            }
+        });
+    }
+
+    function updateHistoricalCharts(forceRender) {
+        const allowRender = $('#historical-charts').hasClass('active show');
+        if (!forceRender && !historicalChartsDirty && allowRender) {
+            return;
+        }
+
+        const throughputSamples = parseSamples('#tpSamples');
+        const leadTimeSamples = parseSamples('#ltSamples');
+
+        renderHistogramChart({
+            values: throughputSamples,
+            canvasId: 'tp-histogram-chart',
+            chartKey: 'throughputHistogram',
+            emptySelector: '#tp-histogram-empty',
+            containerSelector: '#tp-histogram-container',
+            colors: chartColors.throughput,
+            xLabel: 'Throughput semanal',
+            allowRender
+        });
+
+        renderControlChart({
+            values: throughputSamples,
+            canvasId: 'tp-control-chart',
+            chartKey: 'throughputControl',
+            emptySelector: '#tp-control-empty',
+            containerSelector: '#tp-control-container',
+            colors: chartColors.throughput,
+            seriesLabel: 'Throughput histórico',
+            xLabel: 'Semana',
+            yLabel: 'Itens por semana',
+            allowRender
+        });
+
+        renderHistogramChart({
+            values: leadTimeSamples,
+            canvasId: 'lt-histogram-chart',
+            chartKey: 'leadHistogram',
+            emptySelector: '#lt-histogram-empty',
+            containerSelector: '#lt-histogram-container',
+            colors: chartColors.leadTime,
+            xLabel: 'Lead time (dias)',
+            allowRender
+        });
+
+        renderControlChart({
+            values: leadTimeSamples,
+            canvasId: 'lt-control-chart',
+            chartKey: 'leadControl',
+            emptySelector: '#lt-control-empty',
+            containerSelector: '#lt-control-container',
+            colors: chartColors.leadTime,
+            seriesLabel: 'Lead time histórico',
+            xLabel: 'Ordem de ocorrência',
+            yLabel: 'Dias',
+            allowRender
+        });
+
+        historicalChartsDirty = !allowRender;
+    }
+
+    function scheduleHistoricalUpdate() {
+        if (historicalChartsUpdateTimer) {
+            clearTimeout(historicalChartsUpdateTimer);
+        }
+        historicalChartsUpdateTimer = setTimeout(() => {
+            updateHistoricalCharts(true);
+            historicalChartsUpdateTimer = null;
+        }, 250);
+    }
+
+    function markHistoricalChartsDirty() {
+        historicalChartsDirty = true;
+        updateHistoricalCharts(false);
+        if ($('#historical-charts').hasClass('active show')) {
+            scheduleHistoricalUpdate();
+        }
+    }
 
     function parseRisks(selector) {
         const risks = [];
@@ -794,13 +1347,19 @@ $(window).on("load", function () {
 
         let consensusHtml = '';
         if (consensus) {
+            const alertClass = consensus.both_agree ? 'alert-success' : 'alert-warning';
+            const icon = consensus.both_agree ? '✅' : '⚠️';
+            const percentageDiff = consensus.percentage_difference != null ? ` (${consensus.percentage_difference}%)` : '';
+
             consensusHtml = `
                 <div class="col-lg-12 mt-3">
-                    <div class="alert ${consensus.both_agree ? 'alert-success' : 'alert-warning'} mb-0 text-left" role="alert">
-                        <h5 class="alert-heading">Consenso dos Métodos</h5>
+                    <div class="alert ${alertClass} mb-0 text-left" role="alert">
+                        <h5 class="alert-heading">${icon} Consenso dos Métodos</h5>
                         <p class="mb-1"><strong>Ambos os métodos concordam:</strong> ${consensus.both_agree ? 'Sim' : 'Não'}</p>
-                        <p class="mb-1"><strong>Diferença entre projeções P85:</strong> ${formatWeeks(consensus.difference_weeks)} semanas</p>
-                        <p class="mb-0"><strong>Recomendação:</strong> ${consensus.recommendation}</p>
+                        <p class="mb-1"><strong>Diferença entre projeções P85:</strong> ${formatWeeks(consensus.difference_weeks)} semanas${percentageDiff}</p>
+                        ${consensus.mc_more_conservative != null ? `<p class="mb-1"><strong>Método mais conservador:</strong> ${consensus.mc_more_conservative ? 'Monte Carlo' : 'Machine Learning'}</p>` : ''}
+                        <p class="mb-${consensus.explanation ? '2' : '0'}"><strong>Recomendação:</strong> ${consensus.recommendation}</p>
+                        ${consensus.explanation ? `<div class="small bg-light p-2 rounded">${consensus.explanation}</div>` : ''}
                     </div>
                 </div>`;
         }
@@ -1145,6 +1704,7 @@ ${generateProgressBar(p50Items, backlog, 'P50 (arriscado)  ', Math.round((p50Ite
                         }
                     }
                     runSimulation();
+                    markHistoricalChartsDirty();
                 },
                 error: function() {
                     console.error('Error loading data from URL');
@@ -1156,6 +1716,13 @@ ${generateProgressBar(p50Items, backlog, 'P50 (arriscado)  ', Math.round((p50Ite
             return false;
         }
     }
+
+    $('#tpSamples, #ltSamples').on('input change', markHistoricalChartsDirty);
+    $('a[data-toggle="tab"][href="#historical-charts"]').on('shown.bs.tab', function() {
+        updateHistoricalCharts(true);
+    });
+
+    updateHistoricalCharts(false);
 
     if (location.hash && location.hash.trim().length > 1) {
         loadDataFromUrl();

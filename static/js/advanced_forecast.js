@@ -251,6 +251,133 @@ $(document).ready(function() {
         }
     }
 
+    function analyzeAndRankModels(results) {
+        const models = [];
+
+        for (const [modelName, data] of Object.entries(results)) {
+            if (data.error || data.mae === undefined || data.mae === null) continue;
+
+            models.push({
+                name: modelName,
+                mae: data.mae,
+                rmse: data.rmse,
+                r2: data.r2,
+                mape: data.mape,
+                smape: data.smape,
+                median_ae: data.median_ae
+            });
+        }
+
+        if (models.length === 0) return null;
+
+        // Ranking por múltiplos critérios
+        const rankings = {
+            mae: [...models].sort((a, b) => a.mae - b.mae),
+            rmse: [...models].sort((a, b) => a.rmse - b.rmse),
+            mape: [...models].sort((a, b) => a.mape - b.mape),
+            smape: [...models].sort((a, b) => a.smape - b.smape),
+            r2: [...models].sort((a, b) => b.r2 - a.r2) // R² maior é melhor
+        };
+
+        // Sistema de pontuação: 1º lugar = n pontos, 2º = n-1, etc.
+        const scores = {};
+        models.forEach(m => scores[m.name] = 0);
+
+        Object.values(rankings).forEach(ranking => {
+            ranking.forEach((model, index) => {
+                scores[model.name] += (models.length - index);
+            });
+        });
+
+        // Encontrar o melhor modelo
+        const bestModelName = Object.keys(scores).reduce((a, b) => scores[a] > scores[b] ? a : b);
+        const bestModel = models.find(m => m.name === bestModelName);
+
+        // Determinar critérios vencidos
+        const criteria = [];
+        if (rankings.mae[0].name === bestModelName) criteria.push('MAE');
+        if (rankings.rmse[0].name === bestModelName) criteria.push('RMSE');
+        if (rankings.mape[0].name === bestModelName) criteria.push('MAPE');
+        if (rankings.smape[0].name === bestModelName) criteria.push('sMAPE');
+        if (rankings.r2[0].name === bestModelName) criteria.push('R²');
+
+        return {
+            bestModel: bestModel,
+            scores: scores,
+            rankings: rankings,
+            criteria: criteria
+        };
+    }
+
+    function generateBestModelSummary(analysis) {
+        if (!analysis) return '';
+
+        const model = analysis.bestModel;
+        const criteria = analysis.criteria;
+
+        // Determinar qualidade do modelo baseado em MAPE
+        let quality = '';
+        let qualityClass = '';
+        let recommendation = '';
+
+        if (model.mape < 10) {
+            quality = 'EXCELENTE';
+            qualityClass = 'success';
+            recommendation = 'Modelo altamente confiável para uso em produção.';
+        } else if (model.mape < 20) {
+            quality = 'BOM';
+            qualityClass = 'success';
+            recommendation = 'Modelo confiável. Recomendado para uso em produção.';
+        } else if (model.mape < 30) {
+            quality = 'RAZOÁVEL';
+            qualityClass = 'warning';
+            recommendation = 'Modelo aceitável, mas use como suporte ao Monte Carlo.';
+        } else if (model.mape < 50) {
+            quality = 'FRACO';
+            qualityClass = 'warning';
+            recommendation = 'Use apenas como referência. Priorize Monte Carlo.';
+        } else {
+            quality = 'INADEQUADO';
+            qualityClass = 'danger';
+            recommendation = 'NÃO recomendado. Use apenas Monte Carlo.';
+        }
+
+        // Verificar se R² é negativo
+        const r2Warning = model.r2 < 0
+            ? '<div class="alert alert-warning mt-2 mb-0 small">⚠️ <strong>R² negativo:</strong> O modelo está performando pior que simplesmente usar a média histórica. Considere coletar mais dados ou usar apenas Monte Carlo.</div>'
+            : '';
+
+        const precision = Math.round(100 - model.mape);
+
+        return `
+            <div class="card mb-3 border-${qualityClass}">
+                <div class="card-header bg-${qualityClass} text-white">
+                    <h5 class="mb-0">🏆 Melhor Modelo: ${model.name}</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6 class="font-weight-bold">Métricas de Performance</h6>
+                            <ul class="mb-0">
+                                <li><strong>MAE:</strong> ${model.mae.toFixed(3)} (erro médio de ~${model.mae.toFixed(1)} item${model.mae >= 2 ? 's' : ''}/semana)</li>
+                                <li><strong>MAPE:</strong> ${model.mape.toFixed(2)}% (precisão de ~${precision}%)</li>
+                                <li><strong>RMSE:</strong> ${model.rmse.toFixed(3)}</li>
+                                <li><strong>R²:</strong> ${model.r2.toFixed(3)} ${model.r2 < 0 ? '(⚠️ negativo)' : ''}</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <h6 class="font-weight-bold">Análise</h6>
+                            <p class="mb-1"><strong>Qualidade:</strong> <span class="badge badge-${qualityClass} badge-lg">${quality}</span></p>
+                            <p class="mb-1"><strong>Critérios vencidos:</strong> ${criteria.length > 0 ? criteria.join(', ') : 'Pontuação geral'}</p>
+                            <p class="mb-0"><strong>Recomendação:</strong> ${recommendation}</p>
+                        </div>
+                    </div>
+                    ${r2Warning}
+                </div>
+            </div>
+        `;
+    }
+
     function displayWalkForwardResults(results, forecastSteps) {
         const $container = $('#walk-forward-results');
         const $metrics = $('#walk-forward-metrics');
@@ -265,19 +392,48 @@ $(document).ready(function() {
             return;
         }
 
-        let metricsHtml = '<table class="table table-sm table-bordered"><thead class="thead-light"><tr>' +
-            '<th>Modelo</th><th>MAE</th><th>RMSE</th><th>R²</th><th>MAPE</th><th>sMAPE</th><th>Mediana |Erro|</th><th>Origens</th><th>Pontos</th>' +
+        // Analisar e ranquear modelos
+        const analysis = analyzeAndRankModels(results);
+        const bestModelSummary = generateBestModelSummary(analysis);
+
+        let metricsHtml = bestModelSummary;
+
+        // Add scoring explanation
+        if (analysis && Object.keys(analysis.scores).length > 1) {
+            metricsHtml += `
+                <div class="alert alert-info mb-3">
+                    <h6 class="font-weight-bold mb-2">📊 Como o melhor modelo é escolhido?</h6>
+                    <p class="small mb-2">O sistema utiliza um <strong>ranking multi-critério</strong> que avalia cada modelo em 5 métricas diferentes:</p>
+                    <ul class="small mb-2">
+                        <li><strong>MAE (Mean Absolute Error):</strong> Erro absoluto médio - menor é melhor</li>
+                        <li><strong>RMSE (Root Mean Squared Error):</strong> Penaliza erros grandes - menor é melhor</li>
+                        <li><strong>MAPE (Mean Absolute Percentage Error):</strong> Erro percentual - menor é melhor</li>
+                        <li><strong>sMAPE (Symmetric MAPE):</strong> Erro percentual simétrico - menor é melhor</li>
+                        <li><strong>R² (Coeficiente de Determinação):</strong> Qualidade do ajuste - maior é melhor (próximo de 1)</li>
+                    </ul>
+                    <p class="small mb-0"><strong>Sistema de pontuação:</strong> Cada modelo recebe pontos em cada critério (1º lugar = ${Object.keys(analysis.scores).length} pontos, 2º = ${Object.keys(analysis.scores).length - 1} pontos, etc.). O modelo com maior pontuação total é eleito o melhor. A coluna "Score" mostra a pontuação total de cada modelo.</p>
+                </div>
+            `;
+        }
+
+        metricsHtml += '<table class="table table-sm table-bordered"><thead class="thead-light"><tr>' +
+            '<th>Modelo</th><th>MAE</th><th>RMSE</th><th>R²</th><th>MAPE</th><th>sMAPE</th><th>Mediana |Erro|</th><th>Origens</th><th>Pontos</th><th>Score</th>' +
             '</tr></thead><tbody>';
 
         let chartIndex = 0;
         for (const [modelName, data] of Object.entries(results)) {
             if (data.error) {
-                metricsHtml += `<tr><td>${modelName}</td><td colspan="8">${data.error}</td></tr>`;
+                metricsHtml += `<tr><td>${modelName}</td><td colspan="9">${data.error}</td></tr>`;
                 continue;
             }
 
-            metricsHtml += `<tr>
-                <td>${modelName}</td>
+            const isBest = analysis && analysis.bestModel.name === modelName;
+            const rowClass = isBest ? 'table-success font-weight-bold' : '';
+            const badge = isBest ? ' 🏆' : '';
+            const score = analysis ? analysis.scores[modelName] : '—';
+
+            metricsHtml += `<tr class="${rowClass}">
+                <td>${modelName}${badge}</td>
                 <td>${data.mae !== undefined && data.mae !== null ? data.mae.toFixed(3) : '—'}</td>
                 <td>${data.rmse !== undefined && data.rmse !== null ? data.rmse.toFixed(3) : '—'}</td>
                 <td>${data.r2 !== undefined && data.r2 !== null ? data.r2.toFixed(3) : '—'}</td>
@@ -286,6 +442,7 @@ $(document).ready(function() {
                 <td>${data.median_ae !== undefined && data.median_ae !== null ? data.median_ae.toFixed(3) : '—'}</td>
                 <td>${data.n_forecasts ?? '—'}</td>
                 <td>${data.n_points ?? '—'}</td>
+                <td><span class="badge badge-secondary">${score}</span></td>
             </tr>`;
 
             if (data.predictions && data.actuals && data.predictions.length && data.actuals.length) {

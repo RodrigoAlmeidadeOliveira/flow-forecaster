@@ -159,6 +159,9 @@
 <a aria-controls="deadline-analysis" aria-selected="false" class="nav-link" data-toggle="tab" href="#deadline-analysis" id="tab-deadline-link" role="tab">Deadline Analysis</a>
 </li>
 <li class="nav-item">
+<a aria-controls="historical-charts" aria-selected="false" class="nav-link" data-toggle="tab" href="#historical-charts" id="tab-historical-link" role="tab">Historical Charts</a>
+</li>
+<li class="nav-item">
 <a aria-controls="cost-analysis" aria-selected="false" class="nav-link" data-toggle="tab" href="#cost-analysis" id="tab-cost-link" role="tab">Cost Analysis</a>
 </li>
 </ul>
@@ -617,6 +620,82 @@
 </div>
 </div>
 </div>
+</div>
+</div>
+<div aria-labelledby="tab-historical-link" class="tab-pane fade" id="historical-charts" role="tabpanel">
+<div class="pt-4 pb-5">
+<div class="container text-center">
+<h2>Historical Throughput &amp; Lead Time Charts</h2>
+<p class="mb-4">Visualize the distribution and stability of the samples you provided. Update the fields above to refresh these charts.</p>
+</div>
+<div class="container-fluid">
+<div class="row">
+<div class="col-lg-6 mb-4">
+<div class="card h-100">
+<div class="card-header bg-primary text-white">
+<h5 class="mb-0">Throughput Histogram</h5>
+</div>
+<div class="card-body">
+<div class="alert alert-info" id="tp-histogram-empty" role="alert" style="display:none;">
+Forneça ao menos 3 amostras de throughput para gerar o histograma.
+</div>
+<div class="chart-container" id="tp-histogram-container">
+<canvas id="tp-histogram-chart"></canvas>
+</div>
+</div>
+</div>
+</div>
+<div class="col-lg-6 mb-4">
+<div class="card h-100">
+<div class="card-header bg-secondary text-white">
+<h5 class="mb-0">Throughput Control Chart</h5>
+</div>
+<div class="card-body">
+<div class="alert alert-info" id="tp-control-empty" role="alert" style="display:none;">
+Forneça amostras de throughput para visualizar o control chart.
+</div>
+<div class="chart-container" id="tp-control-container">
+<canvas id="tp-control-chart"></canvas>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="row">
+<div class="col-lg-6 mb-4">
+<div class="card h-100">
+<div class="card-header bg-success text-white">
+<h5 class="mb-0">Lead Time Histogram</h5>
+</div>
+<div class="card-body">
+<div class="alert alert-info" id="lt-histogram-empty" role="alert" style="display:none;">
+Forneça ao menos 3 amostras de lead time para gerar o histograma.
+</div>
+<div class="chart-container" id="lt-histogram-container">
+<canvas id="lt-histogram-chart"></canvas>
+</div>
+</div>
+</div>
+</div>
+<div class="col-lg-6 mb-4">
+<div class="card h-100">
+<div class="card-header bg-dark text-white">
+<h5 class="mb-0">Lead Time Control Chart</h5>
+</div>
+<div class="card-body">
+<div class="alert alert-info" id="lt-control-empty" role="alert" style="display:none;">
+Forneça amostras de lead time para visualizar o control chart.
+</div>
+<div class="chart-container" id="lt-control-container">
+<canvas id="lt-control-chart"></canvas>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
 <div aria-labelledby="tab-cost-link" class="tab-pane fade" id="cost-analysis" role="tabpanel">
 <div class="pt-4 pb-5">
 <div class="container text-center">
@@ -797,9 +876,10 @@
         (function secureChartRegistration() {
             function registerCharts() {
                 try {
-                    if (window.Chart && typeof window.Chart.register === 'function' && window.Chart.registerables) {
-                        window.Chart.register(...window.Chart.registerables);
+                    if (!window.Chart || typeof window.Chart.register !== 'function' || !window.Chart.registerables) {
+                        return;
                     }
+                    window.Chart.register(...window.Chart.registerables);
                 } catch (error) {
                     console.warn('Chart.js registration skipped:', error);
                 }
@@ -829,6 +909,8 @@
                     $('#tab-advanced-link').tab('show');
                 } else if (hash === '#deadline-analysis') {
                     $('#tab-deadline-link').tab('show');
+                } else if (hash === '#historical-charts') {
+                    $('#tab-historical-link').tab('show');
                 } else if (hash === '#cost-analysis') {
                     $('#tab-cost-link').tab('show');
                 } else if (hash === '#mc-forecast') {
@@ -851,7 +933,7 @@
 
             $('a[data-toggle="tab"]').on('shown.bs.tab', function (e) {
                 const target = $(e.target).attr('href');
-                if (target === '#advanced-forecast' || target === '#mc-forecast' || target === '#deadline-analysis') {
+                if (target === '#advanced-forecast' || target === '#mc-forecast' || target === '#deadline-analysis' || target === '#historical-charts') {
                     history.replaceState(null, null, target);
                 }
             });
