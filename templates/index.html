@@ -1,10 +1,14 @@
 <!DOCTYPE html>
 
-<html lang="en">
+<html lang="pt">
 <head>
-<title>Project Forecaster</title>
+<title>Flow Forecasting</title>
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1" name="viewport"/>
+<!-- Google Fonts - Inter -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <!-- Bootstrap CSS -->
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@4.5.0/dist/css/bootstrap.min.css" rel="stylesheet"/>
 <!-- Chart.js CSS -->
@@ -110,39 +114,44 @@
 </head>
 <body>
 <nav class="navbar navbar-expand-md navbar-dark bg-dark fixed-top">
-<a class="navbar-brand" href="#">Project Forecaster</a>
+<a class="navbar-brand" href="#" data-i18n="site_name">Flow Forecasting</a>
 <button aria-expanded="false" aria-label="Toggle navigation" class="navbar-toggler" data-target="#navbarsExampleDefault" data-toggle="collapse" type="button">
 <span class="navbar-toggler-icon"></span>
 </button>
 <div class="collapse navbar-collapse" id="navbarsExampleDefault">
 <ul class="navbar-nav mr-auto">
 <li class="nav-item">
-<a class="nav-link" data-target="#advanced-forecast" href="#advanced-forecast">Advanced Forecast</a>
+<a class="nav-link" data-target="#advanced-forecast" href="#advanced-forecast" data-i18n="menu_advanced">Previsão Avançada</a>
 </li>
 <li class="nav-item">
-<a class="nav-link" data-target="#deadline-analysis" href="#deadline-analysis">Deadline Analysis</a>
+<a class="nav-link" data-target="#deadline-analysis" href="#deadline-analysis" data-i18n="menu_deadline">Análise de Prazo</a>
 </li>
 </ul>
+<div class="language-selector">
+<button class="language-btn" data-lang="pt" onclick="changeLanguage('pt')">PT</button>
+<button class="language-btn" data-lang="en" onclick="changeLanguage('en')">EN</button>
+<button class="language-btn" data-lang="es" onclick="changeLanguage('es')">ES</button>
+</div>
 </div>
 </nav>
 <main class="container" role="main">
 <br/><br/><br/>
 <div class="container text-center">
-<h1>Project Forecaster</h1>
+<h1 data-i18n="site_name">Flow Forecasting</h1>
 <p>
-                Forecast project effort and duration using Monte Carlo simulations, or combine them with machine learning insights.
+                <span data-i18n="site_tagline">Previsão de esforço e duração de projetos usando simulações Monte Carlo e aprendizado de máquina.</span>
                 <br/>
-                Your data remains local to your browser/server.
+                <span data-i18n="site_description">Seus dados permanecem locais no seu navegador/servidor.</span>
             </p>
 </div>
 <section class="mt-4">
 <div class="container-fluid bg-12 text-center">
-<h2>Shared Throughput Data</h2>
+<h2 data-i18n="shared_throughput_title">Dados de Throughput Compartilhados</h2>
 <div class="row justify-content-center">
 <div class="col-lg-8">
-<textarea class="form-control text-monospace" id="tpSamples" placeholder="Example: 5, 6, 7, 4, 8, 6, 5, 7, 6, 8" rows="4" title="Historical weekly throughput used by all simulations"></textarea>
-<small class="form-text text-muted">
-                            Provide weekly throughput samples once and reuse them across Monte Carlo and Machine Learning simulations.
+<textarea class="form-control text-monospace" id="tpSamples" data-i18n-placeholder="throughput_placeholder" placeholder="Exemplo: 5, 6, 7, 4, 8, 6, 5, 7, 6, 8" rows="4" title="Historical weekly throughput used by all simulations"></textarea>
+<small class="form-text text-muted" data-i18n="throughput_help">
+                            Forneça amostras de throughput semanais uma vez e reutilize-as em simulações Monte Carlo e Aprendizado de Máquina.
                         </small>
 </div>
 </div>
@@ -150,19 +159,19 @@
 </section>
 <ul class="nav nav-tabs nav-fill mt-4" id="forecastTabs" role="tablist">
 <li class="nav-item">
-<a aria-controls="mc-forecast" aria-selected="true" class="nav-link active" data-toggle="tab" href="#mc-forecast" id="tab-mc-link" role="tab">Monte Carlo</a>
+<a aria-controls="mc-forecast" aria-selected="true" class="nav-link active" data-toggle="tab" href="#mc-forecast" id="tab-mc-link" role="tab" data-i18n="tab_monte_carlo">Monte Carlo</a>
 </li>
 <li class="nav-item">
-<a aria-controls="advanced-forecast" aria-selected="false" class="nav-link" data-toggle="tab" href="#advanced-forecast" id="tab-advanced-link" role="tab">Advanced (ML + MC)</a>
+<a aria-controls="advanced-forecast" aria-selected="false" class="nav-link" data-toggle="tab" href="#advanced-forecast" id="tab-advanced-link" role="tab" data-i18n="tab_advanced">Avançado (ML + MC)</a>
 </li>
 <li class="nav-item">
-<a aria-controls="deadline-analysis" aria-selected="false" class="nav-link" data-toggle="tab" href="#deadline-analysis" id="tab-deadline-link" role="tab">Deadline Analysis</a>
+<a aria-controls="deadline-analysis" aria-selected="false" class="nav-link" data-toggle="tab" href="#deadline-analysis" id="tab-deadline-link" role="tab" data-i18n="tab_deadline">Análise de Prazo</a>
 </li>
 <li class="nav-item">
-<a aria-controls="historical-charts" aria-selected="false" class="nav-link" data-toggle="tab" href="#historical-charts" id="tab-historical-link" role="tab">Historical Charts</a>
+<a aria-controls="historical-charts" aria-selected="false" class="nav-link" data-toggle="tab" href="#historical-charts" id="tab-historical-link" role="tab" data-i18n="tab_historical">Gráficos Históricos</a>
 </li>
 <li class="nav-item">
-<a aria-controls="cost-analysis" aria-selected="false" class="nav-link" data-toggle="tab" href="#cost-analysis" id="tab-cost-link" role="tab">Cost Analysis</a>
+<a aria-controls="cost-analysis" aria-selected="false" class="nav-link" data-toggle="tab" href="#cost-analysis" id="tab-cost-link" role="tab" data-i18n="tab_cost">Análise de Custos</a>
 </li>
 </ul>
 <div class="tab-content" id="forecastTabsContent">
@@ -171,37 +180,37 @@
 <div class="container-fluid bg-6 text-center">
 <div class="row">
 <div class="col-sm-6 text-left">
-<h3>Project properties</h3>
+<h3 data-i18n="project_props">Propriedades do Projeto</h3>
 <div class="input-group mb-3">
 <div class="input-group-prepend">
-<span class="input-group-text">Project name</span>
+<span class="input-group-text" data-i18n="project_name">Nome do projeto</span>
 </div>
 <input class="form-control" id="projectName" type="text"/>
 </div>
 <div class="input-group mb-3">
 <div class="input-group-prepend">
-<span class="input-group-text">Team size<span style="color:red">*</span></span>
+<span class="input-group-text"><span data-i18n="team_size">Tamanho da equipe</span><span style="color:red">*</span></span>
 </div>
 <input class="form-control" id="totalContributors" max="9999" min="1" required="required" title="Total number of individual contributors on this team" type="number" value="1"/>
 <div class="input-group-append">
-<span class="input-group-text">contributors</span>
+<span class="input-group-text" data-i18n="contributors">contribuidores</span>
 </div>
 </div>
 <div class="input-group mb-3">
 <div class="input-group-prepend">
-<span class="input-group-text">Minimum contributors</span>
+<span class="input-group-text" data-i18n="min_contributors">Contribuidores mínimos</span>
 </div>
 <input class="form-control" id="minContributors" max="9999" min="1" title="Minimum number of contributors who will start working in the project" type="number"/>
 </div>
 <div class="input-group mb-3">
 <div class="input-group-prepend">
-<span class="input-group-text">Maximum contributors</span>
+<span class="input-group-text" data-i18n="max_contributors">Contribuidores máximos</span>
 </div>
 <input class="form-control" id="maxContributors" max="9999" min="1" title="Maximum number of contributors who can work in the project" type="number"/>
 </div>
 <div class="input-group mb-3">
 <div class="input-group-prepend">
-<span class="input-group-text">Number of tasks<span style="color:red">*</span></span>
+<span class="input-group-text"><span data-i18n="num_tasks">Número de tarefas</span><span style="color:red">*</span></span>
 </div>
 <input class="form-control" id="numberOfTasks" max="9999" min="0" required="required" title="Number of tasks planned for this project" type="number" value="1"/>
 </div>
@@ -216,16 +225,16 @@
 </div>
 </div>
 <div class="col-sm-6 text-left">
-<h3>Simulation properties</h3>
+<h3 data-i18n="simulation_props">Propriedades da Simulação</h3>
 <div class="input-group mb-3">
 <div class="input-group-prepend">
-<span class="input-group-text">Number of simulations<span style="color:red">*</span></span>
+<span class="input-group-text"><span data-i18n="num_simulations">Número de simulações</span><span style="color:red">*</span></span>
 </div>
 <input class="form-control" id="numberOfSimulations" max="10000000" min="10000" required="required" title="Number of simulations to execute (Default: 100K)" type="number" value="100000"/>
 </div>
 <div class="input-group mb-3">
 <div class="input-group-prepend">
-<span class="input-group-text">S-Curve size</span>
+<span class="input-group-text" data-i18n="scurve_size">Tamanho da Curva-S</span>
 </div>
 <input class="form-control" id="sCurveSize" max="50" min="0" title="Size of the S-Curve at the beginning and end of the project (Default: 20%)" type="number" value="20"/>
 <div class="input-group-append">
@@ -234,7 +243,7 @@
 </div>
 <div class="input-group mb-3">
 <div class="input-group-prepend">
-<span class="input-group-text">Confidence level</span>
+<span class="input-group-text" data-i18n="confidence_level">Nível de confiança</span>
 </div>
 <input class="form-control" id="confidenceLevel" max="99" min="1" title="Level of confidence to report in the results (Default: 85%)" type="number" value="85"/>
 <div class="input-group-append">
@@ -243,13 +252,13 @@
 </div>
 <div class="input-group mb-3">
 <div class="input-group-prepend">
-<span class="input-group-text">Start date</span>
+<span class="input-group-text" data-i18n="start_date">Data de início</span>
 </div>
 <input class="form-control" id="startDate" title="Planned start date for this project" type="date"/>
 </div>
 <div class="input-group mb-3">
 <div class="input-group-prepend">
-<span class="input-group-text">Deadline</span>
+<span class="input-group-text" data-i18n="deadline">Prazo</span>
 </div>
 <input class="form-control" id="deadlineDate" title="Target deadline date for deadline analysis" type="date"/>
 </div>
@@ -258,8 +267,8 @@
 <p class="mb-0"><i>(Fields marked with a red <span style="color:red">*</span> are mandatory)</i></p>
 </div>
 <div class="container-fluid bg-12 text-center">
-<h2>Historical data</h2>
-<p class="text-muted mb-4">Weekly throughput samples are defined in the shared section above.</p>
+<h2 data-i18n="historical_data">Dados históricos</h2>
+<p class="text-muted mb-4" data-i18n="weekly_throughput_note">As amostras de throughput semanais são definidas na seção compartilhada acima.</p>
 <div class="row">
 <div class="col-sm-6">
 <h4>Task lead-times</h4>
@@ -325,11 +334,11 @@
 </div>
 </div>
 <div class="container-fluid bg-12 text-center">
-<button class="btn btn-primary" id="run" type="button">Run the simulation!</button>
-<button class="btn btn-secondary" id="share" title="Share simulation" type="button">Share</button>
+<button class="btn btn-primary" id="run" type="button" data-i18n="run_simulation">Executar a simulação!</button>
+<button class="btn btn-secondary" id="share" title="Share simulation" type="button" data-i18n="share">Compartilhar</button>
 </div>
 <div class="container-fluid bg-12 text-center" id="results-main" style="display:none">
-<h2>Simulation results</h2>
+<h2 data-i18n="results_title">Resultados da Simulação</h2>
 <div class="col-sm-4 text-left">
 <h4 id="res-summary-header">Project forecast summary:</h4>
 <div class="input-group mb-1">
@@ -526,29 +535,29 @@
 <div aria-labelledby="tab-deadline-link" class="tab-pane fade" id="deadline-analysis" role="tabpanel">
 <div class="pt-4 pb-5">
 <div class="container text-center">
-<h2>Deadline Analysis</h2>
-<p class="mb-4">
-                            Reuse your existing simulation inputs and risks to evaluate whether the deadline can be achieved.
-                            Ensure the <strong>Start date</strong> and <strong>Deadline</strong> fields in the Monte Carlo form are filled.
+<h2 data-i18n="deadline_analysis">Análise de Prazo</h2>
+<p class="mb-4" data-i18n="deadline_reuse_desc">
+                            Reutilize suas entradas de simulação e riscos existentes para avaliar se o prazo pode ser alcançado.
+                            Certifique-se de que os campos Data de início e Prazo no formulário Monte Carlo estejam preenchidos.
                         </p>
 </div>
 <div class="container-fluid bg-12 text-center">
 <div class="alert alert-info d-inline-block text-left" role="alert">
-<strong>How it works:</strong> we run the full Monte Carlo simulation with your risks and team settings,
-                            then compare the projected completion percentiles against the selected deadline. The Machine Learning
-                            forecaster is executed as well when at least eight throughput samples are available.
+<strong data-i18n="how_it_works">Como funciona</strong>: <span data-i18n="how_works_desc">executamos a simulação Monte Carlo completa com seus riscos e configurações de equipe,
+                            depois comparamos os percentis de conclusão projetados com o prazo selecionado. O previsor de Aprendizado de Máquina
+                            também é executado quando pelo menos oito amostras de throughput estão disponíveis.</span>
                         </div>
 <div class="mt-3">
-<button class="btn btn-primary btn-lg" id="runDeadlineAnalysis" type="button">
-                                Run Deadline Analysis
+<button class="btn btn-primary btn-lg" id="runDeadlineAnalysis" type="button" data-i18n="run_deadline_analysis">
+                                Executar Análise de Prazo
                             </button>
 </div>
 </div>
 <div class="mt-4" id="deadline-analysis-loading" style="display:none">
 <div class="spinner-border text-primary" role="status">
-<span class="sr-only">Loading...</span>
+<span class="sr-only" data-i18n="loading">Carregando...</span>
 </div>
-<p class="mt-2">Running deadline simulations...</p>
+<p class="mt-2" data-i18n="running_simulations">Executando simulações de prazo...</p>
 </div>
 <div class="mt-4" id="deadline-analysis-panels" style="display:none">
 <ul class="nav nav-tabs nav-fill mb-3" id="deadlineResultsTabs" role="tablist">
@@ -591,7 +600,7 @@
 <td id="window-early-status"></td>
 </tr>
 <tr class="table-success">
-<th scope="row">Just in time</th>
+<th scope="row" data-i18n="just_in_time">Just in time</th>
 <td id="window-just-start"></td>
 <td id="window-just-end"></td>
 <td id="window-just-status"></td>
@@ -896,6 +905,8 @@ Forneça amostras de lead time para visualizar o control chart.
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@0.5.7/chartjs-plugin-annotation.min.js"></script>
 <!-- Moment.js -->
 <script src="https://cdn.jsdelivr.net/npm/moment@2.27.0/moment.min.js"></script>
+<!-- Internationalization -->
+<script src="{{ url_for('static', filename='js/i18n.js') }}"></script>
 <!-- Custom JS -->
 <script src="{{ url_for('static', filename='js/ui.js') }}"></script>
 <script src="{{ url_for('static', filename='js/advanced_forecast.js') }}"></script>
