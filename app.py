@@ -421,7 +421,12 @@ def api_deadline_analysis():
         JSON with deadline analysis results from both methods
     """
     try:
+        print("=" * 60, flush=True)
+        print("API DEADLINE ANALYSIS CALLED", flush=True)
+        print("=" * 60, flush=True)
+
         data = request.json
+        print(f"Received data keys: {list(data.keys()) if data else 'None'}", flush=True)
 
         def parse_date(date_str: str) -> datetime:
             if not date_str or not isinstance(date_str, str):
@@ -654,11 +659,29 @@ def api_deadline_analysis():
                 'mc_more_conservative': mc_weeks > ml_weeks if (mc_weeks and ml_weeks) else None
             }
 
+        print("=" * 60, flush=True)
+        print("DEADLINE ANALYSIS COMPLETED SUCCESSFULLY", flush=True)
+        print("=" * 60, flush=True)
         return jsonify(convert_to_native_types(response_data))
 
+    except ValueError as e:
+        import traceback
+        error_msg = str(e)
+        trace_msg = traceback.format_exc()
+        print("=" * 60, flush=True)
+        print(f"DEADLINE ANALYSIS ERROR (ValueError): {error_msg}", flush=True)
+        print(trace_msg, flush=True)
+        print("=" * 60, flush=True)
+        return jsonify({'error': error_msg, 'trace': trace_msg, 'error_type': 'ValueError'}), 400
     except Exception as e:
         import traceback
-        return jsonify({'error': str(e), 'trace': traceback.format_exc()}), 500
+        error_msg = str(e)
+        trace_msg = traceback.format_exc()
+        print("=" * 60, flush=True)
+        print(f"DEADLINE ANALYSIS ERROR (Exception): {error_msg}", flush=True)
+        print(trace_msg, flush=True)
+        print("=" * 60, flush=True)
+        return jsonify({'error': error_msg, 'trace': trace_msg, 'error_type': type(e).__name__}), 500
 
 
 @app.route('/api/forecast-how-many', methods=['POST'])
