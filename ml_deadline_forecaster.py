@@ -55,6 +55,11 @@ class MLDeadlineForecaster:
         # Initialize ML forecaster with K-Fold CV protocol
         self.ml_forecaster = MLForecaster(max_lag=4, n_splits=5, validation_size=0.2)
 
+        # Cache for trained models to avoid retraining
+        self._models_trained = False
+        self._cached_forecasts = None
+        self._cached_ensemble_stats = None
+
         # Pre-calculate S-curve if needed
         if self.s_curve_size > 0:
             self.contributors_distribution = self._calculate_s_curve()
@@ -115,6 +120,35 @@ class MLDeadlineForecaster:
 
         return lead_time_days / 7.0
 
+    def _train_models_once(self, forecast_steps: int) -> None:
+        """
+        Train ML models once and cache the results.
+        This avoids retraining when multiple forecasts are needed.
+
+        Args:
+            forecast_steps: Number of weeks to forecast with ML
+        """
+        if self._models_trained:
+            # Models already trained, skip
+            return
+
+        print(f"[CACHE] Training ML models for the first time...", flush=True)
+
+        # Train ML models WITHOUT Grid Search (faster for low-memory environments)
+        self.ml_forecaster.train_models(np.array(self.tp_samples), use_kfold_cv=False)
+
+        # Get ML forecast (ensemble of all models) and cache it
+        self._cached_forecasts = self.ml_forecaster.forecast(
+            np.array(self.tp_samples),
+            steps=forecast_steps,
+            model_name='ensemble'
+        )
+
+        self._cached_ensemble_stats = self.ml_forecaster.get_ensemble_forecast(self._cached_forecasts)
+
+        self._models_trained = True
+        print(f"[CACHE] ML models trained and cached successfully", flush=True)
+
     def simulate_project_with_ml(self,
                                  backlog: int,
                                  forecast_steps: int,
@@ -130,18 +164,14 @@ class MLDeadlineForecaster:
         Returns:
             Dictionary with simulation results
         """
-        # Train ML models WITHOUT Grid Search (faster for low-memory environments)
-        # use_kfold_cv=False uses simple Time Series CV without hyperparameter tuning
-        self.ml_forecaster.train_models(np.array(self.tp_samples), use_kfold_cv=False)
+        # Train models once and cache (reuses if already trained)
+        self._train_models_once(forecast_steps)
 
-        # Get ML forecast (ensemble of all models)
-        ml_forecasts = self.ml_forecaster.forecast(
-            np.array(self.tp_samples),
-            steps=forecast_steps,
-            model_name='ensemble'
-        )
+        # Use cached forecasts
+        ml_forecasts = self._cached_forecasts
+        ensemble_stats = self._cached_ensemble_stats
 
-        ensemble_stats = self.ml_forecaster.get_ensemble_forecast(ml_forecasts)
+        print(f"[CACHE] Using cached ML forecasts (models_trained={self._models_trained})", flush=True)
 
         # Run simulations with ML forecasts
         completion_times = []
@@ -277,7 +307,7 @@ def ml_analyze_deadline(
     days_to_deadline = (deadline - start).days
     weeks_to_deadline = days_to_deadline / 7.0
 
-    # Initialize forecaster
+    # Initialize forecaster (will be reused for both forecasts)
     forecaster = MLDeadlineForecaster(
         tp_samples=tp_samples,
         team_size=team_size,
@@ -288,7 +318,7 @@ def ml_analyze_deadline(
         split_rate_samples=split_rate_samples
     )
 
-    # Run ML simulation
+    # Run ML simulation (this will train models once)
     result = forecaster.simulate_project_with_ml(
         backlog=backlog,
         forecast_steps=forecast_weeks,
@@ -301,7 +331,7 @@ def ml_analyze_deadline(
     # Can meet deadline?
     can_meet_deadline = weeks_to_deadline >= projected_weeks_p85
 
-    # Estimate work by deadline using ML forecasts
+    # Estimate work by deadline using the SAME forecaster (reuses trained models)
     work_by_deadline = ml_forecast_how_many(
         tp_samples=tp_samples,
         start_date=start_date,
@@ -311,7 +341,8 @@ def ml_analyze_deadline(
         max_contributors=max_contributors,
         s_curve_size=s_curve_size,
         lt_samples=lt_samples,
-        n_simulations=n_simulations
+        n_simulations=n_simulations,
+        forecaster=forecaster  # Pass the already-trained forecaster
     )
 
     projected_work_p85 = work_by_deadline['items_p85']
@@ -349,7 +380,8 @@ def ml_forecast_how_many(
     max_contributors: Optional[int] = None,
     s_curve_size: int = 0,
     lt_samples: Optional[List[float]] = None,
-    n_simulations: int = 1000
+    n_simulations: int = 1000,
+    forecaster: Optional[MLDeadlineForecaster] = None
 ) -> Dict[str, Any]:
     """
     ML forecast: How many items in a time period?
@@ -364,6 +396,7 @@ def ml_forecast_how_many(
         s_curve_size: S-curve percentage
         lt_samples: Lead time samples
         n_simulations: Number of simulations
+        forecaster: Optional pre-trained forecaster (for model reuse)
 
     Returns:
         Forecast of items deliverable in period
@@ -388,27 +421,40 @@ def ml_forecast_how_many(
     days = (end - start).days
     weeks = math.ceil(days / 7.0)
 
-    # Initialize forecaster
-    forecaster = MLDeadlineForecaster(
-        tp_samples=tp_samples,
-        team_size=team_size,
-        min_contributors=min_contributors,
-        max_contributors=max_contributors,
-        s_curve_size=s_curve_size,
-        lt_samples=lt_samples
-    )
+    # Use provided forecaster if available, otherwise create new one
+    if forecaster is None:
+        print(f"[CACHE] Creating new forecaster for ml_forecast_how_many", flush=True)
+        forecaster = MLDeadlineForecaster(
+            tp_samples=tp_samples,
+            team_size=team_size,
+            min_contributors=min_contributors,
+            max_contributors=max_contributors,
+            s_curve_size=s_curve_size,
+            lt_samples=lt_samples
+        )
+        # Train models for this new forecaster
+        forecaster._train_models_once(weeks)
+    else:
+        print(f"[CACHE] Reusing provided forecaster (already trained)", flush=True)
+        # If models are already trained with a different forecast horizon,
+        # we still need to get forecasts for the new number of weeks
+        if not forecaster._models_trained:
+            forecaster._train_models_once(weeks)
 
-    # Train ML models WITHOUT Grid Search (faster for low-memory environments)
-    forecaster.ml_forecaster.train_models(np.array(tp_samples), use_kfold_cv=False)
-
-    # Get ML forecast
-    ml_forecasts = forecaster.ml_forecaster.forecast(
-        np.array(tp_samples),
-        steps=weeks,
-        model_name='ensemble'
-    )
-
-    ensemble_stats = forecaster.ml_forecaster.get_ensemble_forecast(ml_forecasts)
+    # Get ensemble stats (use cached if available with same horizon, otherwise generate new)
+    if forecaster._cached_ensemble_stats is not None and len(forecaster._cached_ensemble_stats['mean']) >= weeks:
+        # Cached forecasts are sufficient, use them
+        ensemble_stats = forecaster._cached_ensemble_stats
+        print(f"[CACHE] Using cached ensemble stats (sufficient horizon)", flush=True)
+    else:
+        # Need to generate forecasts for the required horizon
+        print(f"[CACHE] Generating new forecasts for {weeks} weeks", flush=True)
+        ml_forecasts = forecaster.ml_forecaster.forecast(
+            np.array(tp_samples),
+            steps=weeks,
+            model_name='ensemble'
+        )
+        ensemble_stats = forecaster.ml_forecaster.get_ensemble_forecast(ml_forecasts)
 
     # Simulate total items
     items_completed = []
