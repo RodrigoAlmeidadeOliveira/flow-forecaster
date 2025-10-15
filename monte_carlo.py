@@ -400,7 +400,11 @@ def simulate_burn_down(simulation_data: Dict[str, Any]) -> Dict[str, Any]:
         # CHANGED: Use Weibull distribution instead of random_element
         random_tp = max(0, round(weibull_fitter.generate_sample()))
 
-        percent_complete = max(0, min(99, round((total_tasks - remaining_tasks) / total_tasks * 100)))
+        # FIXED: Prevent division by zero when total_tasks is 0
+        if total_tasks > 0:
+            percent_complete = max(0, min(99, round((total_tasks - remaining_tasks) / total_tasks * 100)))
+        else:
+            percent_complete = 0
         contributors_this_week = contributors_distribution[percent_complete]
 
         # FIXED: Adjust throughput based on active contributors
