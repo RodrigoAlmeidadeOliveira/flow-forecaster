@@ -130,8 +130,9 @@ class MLDeadlineForecaster:
         Returns:
             Dictionary with simulation results
         """
-        # Train ML models using K-Fold CV with Grid Search
-        self.ml_forecaster.train_models(np.array(self.tp_samples), use_kfold_cv=True)
+        # Train ML models WITHOUT Grid Search (faster for low-memory environments)
+        # use_kfold_cv=False uses simple Time Series CV without hyperparameter tuning
+        self.ml_forecaster.train_models(np.array(self.tp_samples), use_kfold_cv=False)
 
         # Get ML forecast (ensemble of all models)
         ml_forecasts = self.ml_forecaster.forecast(
@@ -397,8 +398,8 @@ def ml_forecast_how_many(
         lt_samples=lt_samples
     )
 
-    # Train ML models using K-Fold CV with Grid Search
-    forecaster.ml_forecaster.train_models(np.array(tp_samples), use_kfold_cv=True)
+    # Train ML models WITHOUT Grid Search (faster for low-memory environments)
+    forecaster.ml_forecaster.train_models(np.array(tp_samples), use_kfold_cv=False)
 
     # Get ML forecast
     ml_forecasts = forecaster.ml_forecaster.forecast(
