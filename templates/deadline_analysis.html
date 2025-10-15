@@ -225,6 +225,23 @@
                                 <input type="text" class="form-control" id="splitRates" placeholder="1.0, 1.1, 1.2, 1.0">
                             </div>
                         </div>
+                        <div class="row mt-3">
+                            <div class="col-md-6">
+                                <label class="form-label">
+                                    <i class="fas fa-dollar-sign"></i> Custo por Pessoa-Semana (R$)
+                                </label>
+                                <input type="number" class="form-control" id="costPerPersonWeek" value="5000" min="0" step="100">
+                                <small class="text-muted">Custo semanal por pessoa (ex: salário + encargos + overhead)</small>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">
+                                    <i class="fas fa-info-circle"></i> Informação
+                                </label>
+                                <div class="alert alert-info mb-0 py-2">
+                                    <small><strong>Cálculo:</strong> Custo Total = Esforço (pessoa-semanas) × Custo/Semana</small>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -287,6 +304,8 @@
             const startDate = (document.getElementById('startDate').value || '').trim();
             const deadlineDate = (document.getElementById('deadlineDate').value || '').trim();
 
+            const costPerPersonWeek = document.getElementById('costPerPersonWeek').value;
+
             return {
                 tpSamples,
                 backlog: parseInt(document.getElementById('backlog').value),
@@ -298,7 +317,8 @@
                 sCurveSize: parseInt(document.getElementById('sCurveSize').value) || 0,
                 ltSamples,
                 splitRateSamples,
-                nSimulations: 10000
+                nSimulations: 10000,
+                costPerPersonWeek: costPerPersonWeek ? parseFloat(costPerPersonWeek) : 5000
             };
         }
 
@@ -464,52 +484,101 @@
                             <div class="result-card">
                                 <div class="alert alert-info">
                                     <h6><i class="fas fa-calculator"></i> ${costAnalysis.formula}</h6>
-                                    <p class="mb-0">${costAnalysis.explanation}</p>
+                                    <p class="mb-0" style="white-space: pre-line;">${costAnalysis.explanation}</p>
                                 </div>
-                                <div class="row mt-3">
-                                    ${costAnalysis.cost_percentiles && costAnalysis.cost_percentiles.p50 ? `
-                                    <div class="col-md-4">
-                                        <div class="metric-box">
-                                            <div class="metric-label">Custo P50 (Mediana)</div>
-                                            <div class="metric-value" style="font-size: 1.5rem;">${costAnalysis.cost_percentiles.p50.formatted}</div>
-                                            <small class="text-muted">${costAnalysis.cost_percentiles.p50.effort_person_weeks} pessoa-semanas</small>
+
+                                ${costAnalysis.team_info ? `
+                                <div class="row mb-3">
+                                    <div class="col-12">
+                                        <div class="alert alert-light mb-0">
+                                            <strong>Parâmetros:</strong>
+                                            Equipe: ${costAnalysis.team_info.team_size} pessoas |
+                                            Contrib. Médio: ${costAnalysis.team_info.avg_contributors.toFixed(1)} |
+                                            Custo/Semana: R$ ${costAnalysis.team_info.cost_per_week.toLocaleString('pt-BR')}
                                         </div>
                                     </div>
-                                    ` : ''}
-                                    ${costAnalysis.cost_p85 ? `
-                                    <div class="col-md-4">
-                                        <div class="metric-box" style="border: 2px solid var(--success-color);">
-                                            <div class="metric-label">Custo P85 (Recomendado)</div>
-                                            <div class="metric-value" style="font-size: 1.5rem; color: var(--success-color);">
-                                                ${costAnalysis.cost_p85.formatted_total}
-                                            </div>
-                                            <small class="text-muted">${costAnalysis.cost_p85.effort_person_weeks} pessoa-semanas</small>
-                                        </div>
-                                    </div>
-                                    ` : ''}
-                                    ${costAnalysis.cost_percentiles && costAnalysis.cost_percentiles.p95 ? `
-                                    <div class="col-md-4">
-                                        <div class="metric-box">
-                                            <div class="metric-label">Custo P95 (Conservador)</div>
-                                            <div class="metric-value" style="font-size: 1.5rem;">${costAnalysis.cost_percentiles.p95.formatted}</div>
-                                            <small class="text-muted">${costAnalysis.cost_percentiles.p95.effort_person_weeks} pessoa-semanas</small>
-                                        </div>
-                                    </div>
-                                    ` : ''}
                                 </div>
-                                ${costAnalysis.cost_p85 ? `
+                                ` : ''}
+
+                                <!-- Monte Carlo Costs -->
+                                ${costAnalysis.monte_carlo ? `
                                 <div class="mt-3">
+                                    <h6 class="text-primary"><i class="fas fa-dice"></i> Monte Carlo - Custos Projetados</h6>
+                                    <div class="row">
+                                        <div class="col-md-4">
+                                            <div class="metric-box">
+                                                <div class="metric-label">Custo P50 (Mediana)</div>
+                                                <div class="metric-value" style="font-size: 1.3rem;">${costAnalysis.monte_carlo.cost_p50.formatted_total}</div>
+                                                <small class="text-muted">${costAnalysis.monte_carlo.effort_p50.toFixed(1)} pessoa-semanas</small>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="metric-box" style="border: 2px solid var(--success-color);">
+                                                <div class="metric-label">Custo P85 (Recomendado)</div>
+                                                <div class="metric-value" style="font-size: 1.3rem; color: var(--success-color);">
+                                                    ${costAnalysis.monte_carlo.cost_p85.formatted_total}
+                                                </div>
+                                                <small class="text-muted">${costAnalysis.monte_carlo.effort_p85.toFixed(1)} pessoa-semanas</small>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="metric-box">
+                                                <div class="metric-label">Custo P95 (Conservador)</div>
+                                                <div class="metric-value" style="font-size: 1.3rem;">${costAnalysis.monte_carlo.cost_p95.formatted_total}</div>
+                                                <small class="text-muted">${costAnalysis.monte_carlo.effort_p95.toFixed(1)} pessoa-semanas</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                ` : ''}
+
+                                <!-- Machine Learning Costs -->
+                                ${costAnalysis.machine_learning ? `
+                                <div class="mt-4">
+                                    <h6 class="text-primary"><i class="fas fa-brain"></i> Machine Learning - Custos Projetados</h6>
+                                    <div class="row">
+                                        <div class="col-md-4">
+                                            <div class="metric-box">
+                                                <div class="metric-label">Custo P50 (Mediana)</div>
+                                                <div class="metric-value" style="font-size: 1.3rem;">${costAnalysis.machine_learning.cost_p50.formatted_total}</div>
+                                                <small class="text-muted">${costAnalysis.machine_learning.effort_p50.toFixed(1)} pessoa-semanas</small>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="metric-box" style="border: 2px solid var(--success-color);">
+                                                <div class="metric-label">Custo P85 (Recomendado)</div>
+                                                <div class="metric-value" style="font-size: 1.3rem; color: var(--success-color);">
+                                                    ${costAnalysis.machine_learning.cost_p85.formatted_total}
+                                                </div>
+                                                <small class="text-muted">${costAnalysis.machine_learning.effort_p85.toFixed(1)} pessoa-semanas</small>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="metric-box">
+                                                <div class="metric-label">Custo P95 (Conservador)</div>
+                                                <div class="metric-value" style="font-size: 1.3rem;">${costAnalysis.machine_learning.cost_p95.formatted_total}</div>
+                                                <small class="text-muted">${costAnalysis.machine_learning.effort_p95.toFixed(1)} pessoa-semanas</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                ` : ''}
+
+                                <!-- Cost Rate Reference -->
+                                ${costAnalysis.monte_carlo && costAnalysis.monte_carlo.cost_p85 ? `
+                                <div class="mt-3">
+                                    <h6>Referência de Taxas</h6>
                                     <div class="comparison-row">
                                         <span>Taxa por Pessoa-Semana:</span>
-                                        <strong>${costAnalysis.cost_p85.formatted_per_week}</strong>
+                                        <strong>${costAnalysis.monte_carlo.cost_p85.formatted_per_week}</strong>
                                     </div>
                                     <div class="comparison-row">
                                         <span>Taxa por Pessoa-Mês:</span>
-                                        <strong>${costAnalysis.cost_p85.formatted_per_month}</strong>
+                                        <strong>${costAnalysis.monte_carlo.cost_p85.formatted_per_month}</strong>
                                     </div>
                                     <div class="comparison-row">
                                         <span>Taxa por Pessoa-Ano:</span>
-                                        <strong>${costAnalysis.cost_p85.formatted_per_year}</strong>
+                                        <strong>${costAnalysis.monte_carlo.cost_p85.formatted_per_year}</strong>
                                     </div>
                                 </div>
                                 ` : ''}

@@ -605,18 +605,65 @@ def api_deadline_analysis():
 
         # Calculate effort-based costs
         cost_analysis = None
+
+        # Calculate costs from Monte Carlo results (always available)
+        mc_projected_weeks_p50 = mc_result_native.get('projected_weeks_p50', 0)
+        mc_projected_weeks_p85 = mc_result_native.get('projected_weeks_p85', 0)
+        mc_projected_weeks_p95 = mc_result_native.get('projected_weeks_p95', 0)
+
+        # Estimate effort for Monte Carlo using team size
+        # Effort = average contributors × weeks
+        avg_contributors = team_size
+        if min_contributors and max_contributors:
+            avg_contributors = (min_contributors + max_contributors) / 2
+
+        mc_effort_p50 = mc_projected_weeks_p50 * avg_contributors
+        mc_effort_p85 = mc_projected_weeks_p85 * avg_contributors
+        mc_effort_p95 = mc_projected_weeks_p95 * avg_contributors
+
+        # Calculate costs for Monte Carlo percentiles
+        mc_cost_percentiles = calculate_effort_based_cost_with_percentiles(
+            effort_percentiles={
+                'p50': mc_effort_p50,
+                'p85': mc_effort_p85,
+                'p95': mc_effort_p95
+            },
+            cost_per_person_week=cost_per_person_week,
+            currency="R$"
+        )
+
+        # Calculate main cost for P85
+        mc_cost_p85 = calculate_effort_based_cost(
+            effort_person_weeks=mc_effort_p85,
+            cost_per_person_week=cost_per_person_week,
+            currency="R$"
+        )
+
+        cost_analysis = {
+            'monte_carlo': {
+                'cost_p50': calculate_effort_based_cost(mc_effort_p50, cost_per_person_week, "R$"),
+                'cost_p85': mc_cost_p85,
+                'cost_p95': calculate_effort_based_cost(mc_effort_p95, cost_per_person_week, "R$"),
+                'cost_percentiles': mc_cost_percentiles,
+                'effort_p50': mc_effort_p50,
+                'effort_p85': mc_effort_p85,
+                'effort_p95': mc_effort_p95
+            },
+            'formula': 'Custo = Esforço (pessoa-semanas) × Custo por Pessoa-Semana',
+            'explanation': f'Monte Carlo: Com esforço de {mc_effort_p85:.1f} pessoa-semanas e custo de {mc_cost_p85["formatted_per_week"]} por semana, o custo total estimado (P85) é {mc_cost_p85["formatted_total"]}',
+            'team_info': {
+                'team_size': team_size,
+                'avg_contributors': avg_contributors,
+                'cost_per_week': cost_per_person_week
+            }
+        }
+
+        # Add ML costs if available
         if ml_result_native and isinstance(ml_result_native, dict) and 'error' not in ml_result_native:
             # Get effort from ML result (P85 confidence level)
             projected_effort_p85 = ml_result_native.get('projected_effort_p85')
 
             if projected_effort_p85:
-                # Calculate cost for P85 effort
-                cost_p85 = calculate_effort_based_cost(
-                    effort_person_weeks=projected_effort_p85,
-                    cost_per_person_week=cost_per_person_week,
-                    currency="R$"
-                )
-
                 # Also get effort from percentile stats if available
                 percentile_stats = ml_result_native.get('percentile_stats', {})
                 projected_weeks_p50 = ml_result_native.get('projected_weeks_p50', 0)
@@ -624,29 +671,37 @@ def api_deadline_analysis():
                 projected_weeks_p95 = percentile_stats.get('p95', 0)
 
                 # Estimate effort for different percentiles using team size
-                # Effort = average contributors × weeks
-                avg_contributors = (min_contributors or team_size + max_contributors or team_size) / 2
-
-                effort_p50 = projected_weeks_p50 * avg_contributors
-                effort_p95 = projected_weeks_p95 * avg_contributors
+                ml_effort_p50 = projected_weeks_p50 * avg_contributors
+                ml_effort_p95 = projected_weeks_p95 * avg_contributors
 
                 # Calculate costs for all percentiles
-                cost_percentiles = calculate_effort_based_cost_with_percentiles(
+                ml_cost_percentiles = calculate_effort_based_cost_with_percentiles(
                     effort_percentiles={
-                        'p50': effort_p50,
+                        'p50': ml_effort_p50,
                         'p85': projected_effort_p85,
-                        'p95': effort_p95
+                        'p95': ml_effort_p95
                     },
                     cost_per_person_week=cost_per_person_week,
                     currency="R$"
                 )
 
-                cost_analysis = {
-                    'cost_p85': cost_p85,
-                    'cost_percentiles': cost_percentiles,
-                    'formula': 'Custo = Esforço (pessoa-semanas) × Custo por Pessoa-Semana',
-                    'explanation': f'Com esforço de {projected_effort_p85} pessoa-semanas e custo de {cost_p85["formatted_per_week"]} por semana, o custo total estimado é {cost_p85["formatted_total"]}'
+                ml_cost_p85 = calculate_effort_based_cost(
+                    effort_person_weeks=projected_effort_p85,
+                    cost_per_person_week=cost_per_person_week,
+                    currency="R$"
+                )
+
+                cost_analysis['machine_learning'] = {
+                    'cost_p50': calculate_effort_based_cost(ml_effort_p50, cost_per_person_week, "R$"),
+                    'cost_p85': ml_cost_p85,
+                    'cost_p95': calculate_effort_based_cost(ml_effort_p95, cost_per_person_week, "R$"),
+                    'cost_percentiles': ml_cost_percentiles,
+                    'effort_p50': ml_effort_p50,
+                    'effort_p85': projected_effort_p85,
+                    'effort_p95': ml_effort_p95
                 }
+
+                cost_analysis['explanation'] += f'\nMachine Learning: Com esforço de {projected_effort_p85:.1f} pessoa-semanas, o custo total estimado (P85) é {ml_cost_p85["formatted_total"]}'
 
         response_data = {
             'monte_carlo': mc_result_native,
