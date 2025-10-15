@@ -250,44 +250,44 @@ class MLForecaster:
         return np.mean(maes), np.mean(rmses)
 
     def _get_param_grid(self, model_name: str) -> Dict:
-        """Get hyperparameter grid for each model type."""
+        """Get hyperparameter grid for each model type (optimized for low memory)."""
         if 'RandomForest' in model_name:
             return {
-                'n_estimators': [50, 100, 150],
-                'max_depth': [3, 5, 7],
-                'min_samples_split': [2, 5]
+                'n_estimators': [50, 100],
+                'max_depth': [3, 5],
+                'min_samples_split': [2]
             }
         elif 'XGBoost' in model_name:
             return {
-                'n_estimators': [50, 100, 150],
-                'max_depth': [3, 5, 7],
-                'learning_rate': [0.01, 0.05, 0.1]
+                'n_estimators': [50, 100],
+                'max_depth': [3, 5],
+                'learning_rate': [0.05, 0.1]
             }
         elif 'HistGradient' in model_name:
             return {
-                'max_iter': [50, 100, 150],
-                'max_depth': [3, 5, 7],
-                'learning_rate': [0.01, 0.05, 0.1]
+                'max_iter': [50, 100],
+                'max_depth': [3, 5],
+                'learning_rate': [0.05, 0.1]
             }
         elif 'Ridge' in model_name:
             return {
-                'ridge__alpha': [0.1, 1.0, 10.0, 25.0]
+                'ridge__alpha': [0.1, 1.0, 10.0]
             }
         elif 'Lasso' in model_name:
             return {
-                'lasso__alpha': [0.001, 0.01, 0.1, 1.0],
-                'lasso__max_iter': [2000, 5000, 10000]
+                'lasso__alpha': [0.01, 0.1, 1.0],
+                'lasso__max_iter': [2000, 5000]
             }
         elif 'KNN' in model_name:
             return {
-                'knn__n_neighbors': [1, 2, 3, 4, 5, 7, 9],
+                'knn__n_neighbors': [2, 3, 5],
                 'knn__weights': ['uniform', 'distance']
             }
         elif 'SVR' in model_name:
             return {
-                'svr__C': [0.5, 1.0, 5.0, 10.0],
-                'svr__epsilon': [0.01, 0.05, 0.1, 0.5],
-                'svr__gamma': ['scale', 'auto']
+                'svr__C': [1.0, 5.0],
+                'svr__epsilon': [0.05, 0.1],
+                'svr__gamma': ['scale']
             }
         else:
             return {}
@@ -366,7 +366,7 @@ class MLForecaster:
                     param_grid=param_grid,
                     cv=kfold_gs,
                     scoring='neg_mean_absolute_error',
-                    n_jobs=-1,
+                    n_jobs=1,  # Changed from -1 to 1 to reduce memory usage on Fly.io (1GB RAM)
                     verbose=0
                 )
 
