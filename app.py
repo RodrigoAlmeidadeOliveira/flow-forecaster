@@ -13,7 +13,12 @@ from monte_carlo_unified import analyze_deadline, forecast_how_many, forecast_wh
 from ml_forecaster import MLForecaster
 from ml_deadline_forecaster import ml_analyze_deadline, ml_forecast_how_many, ml_forecast_when
 from visualization import ForecastVisualizer
-from cost_pert_beta import simulate_pert_beta_cost, calculate_risk_metrics
+from cost_pert_beta import (
+    simulate_pert_beta_cost,
+    calculate_risk_metrics,
+    calculate_effort_based_cost,
+    calculate_effort_based_cost_with_percentiles
+)
 
 app = Flask(__name__)
 
@@ -414,11 +419,12 @@ def api_deadline_analysis():
         "sCurveSize": int (optional, default: 0),
         "ltSamples": list[float] (optional),
         "splitRateSamples": list[float] (optional),
-        "nSimulations": int (optional, default: 10000)
+        "nSimulations": int (optional, default: 10000),
+        "costPerPersonWeek": float (optional, default: 5000, custo por pessoa-semana)
     }
 
     Returns:
-        JSON with deadline analysis results from both methods
+        JSON with deadline analysis results from both methods, including cost estimates
     """
     try:
         print("=" * 60, flush=True)
@@ -452,6 +458,7 @@ def api_deadline_analysis():
         lt_samples = data.get('ltSamples', [])
         split_rate_samples = data.get('splitRateSamples', [])
         n_simulations = data.get('nSimulations', 10000)
+        cost_per_person_week = data.get('costPerPersonWeek', 5000)  # Default: R$ 5,000/week
         simulation_payload = data.get('simulationData')
 
         simulation_data = None
@@ -596,9 +603,55 @@ def api_deadline_analysis():
         mc_result_native = convert_to_native_types(mc_result)
         ml_result_native = convert_to_native_types(ml_result) if ml_result else None
 
+        # Calculate effort-based costs
+        cost_analysis = None
+        if ml_result_native and isinstance(ml_result_native, dict) and 'error' not in ml_result_native:
+            # Get effort from ML result (P85 confidence level)
+            projected_effort_p85 = ml_result_native.get('projected_effort_p85')
+
+            if projected_effort_p85:
+                # Calculate cost for P85 effort
+                cost_p85 = calculate_effort_based_cost(
+                    effort_person_weeks=projected_effort_p85,
+                    cost_per_person_week=cost_per_person_week,
+                    currency="R$"
+                )
+
+                # Also get effort from percentile stats if available
+                percentile_stats = ml_result_native.get('percentile_stats', {})
+                projected_weeks_p50 = ml_result_native.get('projected_weeks_p50', 0)
+                projected_weeks_p85 = ml_result_native.get('projected_weeks_p85', 0)
+                projected_weeks_p95 = percentile_stats.get('p95', 0)
+
+                # Estimate effort for different percentiles using team size
+                # Effort = average contributors × weeks
+                avg_contributors = (min_contributors or team_size + max_contributors or team_size) / 2
+
+                effort_p50 = projected_weeks_p50 * avg_contributors
+                effort_p95 = projected_weeks_p95 * avg_contributors
+
+                # Calculate costs for all percentiles
+                cost_percentiles = calculate_effort_based_cost_with_percentiles(
+                    effort_percentiles={
+                        'p50': effort_p50,
+                        'p85': projected_effort_p85,
+                        'p95': effort_p95
+                    },
+                    cost_per_person_week=cost_per_person_week,
+                    currency="R$"
+                )
+
+                cost_analysis = {
+                    'cost_p85': cost_p85,
+                    'cost_percentiles': cost_percentiles,
+                    'formula': 'Custo = Esforço (pessoa-semanas) × Custo por Pessoa-Semana',
+                    'explanation': f'Com esforço de {projected_effort_p85} pessoa-semanas e custo de {cost_p85["formatted_per_week"]} por semana, o custo total estimado é {cost_p85["formatted_total"]}'
+                }
+
         response_data = {
             'monte_carlo': mc_result_native,
             'machine_learning': ml_result_native,
+            'cost_analysis': cost_analysis,
             'consensus': None
         }
 

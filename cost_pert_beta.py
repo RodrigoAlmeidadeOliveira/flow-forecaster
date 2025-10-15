@@ -210,6 +210,107 @@ def simulate_pert_beta_cost(
     }
 
 
+def calculate_effort_based_cost(
+    effort_person_weeks: float,
+    cost_per_person_week: float,
+    currency: str = "R$"
+) -> Dict[str, Any]:
+    """
+    Calculate project cost based on effort and cost per person-week.
+
+    Formula: Total Cost = Effort (person-weeks) × Cost per Person-Week
+
+    Args:
+        effort_person_weeks: Total effort in person-weeks
+        cost_per_person_week: Cost per person per week (e.g., weekly salary)
+        currency: Currency symbol (default: "R$")
+
+    Returns:
+        Dictionary with cost breakdown:
+        - total_cost: Total project cost
+        - effort_person_weeks: Input effort
+        - cost_per_person_week: Input cost rate
+        - cost_per_person_month: Calculated monthly cost (4.33 weeks/month)
+        - cost_per_person_year: Calculated yearly cost (52 weeks/year)
+        - formatted_total: Formatted total cost string
+
+    Example:
+        >>> calculate_effort_based_cost(54, 5000, "R$")
+        {
+            'total_cost': 270000.0,
+            'effort_person_weeks': 54,
+            'cost_per_person_week': 5000,
+            'cost_per_person_month': 21650.0,
+            'cost_per_person_year': 260000.0,
+            'formatted_total': 'R$ 270,000.00'
+        }
+    """
+    total_cost = effort_person_weeks * cost_per_person_week
+    cost_per_person_month = cost_per_person_week * 4.33  # Average weeks per month
+    cost_per_person_year = cost_per_person_week * 52  # Weeks per year
+
+    return {
+        'total_cost': float(total_cost),
+        'effort_person_weeks': float(effort_person_weeks),
+        'cost_per_person_week': float(cost_per_person_week),
+        'cost_per_person_month': float(cost_per_person_month),
+        'cost_per_person_year': float(cost_per_person_year),
+        'currency': currency,
+        'formatted_total': f"{currency} {total_cost:,.2f}",
+        'formatted_per_week': f"{currency} {cost_per_person_week:,.2f}",
+        'formatted_per_month': f"{currency} {cost_per_person_month:,.2f}",
+        'formatted_per_year': f"{currency} {cost_per_person_year:,.2f}"
+    }
+
+
+def calculate_effort_based_cost_with_percentiles(
+    effort_percentiles: Dict[str, float],
+    cost_per_person_week: float,
+    currency: str = "R$"
+) -> Dict[str, Any]:
+    """
+    Calculate costs for multiple effort percentiles (P50, P85, P95, etc.).
+
+    Args:
+        effort_percentiles: Dict with percentile labels and effort values
+                           e.g., {'p50': 45, 'p85': 54, 'p95': 63}
+        cost_per_person_week: Cost per person per week
+        currency: Currency symbol
+
+    Returns:
+        Dictionary with costs for each percentile
+
+    Example:
+        >>> calculate_effort_based_cost_with_percentiles(
+        ...     {'p50': 45, 'p85': 54, 'p95': 63},
+        ...     5000,
+        ...     "R$"
+        ... )
+        {
+            'p50': {'total_cost': 225000.0, 'formatted': 'R$ 225,000.00'},
+            'p85': {'total_cost': 270000.0, 'formatted': 'R$ 270,000.00'},
+            'p95': {'total_cost': 315000.0, 'formatted': 'R$ 315,000.00'},
+            'cost_per_person_week': 5000,
+            'currency': 'R$'
+        }
+    """
+    results = {}
+
+    for percentile_label, effort_value in effort_percentiles.items():
+        total_cost = effort_value * cost_per_person_week
+        results[percentile_label] = {
+            'effort_person_weeks': float(effort_value),
+            'total_cost': float(total_cost),
+            'formatted': f"{currency} {total_cost:,.2f}"
+        }
+
+    results['cost_per_person_week'] = cost_per_person_week
+    results['currency'] = currency
+    results['formatted_rate'] = f"{currency} {cost_per_person_week:,.2f}/semana"
+
+    return results
+
+
 def calculate_risk_metrics(results: Dict[str, Any], budget: float = None) -> Dict[str, Any]:
     """
     Calculate risk metrics based on simulation results.
