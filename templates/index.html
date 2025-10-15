@@ -13,6 +13,8 @@
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@4.5.0/dist/css/bootstrap.min.css" rel="stylesheet"/>
 <!-- Chart.js CSS -->
 <link href="https://cdn.jsdelivr.net/npm/chart.js@2.9.3/dist/Chart.min.css" rel="stylesheet"/>
+<!-- Font Awesome -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"/>
 <!-- Custom CSS -->
 <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet"/>
 <style>
@@ -708,13 +710,135 @@ Forneça amostras de tempo de lead para visualizar o gráfico de controle.
 <div aria-labelledby="tab-cost-link" class="tab-pane fade" id="cost-analysis" role="tabpanel">
 <div class="pt-4 pb-5">
 <div class="container text-center">
-<h2 data-i18n="cost_analysis_title">Análise de Custos com PERT-Beta</h2>
+<h2 data-i18n="cost_analysis_title">Análise de Custos</h2>
 <p class="mb-4" data-i18n="cost_analysis_desc">
-                            Simule custos do projeto usando distribuição PERT-Beta com estimativas otimista, mais provável e pessimista.
-                            A simulação Monte Carlo com 10.000+ iterações fornece projeções realistas de custo.
+                            Calcule custos do projeto baseados em esforço (pessoa-semanas) ou use distribuição PERT-Beta com estimativas otimista, mais provável e pessimista.
                         </p>
 </div>
+
+<!-- COST BY PERSON-WEEK SECTION -->
+<div class="container-fluid bg-6 text-center mb-5">
+<h2 class="mb-3">💰 Custo por Pessoa-Semana</h2>
+<p class="text-muted mb-4">Calcule custos baseados no esforço projetado (pessoa-semanas) × custo semanal por pessoa</p>
+
+<div class="row">
+<div class="col-md-6 text-left">
+<h3>Parâmetros de Custo</h3>
+<div class="form-group">
+<label for="costPerPersonWeek">Custo por Pessoa-Semana (R$)</label>
+<div class="input-group">
+<div class="input-group-prepend">
+<span class="input-group-text">R$</span>
+</div>
+<input class="form-control" id="costPerPersonWeek" min="0" step="100" type="number" value="5000" placeholder="5000"/>
+</div>
+<small class="form-text text-muted">Custo semanal por pessoa (salário + encargos + overhead)</small>
+</div>
+
+<div class="form-group">
+<label for="effortPersonWeeks">Esforço Estimado (pessoa-semanas)</label>
+<div class="input-group">
+<input class="form-control" id="effortPersonWeeks" min="0" step="0.1" type="number" placeholder="Ex: 54.0"/>
+<div class="input-group-append">
+<span class="input-group-text">pessoa-semanas</span>
+</div>
+</div>
+<small class="form-text text-muted">Ou use as projeções da simulação Monte Carlo</small>
+</div>
+</div>
+
+<div class="col-md-6 text-left">
+<h3>Projeções Monte Carlo</h3>
+<div class="alert alert-info">
+<p class="mb-2"><strong>Para usar projeções Monte Carlo:</strong></p>
+<ol class="mb-0 pl-3">
+<li>Execute a simulação na aba <strong>Monte Carlo</strong></li>
+<li>Os valores de esforço (P50, P85, P95) serão automaticamente usados</li>
+<li>Os custos serão calculados para cada percentil</li>
+</ol>
+</div>
+
+<div class="form-group">
+<label>Tamanho da Equipe</label>
+<div class="alert alert-secondary mb-0">
+Usa o tamanho da equipe definido na aba Monte Carlo
+</div>
+</div>
+</div>
+</div>
+
+<div class="row mt-3">
+<div class="col-12 text-center">
+<button class="btn btn-success btn-lg" id="runEffortCostAnalysis" type="button">
+<i class="fas fa-calculator"></i> Calcular Custos por Esforço
+</button>
+</div>
+</div>
+
+<!-- Effort Cost Results -->
+<div class="mt-4" id="effort-cost-results" style="display:none">
+<h3 class="text-center mb-4">Resultados - Custos por Pessoa-Semana</h3>
+<div class="row">
+<div class="col-md-4">
+<div class="card">
+<div class="card-header bg-info text-white">
+<h5 class="mb-0">P50 (Mediana)</h5>
+</div>
+<div class="card-body text-center">
+<h4 id="effort-cost-p50" class="text-primary">—</h4>
+<small id="effort-weeks-p50" class="text-muted">—</small>
+</div>
+</div>
+</div>
+<div class="col-md-4">
+<div class="card border-success">
+<div class="card-header bg-success text-white">
+<h5 class="mb-0">P85 (Recomendado)</h5>
+</div>
+<div class="card-body text-center">
+<h4 id="effort-cost-p85" class="text-success">—</h4>
+<small id="effort-weeks-p85" class="text-muted">—</small>
+</div>
+</div>
+</div>
+<div class="col-md-4">
+<div class="card">
+<div class="card-header bg-warning">
+<h5 class="mb-0">P95 (Conservador)</h5>
+</div>
+<div class="card-body text-center">
+<h4 id="effort-cost-p95" class="text-warning">—</h4>
+<small id="effort-weeks-p95" class="text-muted">—</small>
+</div>
+</div>
+</div>
+</div>
+
+<div class="row mt-3">
+<div class="col-12">
+<div class="card">
+<div class="card-header bg-secondary text-white">
+<h5 class="mb-0">Taxas de Referência</h5>
+</div>
+<div class="card-body">
+<table class="table table-sm mb-0">
+<tbody id="effort-cost-rates-table">
+</tbody>
+</table>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+<hr class="my-5">
+
+<!-- PERT-BETA SECTION -->
 <div class="container-fluid bg-6 text-center">
+<h2 class="mb-3">📊 Análise PERT-Beta (Avançado)</h2>
+<p class="text-muted mb-4">Simulação Monte Carlo com 10.000+ iterações usando distribuição PERT-Beta</p>
+
 <div class="row">
 <div class="col-md-6 text-left">
 <h3 data-i18n="cost_per_item">Custo por Item</h3>

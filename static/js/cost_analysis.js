@@ -426,4 +426,90 @@ $(document).ready(function() {
             }
         });
     }
+
+    // ===== EFFORT-BASED COST ANALYSIS =====
+    $('#runEffortCostAnalysis').on('click', function() {
+        runEffortCostAnalysis();
+    });
+
+    function runEffortCostAnalysis() {
+        const costPerWeek = parseFloat($('#costPerPersonWeek').val());
+        const manualEffort = parseFloat($('#effortPersonWeeks').val());
+
+        // Validation
+        if (!costPerWeek || costPerWeek <= 0) {
+            alert('Por favor, defina um custo por pessoa-semana válido.');
+            return;
+        }
+
+        // Try to get effort from Monte Carlo results (from window.lastSimulationResult)
+        let effortData = null;
+
+        if (window.lastSimulationResult && window.lastSimulationResult.percentile_stats) {
+            // Use Monte Carlo projections
+            const percentiles = window.lastSimulationResult.percentile_stats;
+            const teamSize = parseInt($('#totalContributors').val()) || 1;
+
+            effortData = {
+                p50: (percentiles.p50 || 0) * teamSize,
+                p85: (percentiles.p85 || 0) * teamSize,
+                p95: (percentiles.p95 || 0) * teamSize
+            };
+        } else if (manualEffort && manualEffort > 0) {
+            // Use manual effort input
+            effortData = {
+                p50: manualEffort * 0.83,  // Approximate P50
+                p85: manualEffort,          // User input as P85
+                p95: manualEffort * 1.17    // Approximate P95
+            };
+        } else {
+            alert('Execute uma simulação Monte Carlo ou insira um esforço estimado manualmente.');
+            return;
+        }
+
+        // Calculate costs
+        const costs = {
+            p50: effortData.p50 * costPerWeek,
+            p85: effortData.p85 * costPerWeek,
+            p95: effortData.p95 * costPerWeek
+        };
+
+        // Display results
+        $('#effort-cost-p50').text(formatCurrency(costs.p50));
+        $('#effort-weeks-p50').text(`${effortData.p50.toFixed(1)} pessoa-semanas`);
+
+        $('#effort-cost-p85').text(formatCurrency(costs.p85));
+        $('#effort-weeks-p85').text(`${effortData.p85.toFixed(1)} pessoa-semanas`);
+
+        $('#effort-cost-p95').text(formatCurrency(costs.p95));
+        $('#effort-weeks-p95').text(`${effortData.p95.toFixed(1)} pessoa-semanas`);
+
+        // Display rates table
+        const monthlyRate = costPerWeek * 4.33;  // 4.33 weeks/month average
+        const yearlyRate = costPerWeek * 52;     // 52 weeks/year
+
+        let ratesHtml = `
+            <tr>
+                <th scope="row">Por Pessoa-Semana</th>
+                <td class="text-right font-weight-bold">${formatCurrency(costPerWeek)}</td>
+            </tr>
+            <tr>
+                <th scope="row">Por Pessoa-Mês (4.33 semanas)</th>
+                <td class="text-right">${formatCurrency(monthlyRate)}</td>
+            </tr>
+            <tr>
+                <th scope="row">Por Pessoa-Ano (52 semanas)</th>
+                <td class="text-right">${formatCurrency(yearlyRate)}</td>
+            </tr>
+        `;
+        $('#effort-cost-rates-table').html(ratesHtml);
+
+        // Show results
+        $('#effort-cost-results').show();
+
+        // Scroll to results
+        $('html, body').animate({
+            scrollTop: $('#effort-cost-results').offset().top - 70
+        }, 300);
+    }
 });

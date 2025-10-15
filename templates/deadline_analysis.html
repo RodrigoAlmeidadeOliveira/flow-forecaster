@@ -225,23 +225,6 @@
                                 <input type="text" class="form-control" id="splitRates" placeholder="1.0, 1.1, 1.2, 1.0">
                             </div>
                         </div>
-                        <div class="row mt-3">
-                            <div class="col-md-6">
-                                <label class="form-label">
-                                    <i class="fas fa-dollar-sign"></i> Custo por Pessoa-Semana (R$)
-                                </label>
-                                <input type="number" class="form-control" id="costPerPersonWeek" value="5000" min="0" step="100">
-                                <small class="text-muted">Custo semanal por pessoa (ex: salário + encargos + overhead)</small>
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label">
-                                    <i class="fas fa-info-circle"></i> Informação
-                                </label>
-                                <div class="alert alert-info mb-0 py-2">
-                                    <small><strong>Cálculo:</strong> Custo Total = Esforço (pessoa-semanas) × Custo/Semana</small>
-                                </div>
-                            </div>
-                        </div>
                     </div>
                 </div>
 
@@ -304,8 +287,6 @@
             const startDate = (document.getElementById('startDate').value || '').trim();
             const deadlineDate = (document.getElementById('deadlineDate').value || '').trim();
 
-            const costPerPersonWeek = document.getElementById('costPerPersonWeek').value;
-
             return {
                 tpSamples,
                 backlog: parseInt(document.getElementById('backlog').value),
@@ -317,8 +298,7 @@
                 sCurveSize: parseInt(document.getElementById('sCurveSize').value) || 0,
                 ltSamples,
                 splitRateSamples,
-                nSimulations: 10000,
-                costPerPersonWeek: costPerPersonWeek ? parseFloat(costPerPersonWeek) : 5000
+                nSimulations: 10000
             };
         }
 
