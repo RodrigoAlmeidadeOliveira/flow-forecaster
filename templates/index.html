@@ -1501,6 +1501,9 @@ Histograma mostrando a distribuição de probabilidade do esforço estimado usan
 <script src="{{ url_for('static', filename='js/cost_analysis.js') }}"></script>
 <script>
         $(function () {
+            // Initialize Bootstrap tooltips
+            $('[data-toggle="tooltip"]').tooltip();
+
             function activateTabFromHash() {
                 const hash = window.location.hash;
                 if (hash === '#advanced-forecast') {
