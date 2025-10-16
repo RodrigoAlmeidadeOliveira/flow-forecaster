@@ -1,5 +1,6 @@
 $(document).ready(function() {
     let costChart = null;
+    let effortHistogramChart = null;
 
     $('#runCostAnalysis').on('click', function() {
         runCostAnalysis();
@@ -471,7 +472,11 @@ $(document).ready(function() {
         return {
             p50: samples[p50Index],
             p85: samples[p85Index],
-            p95: samples[p95Index]
+            p95: samples[p95Index],
+            samples: samples,  // Return all samples for histogram
+            optimistic: optimistic,
+            mostLikely: mostLikely,
+            pessimistic: pessimistic
         };
     }
 
@@ -518,6 +523,183 @@ $(document).ready(function() {
         const u1 = Math.random();
         const u2 = Math.random();
         return Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+    }
+
+    // Draw effort histogram
+    function drawEffortHistogram(simulationData) {
+        const ctx = document.getElementById('effort-histogram-chart').getContext('2d');
+
+        // Destroy previous chart if exists
+        if (effortHistogramChart) {
+            effortHistogramChart.destroy();
+        }
+
+        const samples = simulationData.samples;
+        const nBins = 50;  // Number of histogram bins
+
+        // Calculate histogram
+        const min = Math.min(...samples);
+        const max = Math.max(...samples);
+        const binWidth = (max - min) / nBins;
+
+        const bins = new Array(nBins).fill(0);
+        const binCenters = [];
+
+        for (let i = 0; i < nBins; i++) {
+            binCenters.push(min + (i + 0.5) * binWidth);
+        }
+
+        samples.forEach(value => {
+            const binIndex = Math.min(Math.floor((value - min) / binWidth), nBins - 1);
+            bins[binIndex]++;
+        });
+
+        // Calculate cumulative percentage
+        const totalCount = samples.length;
+        let cumulative = 0;
+        const cumulativeData = bins.map(count => {
+            cumulative += count;
+            return (cumulative / totalCount) * 100;
+        });
+
+        effortHistogramChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: binCenters.map(c => c.toFixed(1) + ' pw'),
+                datasets: [{
+                    label: 'Frequência',
+                    data: bins,
+                    backgroundColor: 'rgba(54, 162, 235, 0.6)',
+                    borderColor: 'rgba(54, 162, 235, 1)',
+                    borderWidth: 1,
+                    yAxisID: 'y-frequency'
+                }, {
+                    label: '% Cumulativo',
+                    data: cumulativeData,
+                    type: 'line',
+                    borderColor: 'rgba(255, 99, 132, 1)',
+                    backgroundColor: 'rgba(255, 99, 132, 0.1)',
+                    borderWidth: 2,
+                    fill: false,
+                    yAxisID: 'y-cumulative',
+                    pointRadius: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                title: {
+                    display: true,
+                    text: `Distribuição PERT-Beta de Esforço (${samples.length.toLocaleString()} simulações)`
+                },
+                scales: {
+                    xAxes: [{
+                        scaleLabel: {
+                            display: true,
+                            labelString: 'Esforço (pessoa-semanas)'
+                        },
+                        ticks: {
+                            maxRotation: 45,
+                            minRotation: 45,
+                            callback: function(value, index, values) {
+                                // Show only every 5th label
+                                return index % 5 === 0 ? value : '';
+                            }
+                        }
+                    }],
+                    yAxes: [{
+                        id: 'y-frequency',
+                        type: 'linear',
+                        position: 'left',
+                        scaleLabel: {
+                            display: true,
+                            labelString: 'Frequência'
+                        },
+                        ticks: {
+                            beginAtZero: true
+                        }
+                    }, {
+                        id: 'y-cumulative',
+                        type: 'linear',
+                        position: 'right',
+                        scaleLabel: {
+                            display: true,
+                            labelString: '% Cumulativo'
+                        },
+                        ticks: {
+                            beginAtZero: true,
+                            max: 100,
+                            callback: function(value) {
+                                return value + '%';
+                            }
+                        },
+                        gridLines: {
+                            drawOnChartArea: false
+                        }
+                    }]
+                },
+                tooltips: {
+                    mode: 'index',
+                    intersect: false,
+                    callbacks: {
+                        label: function(tooltipItem, data) {
+                            const datasetLabel = data.datasets[tooltipItem.datasetIndex].label || '';
+                            const value = tooltipItem.yLabel;
+                            if (datasetLabel === '% Cumulativo') {
+                                return datasetLabel + ': ' + value.toFixed(2) + '%';
+                            }
+                            return datasetLabel + ': ' + value;
+                        }
+                    }
+                },
+                annotation: {
+                    annotations: [
+                        {
+                            type: 'line',
+                            mode: 'vertical',
+                            scaleID: 'x-axis-0',
+                            value: simulationData.p50.toFixed(1) + ' pw',
+                            borderColor: 'green',
+                            borderWidth: 2,
+                            label: {
+                                enabled: true,
+                                content: 'P50',
+                                position: 'top'
+                            }
+                        },
+                        {
+                            type: 'line',
+                            mode: 'vertical',
+                            scaleID: 'x-axis-0',
+                            value: simulationData.p85.toFixed(1) + ' pw',
+                            borderColor: 'orange',
+                            borderWidth: 2,
+                            label: {
+                                enabled: true,
+                                content: 'P85',
+                                position: 'top'
+                            }
+                        },
+                        {
+                            type: 'line',
+                            mode: 'vertical',
+                            scaleID: 'x-axis-0',
+                            value: simulationData.p95.toFixed(1) + ' pw',
+                            borderColor: 'red',
+                            borderWidth: 2,
+                            label: {
+                                enabled: true,
+                                content: 'P95',
+                                position: 'top'
+                            }
+                        }
+                    ]
+                }
+            }
+        });
+
+        // Show histogram container
+        $('#effort-histogram-container').show();
     }
 
     function runEffortCostAnalysis() {
@@ -611,6 +793,14 @@ $(document).ready(function() {
             </tr>
         `;
         $('#effort-cost-rates-table').html(ratesHtml);
+
+        // Draw histogram if we have PERT-Beta simulation data
+        if (effortData.samples) {
+            drawEffortHistogram(effortData);
+        } else {
+            // Hide histogram if not using PERT-Beta
+            $('#effort-histogram-container').hide();
+        }
 
         // Show results
         $('#effort-cost-results').show();
