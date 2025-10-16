@@ -176,7 +176,44 @@
 })();
 
 $(window).on("load", function () {
-    $('[data-toggle="tooltip"]').tooltip({ delay: 500 });
+    const TOOLTIP_DELAY = 500;
+    const DOC_BASE_URL = "https://flow-forecaster.fly.dev/documentacao";
+
+    function attachDocumentationHints() {
+        $('[data-doc-tooltip]').each(function () {
+            const $target = $(this);
+            if ($target.find('.doc-hint-icon').length) {
+                return;
+            }
+            const tooltip = $target.data('docTooltip');
+            if (!tooltip) return;
+            const anchor = $target.data('docAnchor');
+            const placement = $target.data('docPlacement') || 'top';
+            const docUrl = anchor ? `${DOC_BASE_URL}#${anchor}` : DOC_BASE_URL;
+
+            const $icon = $('<a>', {
+                href: docUrl,
+                target: '_blank',
+                rel: 'noopener noreferrer',
+                class: 'doc-hint-icon',
+                'aria-label': 'Abrir documentação relacionada em nova aba',
+                'data-toggle': 'tooltip',
+                'data-placement': placement,
+                title: tooltip
+            }).append($('<i>', {
+                class: 'fas fa-circle-question',
+                'aria-hidden': 'true'
+            }));
+
+            $target.append($icon);
+            $icon.tooltip({ delay: TOOLTIP_DELAY });
+        });
+    }
+
+    window.attachDocumentationHints = attachDocumentationHints;
+
+    $('[data-toggle="tooltip"]').tooltip({ delay: TOOLTIP_DELAY });
+    attachDocumentationHints();
 
     function parseSamples(selector) {
         let val = $(selector).val() || '';

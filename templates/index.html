@@ -112,6 +112,32 @@
         #results-main .input-group-append .input-group-text {
             white-space: nowrap;
         }
+
+        /* Tooltip hint icons */
+        .hint-icon {
+            color: #6c757d;
+            cursor: help;
+            margin-left: 5px;
+            font-size: 14px;
+            transition: color 0.2s;
+        }
+
+        .hint-icon:hover {
+            color: #007bff;
+        }
+
+        /* Custom Bootstrap tooltip styling */
+        .tooltip-inner {
+            max-width: 300px;
+            text-align: left;
+            padding: 10px 12px;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+
+        .tooltip.show {
+            opacity: 1;
+        }
     </style>
 </head>
 <body>
@@ -161,12 +187,17 @@
 </div>
 <section class="mt-4">
 <div class="container-fluid bg-12 text-center">
-<h2 data-i18n="shared_throughput_title">Dados de Throughput Compartilhados</h2>
+<h2 data-i18n="shared_throughput_title"
+    data-doc-tooltip="Cadastre o histórico semanal de throughput em valores separados por vírgula. Precisa de pelo menos 8 amostras para liberar os modelos de Machine Learning."
+    data-doc-anchor="throughput-vazao">
+    Dados de Throughput Compartilhados
+</h2>
 <div class="row justify-content-center">
 <div class="col-lg-8">
 <textarea class="form-control text-monospace" id="tpSamples" data-i18n-placeholder="throughput_placeholder" placeholder="Exemplo: 5, 6, 7, 4, 8, 6, 5, 7, 6, 8" rows="4" title="Historical weekly throughput used by all simulations"></textarea>
 <small class="form-text text-muted" data-i18n="throughput_help">
                             Forneça amostras de throughput semanais uma vez e reutilize-as em simulações Monte Carlo e Aprendizado de Máquina.
+                            <a href="https://flow-forecaster.fly.dev/documentacao#throughput-vazao" target="_blank" rel="noopener noreferrer">Saiba mais na documentação</a>.
                         </small>
 </div>
 </div>
@@ -198,42 +229,105 @@
 <h3 data-i18n="project_props">Propriedades do Projeto</h3>
 <div class="input-group mb-3">
 <div class="input-group-prepend">
-<span class="input-group-text" data-i18n="project_name">Nome do projeto</span>
+<span class="input-group-text"
+      data-i18n="project_name"
+      data-doc-tooltip="Defina um identificador amigável para acompanhar o cenário nas simulações e relatórios."
+      data-doc-anchor="1-simulacao-monte-carlo">
+    Nome do projeto
+</span>
 </div>
-<input class="form-control" id="projectName" type="text"/>
+<input class="form-control"
+       id="projectName"
+       type="text"
+       title="Nome amigável exibido nos resultados e gráficos"/>
 </div>
 <div class="input-group mb-3">
 <div class="input-group-prepend">
-<span class="input-group-text"><span data-i18n="team_size">Tamanho da equipe</span><span style="color:red">*</span></span>
+<span class="input-group-text"
+      data-doc-tooltip="Informe quantas pessoas efetivamente entregam itens por semana. Esse valor é usado para converter semanas em esforço (pessoa-semana) e compor análises de custo."
+      data-doc-anchor="1-simulacao-monte-carlo">
+    <span data-i18n="team_size">Tamanho da equipe</span><span style="color:red">*</span>
+</span>
 </div>
-<input class="form-control" id="totalContributors" max="9999" min="1" required="required" title="Total number of individual contributors on this team" type="number" value="1"/>
+<input class="form-control"
+       id="totalContributors"
+       max="9999"
+       min="1"
+       required="required"
+       title="Quantidade de pessoas ativas que contribuem semanalmente"
+       type="number"
+       value="1"/>
 <div class="input-group-append">
 <span class="input-group-text" data-i18n="contributors">contribuidores</span>
 </div>
 </div>
 <div class="input-group mb-3">
 <div class="input-group-prepend">
-<span class="input-group-text" data-i18n="min_contributors">Contribuidores mínimos</span>
+<span class="input-group-text"
+      data-i18n="min_contributors"
+      data-doc-tooltip="Estime a quantidade mínima de pessoas que podem atuar no período. Útil para cenários com férias ou rodízios."
+      data-doc-anchor="planejamento">
+    Contribuidores mínimos
+</span>
 </div>
-<input class="form-control" id="minContributors" max="9999" min="1" title="Minimum number of contributors who will start working in the project" type="number"/>
-</div>
-<div class="input-group mb-3">
-<div class="input-group-prepend">
-<span class="input-group-text" data-i18n="max_contributors">Contribuidores máximos</span>
-</div>
-<input class="form-control" id="maxContributors" max="9999" min="1" title="Maximum number of contributors who can work in the project" type="number"/>
-</div>
-<div class="input-group mb-3">
-<div class="input-group-prepend">
-<span class="input-group-text"><span data-i18n="num_tasks">Número de tarefas</span><span style="color:red">*</span></span>
-</div>
-<input class="form-control" id="numberOfTasks" max="9999" min="0" required="required" title="Number of tasks planned for this project" type="number" value="1"/>
+<input class="form-control"
+       id="minContributors"
+       max="9999"
+       min="1"
+       title="Quantidade mínima de contribuidores disponíveis"
+       type="number"/>
 </div>
 <div class="input-group mb-3">
 <div class="input-group-prepend">
-<span class="input-group-text" data-i18n="historical_team_size_label" data-i18n-title="historical_team_size_tooltip">Tamanho histórico da equipe</span>
+<span class="input-group-text"
+      data-i18n="max_contributors"
+      data-doc-tooltip="Registre o limite superior de pessoas que podem trabalhar simultaneamente no projeto."
+      data-doc-anchor="planejamento">
+    Contribuidores máximos
+</span>
 </div>
-<input class="form-control" id="historicalTeamSize" max="9999" min="1" title="Number of contributors when historical throughput data was collected (default: 1)" type="number" value="1" placeholder="1"/>
+<input class="form-control"
+       id="maxContributors"
+       max="9999"
+       min="1"
+       title="Quantidade máxima de contribuidores esperada"
+       type="number"/>
+</div>
+<div class="input-group mb-3">
+<div class="input-group-prepend">
+<span class="input-group-text"
+      data-doc-tooltip="Informe o total de itens que precisam ser concluídos. Esse valor representa seu backlog alvo."
+      data-doc-anchor="backlog">
+    <span data-i18n="num_tasks">Número de tarefas</span><span style="color:red">*</span>
+</span>
+</div>
+<input class="form-control"
+       id="numberOfTasks"
+       max="9999"
+       min="0"
+       required="required"
+       title="Quantidade total de itens no backlog analisado"
+       type="number"
+       value="1"/>
+</div>
+<div class="input-group mb-3">
+<div class="input-group-prepend">
+<span class="input-group-text"
+      data-i18n="historical_team_size_label"
+      data-i18n-title="historical_team_size_tooltip"
+      data-doc-tooltip="Informe quantas pessoas estavam ativas quando você coletou o throughput histórico. Isso permite ajustar simulações caso o time atual seja diferente."
+      data-doc-anchor="coleta-de-dados">
+    Tamanho histórico da equipe
+</span>
+</div>
+<input class="form-control"
+       id="historicalTeamSize"
+       max="9999"
+       min="1"
+       title="Tamanho da equipe na época do throughput histórico (default: 1)"
+       type="number"
+       value="1"
+       placeholder="1"/>
 <div class="input-group-append">
 <span class="input-group-text" data-i18n="contributors">contribuidores</span>
 </div>
@@ -243,76 +337,179 @@
 <h3 data-i18n="simulation_props">Propriedades da Simulação</h3>
 <div class="input-group mb-3">
 <div class="input-group-prepend">
-<span class="input-group-text"><span data-i18n="num_simulations">Número de simulações</span><span style="color:red">*</span></span>
+<span class="input-group-text"
+      data-doc-tooltip="Quanto maior o número de simulações, mais estável o resultado. Recomendamos pelo menos 10.000 execuções para cenários confiáveis."
+      data-doc-anchor="1-simulacao-monte-carlo">
+    <span data-i18n="num_simulations">Número de simulações</span><span style="color:red">*</span>
+</span>
 </div>
-<input class="form-control" id="numberOfSimulations" max="10000000" min="10000" required="required" title="Number of simulations to execute (Default: 100K)" type="number" value="100000"/>
+<input class="form-control"
+       id="numberOfSimulations"
+       max="10000000"
+       min="10000"
+       required="required"
+       title="Quantidade de execuções na simulação Monte Carlo"
+       type="number"
+       value="100000"/>
 </div>
 <div class="input-group mb-3">
 <div class="input-group-prepend">
-<span class="input-group-text" data-i18n="scurve_size">Tamanho da Curva-S</span>
+<span class="input-group-text"
+      data-i18n="scurve_size"
+      data-doc-tooltip="A Curva-S controla a rampa de aceleração e desaceleração do time. Ajuste para simular períodos de aquecimento ou encerramento."
+      data-doc-anchor="planejamento">
+    Tamanho da Curva-S
+</span>
 </div>
-<input class="form-control" id="sCurveSize" max="50" min="0" title="Size of the S-Curve at the beginning and end of the project (Default: 20%)" type="number" value="20"/>
+<input class="form-control"
+       id="sCurveSize"
+       max="50"
+       min="0"
+       title="Percentual de rampa de produtividade na largada e encerramento"
+       type="number"
+       value="20"/>
 <div class="input-group-append">
 <span class="input-group-text">%</span>
 </div>
 </div>
 <div class="input-group mb-3">
 <div class="input-group-prepend">
-<span class="input-group-text" data-i18n="confidence_level">Nível de confiança</span>
+<span class="input-group-text"
+      data-i18n="confidence_level"
+      data-doc-tooltip="Escolha o percentil que deseja analisar (ex.: P85 = 85% de confiança). Veja como interpretar P50, P85 e P95 na documentação."
+      data-doc-anchor="percentis-p50-p85-p95">
+    Nível de confiança
+</span>
 </div>
-<input class="form-control" id="confidenceLevel" max="99" min="1" title="Level of confidence to report in the results (Default: 85%)" type="number" value="85"/>
+<input class="form-control"
+       id="confidenceLevel"
+       max="99"
+       min="1"
+       title="Percentual de confiança desejado (ex.: 85)"
+       type="number"
+       value="85"/>
 <div class="input-group-append">
 <span class="input-group-text">%</span>
 </div>
 </div>
 <div class="input-group mb-3">
 <div class="input-group-prepend">
-<span class="input-group-text" data-i18n="start_date">Data de início</span>
+<span class="input-group-text"
+      data-i18n="start_date"
+      data-doc-tooltip="Data planejada para início do trabalho. Necessária para converter semanas simuladas em datas."
+      data-doc-anchor="analise-de-deadline">
+    Data de início
+</span>
 </div>
-<input class="form-control" id="startDate" title="Planned start date for this project" type="date"/>
+<input class="form-control"
+       id="startDate"
+       title="Data planejada para começar o trabalho"
+       type="date"/>
 </div>
 <div class="input-group mb-3">
 <div class="input-group-prepend">
-<span class="input-group-text" data-i18n="deadline">Prazo</span>
+<span class="input-group-text"
+      data-i18n="deadline"
+      data-doc-tooltip="Prazo alvo usado nas análises de deadline e ritmo restante."
+      data-doc-anchor="analise-de-deadline">
+    Prazo
+</span>
 </div>
-<input class="form-control" id="deadlineDate" title="Target deadline date for deadline analysis" type="date"/>
+<input class="form-control"
+       id="deadlineDate"
+       title="Deadline desejado para conclusão"
+       type="date"/>
 </div>
 </div>
 </div>
 <p class="mb-0"><i>(<span data-i18n="fields_mandatory">Campos marcados com um</span> <span style="color:red">*</span> <span data-i18n="are_mandatory">vermelho são obrigatórios</span>)</i></p>
 </div>
 <div class="container-fluid bg-12 text-center">
-<h2 data-i18n="historical_data">Dados históricos</h2>
+<h2 data-i18n="historical_data"
+    data-doc-tooltip="Inclua métricas adicionais como Lead Time e Split Rate para aprimorar as simulações."
+    data-doc-anchor="coleta-de-dados">
+    Dados históricos
+</h2>
 <p class="text-muted mb-4" data-i18n="weekly_throughput_note">As amostras de throughput semanais são definidas na seção compartilhada acima.</p>
 <div class="row">
 <div class="col-sm-6">
-<h4 data-i18n="task_lead_times">Tempos de lead de tarefas</h4>
-<textarea class="form-control text-monospace" id="ltSamples" rows="4" title="Optionally paste your historical data of tasks lead-time"></textarea>
+<h4 data-i18n="task_lead_times"
+    data-doc-tooltip="Lead Time corresponde ao tempo entre início e conclusão de uma tarefa. Use dias separados por vírgula ou linhas."
+    data-doc-anchor="lead-time-tempo-de-ciclo">
+    Tempos de lead de tarefas
+</h4>
+<textarea class="form-control text-monospace"
+          id="ltSamples"
+          rows="4"
+          title="Informe tempos de lead em dias, separados por vírgula ou linhas"></textarea>
 </div>
 <div class="col-sm-6">
-<h4 data-i18n="projects_split_rates">Taxas de divisão de projetos</h4>
-<textarea class="form-control text-monospace" id="splitRateSamples" rows="4" title="Optionally paste your historical data of project's split rates"></textarea>
+<h4 data-i18n="projects_split_rates"
+    data-doc-tooltip="Split Rate representa o quanto itens tendem a ser divididos. Use multiplicadores como 1.1 para 10% de divisão."
+    data-doc-anchor="split-rate-taxa-de-divisao">
+    Taxas de divisão de projetos
+</h4>
+<textarea class="form-control text-monospace"
+          id="splitRateSamples"
+          rows="4"
+          title="Informe multiplicadores de split rate (ex.: 1.1, 1.2) separados por vírgula"></textarea>
 </div>
 </div>
 </div>
 <div class="container-fluid bg-12 text-center">
-<h2 data-i18n="risks_optional">Riscos (opcional)</h2>
-<p class="text-muted" data-i18n="risks_description">Modele riscos discretos para adicionar buffer probabilístico à sua previsão.</p>
+<h2 data-i18n="risks_optional"
+    data-doc-tooltip="Mapeie eventos incertos para adicionar buffers probabilísticos à previsão."
+    data-doc-anchor="planejamento">
+    Riscos (opcional)
+</h2>
+<p class="text-muted" data-i18n="risks_description">
+    Modele riscos discretos para adicionar buffer probabilístico à sua previsão.
+    <a href="https://flow-forecaster.fly.dev/documentacao#planejamento" target="_blank" rel="noopener noreferrer">Ver exemplos</a>.
+</p>
 <div class="row">
 <table class="table table-sm" id="risks">
 <thead>
 <tr class="d-flex">
-<th class="col-2" scope="col" data-i18n="likelihood">Probabilidade</th>
-<th class="col-2" scope="col" data-i18n="low_impact">Impacto baixo</th>
-<th class="col-2" scope="col" data-i18n="high_impact">Impacto alto</th>
-<th class="col-6" scope="col" data-i18n="description">Descrição</th>
+<th class="col-2"
+    scope="col"
+    data-i18n="likelihood"
+    data-doc-tooltip="Chance do risco acontecer. Trabalhe em porcentagem (0-100%)."
+    data-doc-anchor="planejamento">
+    Probabilidade
+</th>
+<th class="col-2"
+    scope="col"
+    data-i18n="low_impact"
+    data-doc-tooltip="Impacto mínimo esperado caso o risco ocorra (ex.: tarefas extras)."
+    data-doc-anchor="planejamento">
+    Impacto baixo
+</th>
+<th class="col-2"
+    scope="col"
+    data-i18n="high_impact"
+    data-doc-tooltip="Impacto máximo estimado caso o risco ocorra."
+    data-doc-anchor="planejamento">
+    Impacto alto
+</th>
+<th class="col-6"
+    scope="col"
+    data-i18n="description"
+    data-doc-tooltip="Descreva o risco e quais gatilhos ou eventos desencadeiam o impacto."
+    data-doc-anchor="planejamento">
+    Descrição
+</th>
 </tr>
 </thead>
 <tbody>
 <tr class="d-flex risk-row" id="risk-row-template">
 <td class="col-2">
 <div class="input-group mb-3">
-<input class="form-control" max="100" min="1" name="likelihood" type="number"/>
+<input class="form-control"
+       max="100"
+       min="1"
+       name="likelihood"
+       title="Probabilidade do risco acontecer (%)"
+       type="number"/>
 <div class="input-group-append d-none d-md-block">
 <span class="input-group-text">%</span>
 </div>
@@ -320,7 +517,12 @@
 </td>
 <td class="col-2">
 <div class="input-group mb-3">
-<input class="form-control" max="100" min="0" name="lowImpact" type="number"/>
+<input class="form-control"
+       max="100"
+       min="0"
+       name="lowImpact"
+       title="Impacto mínimo em tarefas adicionais ou atraso"
+       type="number"/>
 <div class="input-group-append d-none d-lg-block">
 <span class="input-group-text" data-i18n="tasks">tarefas</span>
 </div>
@@ -328,13 +530,21 @@
 </td>
 <td class="col-2">
 <div class="input-group mb-3">
-<input class="form-control" max="100" min="1" name="highImpact" type="number"/>
+<input class="form-control"
+       max="100"
+       min="1"
+       name="highImpact"
+       title="Impacto máximo esperado se o risco ocorrer"
+       type="number"/>
 <div class="input-group-append d-none d-lg-block">
 <span class="input-group-text" data-i18n="tasks">tarefas</span>
 </div>
 </div>
 </td>
-<td class="col-6"><input class="form-control" name="description" type="text"/></td>
+<td class="col-6"><input class="form-control"
+       name="description"
+       title="Descrição sucinta do risco e gatilhos associados"
+       type="text"/></td>
 </tr>
 <tr class="d-flex" id="add-risk-row">
 <td class="col-2"></td>
@@ -432,7 +642,11 @@
 <div aria-labelledby="tab-advanced-link" class="tab-pane fade" id="advanced-forecast" role="tabpanel">
 <div class="pt-4 pb-5">
 <div class="container text-center">
-<h2 data-i18n="advanced_forecasting">Previsão Avançada</h2>
+<h2 data-i18n="advanced_forecasting"
+    data-doc-tooltip="Combine Monte Carlo e Machine Learning para cenários híbridos. Requer pelo menos 8 semanas de throughput."
+    data-doc-anchor="2-machine-learning">
+    Previsão Avançada
+</h2>
 <p class="mb-4" data-i18n="advanced_description">
                             Combine previsões de aprendizado de máquina com simulações de throughput Monte Carlo para perspectivas mais ricas.
                             Forneça pelo menos oito amostras de throughput para desbloquear projeções baseadas em ML.
@@ -441,9 +655,16 @@
 <div class="container-fluid bg-6 text-center">
 <div class="row">
 <div class="col-sm-6 text-left">
-<h3 data-i18n="historical_data_title">Dados Históricos</h3>
+<h3 data-i18n="historical_data_title"
+    data-doc-tooltip="Garanta pelo menos 8 semanas de throughput para habilitar os modelos de Machine Learning."
+    data-doc-anchor="2-machine-learning">
+    Dados Históricos
+</h3>
 <div class="form-group">
-<label><span data-i18n="weekly_throughput_label">Throughput Semanal</span><span style="color:red">*</span></label>
+<label data-doc-tooltip="Utilize a mesma série histórica usada nas simulações base. É a entrada fundamental para treinar os modelos."
+       data-doc-anchor="throughput-vazao">
+    <span data-i18n="weekly_throughput_label">Throughput Semanal</span><span style="color:red">*</span>
+</label>
 <div class="alert alert-secondary mb-3" role="alert">
                                         <span data-i18n="uses_shared_samples">Usa as amostras de throughput compartilhadas definidas acima.</span>
                                         <a class="alert-link scroll-to-throughput" href="#tpSamples" data-i18n="edit_data_link">Editar dados</a>
@@ -451,23 +672,68 @@
 <small class="form-text text-muted" data-i18n="min_8_ml">Mínimo de 8 valores necessários para previsão ML.</small>
 </div>
 <div class="form-group">
-<label for="startDateAdv" data-i18n="start_date_label">Data de Início</label>
-<input class="form-control" id="startDateAdv" type="date"/>
+<label for="startDateAdv"
+       data-i18n="start_date_label"
+       data-doc-tooltip="Define o marco inicial utilizado nos gráficos e projeções temporais do modelo."
+       data-doc-anchor="analise-de-deadline">
+    Data de Início
+</label>
+<input class="form-control"
+       id="startDateAdv"
+       type="date"
+       title="Data de referência para projeções avançadas"/>
 </div>
 </div>
 <div class="col-sm-6 text-left">
-<h3 data-i18n="forecast_params">Parâmetros de Previsão</h3>
+<h3 data-i18n="forecast_params"
+    data-doc-tooltip="Controle quantas semanas projetar e qual algoritmo o ensemble utilizará."
+    data-doc-anchor="2-machine-learning">
+    Parâmetros de Previsão
+</h3>
 <div class="form-group">
-<label for="forecastSteps" data-i18n="forecast_steps_label">Passos de Previsão (semanas)</label>
-<input class="form-control" id="forecastSteps" max="12" min="1" type="number" value="4"/>
+<label for="forecastSteps"
+       data-i18n="forecast_steps_label"
+       data-doc-tooltip="Quantidade de semanas futuras que o modelo irá prever. Ajuste conforme o horizonte desejado."
+       data-doc-anchor="2-machine-learning">
+    Passos de Previsão (semanas)
+</label>
+<input class="form-control"
+       id="forecastSteps"
+       max="12"
+       min="1"
+       type="number"
+       value="4"
+       title="Horizonte de previsão em semanas"/>
 </div>
 <div class="form-group">
-<label for="backlog" data-i18n="backlog_tasks_label">Backlog (tarefas)</label>
-<input class="form-control" id="backlog" max="10000" min="1" type="number" value="50"/>
+<label for="backlog"
+       data-i18n="backlog_tasks_label"
+       data-doc-tooltip="Quantidade de itens que você deseja projetar usando o ensemble ML + MC."
+       data-doc-anchor="backlog">
+    Backlog (tarefas)
+</label>
+<input class="form-control"
+       id="backlog"
+       max="10000"
+       min="1"
+       type="number"
+       value="50"
+       title="Backlog alvo para a previsão avançada"/>
 </div>
 <div class="form-group">
-<label for="nSimulations" data-i18n="mc_simulations_label">Simulações Monte Carlo</label>
-<input class="form-control" id="nSimulations" max="100000" min="1000" type="number" value="10000"/>
+<label for="nSimulations"
+       data-i18n="mc_simulations_label"
+       data-doc-tooltip="Total de execuções Monte Carlo que compõem a parte probabilística do cenário combinado."
+       data-doc-anchor="1-simulacao-monte-carlo">
+    Simulações Monte Carlo
+</label>
+<input class="form-control"
+       id="nSimulations"
+       max="100000"
+       min="1000"
+       type="number"
+       value="10000"
+       title="Número de simulações usadas no modo combinado"/>
 </div>
 </div>
 </div>
@@ -550,7 +816,11 @@
 <div aria-labelledby="tab-deadline-link" class="tab-pane fade" id="deadline-analysis" role="tabpanel">
 <div class="pt-4 pb-5">
 <div class="container text-center">
-<h2 data-i18n="deadline_analysis">Análise de Prazo</h2>
+<h2 data-i18n="deadline_analysis"
+    data-doc-tooltip="Verifique se tempo disponível cobre o backlog planejado usando Monte Carlo e Machine Learning."
+    data-doc-anchor="analise-de-deadline">
+    Análise de Prazo
+</h2>
 <p class="mb-4" data-i18n="deadline_reuse_desc">
                             Reutilize suas entradas de simulação e riscos existentes para avaliar se o prazo pode ser alcançado.
                             Certifique-se de que os campos Data de início e Prazo no formulário Monte Carlo estejam preenchidos.
@@ -723,7 +993,11 @@ Forneça amostras de tempo de lead para visualizar o gráfico de controle.
 <div aria-labelledby="tab-cost-link" class="tab-pane fade" id="cost-analysis" role="tabpanel">
 <div class="pt-4 pb-5">
 <div class="container text-center">
-<h2 data-i18n="cost_analysis_title">Análise de Custos</h2>
+<h2 data-i18n="cost_analysis_title"
+    data-doc-tooltip="Estime investimentos combinando esforço projetado e distribuição PERT-Beta."
+    data-doc-anchor="analise-de-custos">
+    Análise de Custos
+</h2>
 <p class="mb-4" data-i18n="cost_analysis_desc">
                             Calcule custos do projeto baseados em esforço (pessoa-semanas) ou use distribuição PERT-Beta com estimativas otimista, mais provável e pessimista.
                         </p>
@@ -731,25 +1005,45 @@ Forneça amostras de tempo de lead para visualizar o gráfico de controle.
 
 <!-- COST BY PERSON-WEEK SECTION -->
 <div class="container-fluid bg-6 text-center mb-5">
-<h2 class="mb-3">💰 Custo por Pessoa-Semana</h2>
-<p class="text-muted mb-4">Calcule custos baseados no esforço projetado (pessoa-semanas) × custo semanal por pessoa</p>
+<h2 class="mb-3"
+    data-doc-tooltip="Converta esforço em moeda definindo um valor semanal por pessoa. Ideal para budgets rápidos."
+    data-doc-anchor="custo-por-pessoa-semana">
+    💰 Custo por Pessoa-Semana
+</h2>
+<p class="text-muted mb-4">
+    Calcule custos baseados no esforço projetado (pessoa-semanas) × custo semanal por pessoa.
+    <a href="https://flow-forecaster.fly.dev/documentacao#custo-por-pessoa-semana" target="_blank" rel="noopener noreferrer">Ver guia</a>.
+</p>
 
 <div class="row">
 <div class="col-md-6 text-left">
-<h3>Parâmetros de Custo</h3>
+<h3 data-doc-tooltip="Defina o valor semanal e, opcionalmente, informe um esforço fixo para obter custos de referência."
+    data-doc-anchor="custo-por-pessoa-semana">
+    Parâmetros de Custo
+</h3>
 <div class="form-group">
-<label for="costPerPersonWeek">Custo por Pessoa-Semana (R$)</label>
+<label for="costPerPersonWeek"
+       data-doc-tooltip="Inclua salário, encargos e overhead semanal por pessoa para estimar o investimento."
+       data-doc-anchor="custo-por-pessoa-semana">
+    Custo por Pessoa-Semana (R$)
+</label>
 <div class="input-group">
 <div class="input-group-prepend">
 <span class="input-group-text">R$</span>
 </div>
 <input class="form-control" id="costPerPersonWeek" min="0" step="100" type="number" value="5000" placeholder="5000"/>
 </div>
-<small class="form-text text-muted">Custo semanal por pessoa (salário + encargos + overhead)</small>
+<small class="form-text text-muted">
+    Custo semanal por pessoa (salário + encargos + overhead). Consulte a <a href="https://flow-forecaster.fly.dev/documentacao#custo-por-pessoa-semana" target="_blank" rel="noopener noreferrer">documentação</a>.
+</small>
 </div>
 
 <div class="form-group">
-<label for="effortPersonWeeks">Esforço Estimado (pessoa-semanas)</label>
+<label for="effortPersonWeeks"
+       data-doc-tooltip="Você pode informar um esforço manual ou reaproveitar os percentis da simulação Monte Carlo."
+       data-doc-anchor="custo-por-pessoa-semana">
+    Esforço Estimado (pessoa-semanas)
+</label>
 <div class="input-group">
 <input class="form-control" id="effortPersonWeeks" min="0" step="0.1" type="number" placeholder="Ex: 54.0"/>
 <div class="input-group-append">
@@ -761,7 +1055,10 @@ Forneça amostras de tempo de lead para visualizar o gráfico de controle.
 </div>
 
 <div class="col-md-6 text-left">
-<h3>Projeções Monte Carlo</h3>
+<h3 data-doc-tooltip="Os percentis de esforço simulados alimentam automaticamente os cálculos de custo."
+    data-doc-anchor="analise-de-custos">
+    Projeções Monte Carlo
+</h3>
 <div class="alert alert-info">
 <p class="mb-2"><strong>Para usar projeções Monte Carlo:</strong></p>
 <ol class="mb-0 pl-3">
@@ -772,7 +1069,10 @@ Forneça amostras de tempo de lead para visualizar o gráfico de controle.
 </div>
 
 <div class="form-group">
-<label>Tamanho da Equipe</label>
+<label data-doc-tooltip="Valor proveniente da aba Monte Carlo. Ajuste lá para ver o reflexo nesta análise."
+       data-doc-anchor="custo-por-pessoa-semana">
+    Tamanho da Equipe
+</label>
 <div class="alert alert-secondary mb-0">
 Usa o tamanho da equipe definido na aba Monte Carlo
 </div>
@@ -785,15 +1085,25 @@ Usa o tamanho da equipe definido na aba Monte Carlo
 <!-- PERT-Beta Effort Estimation -->
 <div class="row">
 <div class="col-12 text-left">
-<h3><i class="fas fa-chart-line"></i> Estimativa PERT-Beta de Esforço (Opcional)</h3>
-<p class="text-muted">Use estimativas otimista, mais provável e pessimista para simular o esforço do projeto com distribuição PERT-Beta</p>
+<h3 data-doc-tooltip="Modele esforço usando três estimativas (a, m, b) e deixe a simulação derivar percentis via distribuição PERT-Beta."
+    data-doc-anchor="distribuicao-pert-beta">
+    <i class="fas fa-chart-line"></i> Estimativa PERT-Beta de Esforço (Opcional)
+</h3>
+<p class="text-muted">
+    Use estimativas otimista, mais provável e pessimista para simular o esforço do projeto com distribuição PERT-Beta.
+    <a href="https://flow-forecaster.fly.dev/documentacao#distribuicao-pert-beta" target="_blank" rel="noopener noreferrer">Aprenda como calibrar</a>.
+</p>
 </div>
 </div>
 
 <div class="row">
 <div class="col-md-4 text-left">
 <div class="form-group">
-<label for="effortOptimistic">Esforço Otimista (a)</label>
+<label for="effortOptimistic"
+       data-doc-tooltip="Melhor cenário possível: quando tudo flui sem bloqueios."
+       data-doc-anchor="distribuicao-pert-beta">
+    Esforço Otimista (a)
+</label>
 <div class="input-group">
 <input class="form-control" id="effortOptimistic" min="0" step="0.1" type="number" placeholder="Ex: 30.0"/>
 <div class="input-group-append">
@@ -806,7 +1116,11 @@ Usa o tamanho da equipe definido na aba Monte Carlo
 
 <div class="col-md-4 text-left">
 <div class="form-group">
-<label for="effortMostLikely">Esforço Mais Provável (m)</label>
+<label for="effortMostLikely"
+       data-doc-tooltip="Estimativa mais realista baseada no histórico recente."
+       data-doc-anchor="distribuicao-pert-beta">
+    Esforço Mais Provável (m)
+</label>
 <div class="input-group">
 <input class="form-control" id="effortMostLikely" min="0" step="0.1" type="number" placeholder="Ex: 50.0"/>
 <div class="input-group-append">
@@ -819,7 +1133,11 @@ Usa o tamanho da equipe definido na aba Monte Carlo
 
 <div class="col-md-4 text-left">
 <div class="form-group">
-<label for="effortPessimistic">Esforço Pessimista (b)</label>
+<label for="effortPessimistic"
+       data-doc-tooltip="Cenário pessimista considerando bloqueios ou baixa disponibilidade."
+       data-doc-anchor="distribuicao-pert-beta">
+    Esforço Pessimista (b)
+</label>
 <div class="input-group">
 <input class="form-control" id="effortPessimistic" min="0" step="0.1" type="number" placeholder="Ex: 80.0"/>
 <div class="input-group-append">
@@ -934,27 +1252,55 @@ Histograma mostrando a distribuição de probabilidade do esforço estimado usan
 
 <!-- AVERAGE DEMAND COST SECTION -->
 <div class="container-fluid bg-6 text-center">
-<h2 class="mb-3">📊 Custo Médio da Demanda</h2>
-<p class="text-muted mb-4">Simulação Monte Carlo com 10.000+ iterações usando distribuição PERT-Beta para estimar custos baseados no backlog</p>
+<h2 class="mb-3"
+    data-doc-tooltip="Calcule custos baseados no backlog multiplicando o custo por item e projetando com distribuição PERT-Beta."
+    data-doc-anchor="custo-medio-da-demanda">
+    📊 Custo Médio da Demanda
+</h2>
+<p class="text-muted mb-4">
+    Simulação Monte Carlo com 10.000+ iterações usando distribuição PERT-Beta para estimar custos baseados no backlog.
+    <a href="https://flow-forecaster.fly.dev/documentacao#custo-medio-da-demanda" target="_blank" rel="noopener noreferrer">Detalhes na documentação</a>.
+</p>
 
 <div class="row">
 <div class="col-md-6 text-left">
-<h3 data-i18n="cost_per_item">Custo por Item</h3>
+<h3 data-i18n="cost_per_item"
+    data-doc-tooltip="Informe a média histórica gasta para concluir um item de trabalho."
+    data-doc-anchor="custo-medio-da-demanda">
+    Custo por Item
+</h3>
 <div class="form-group">
-<label for="avgCostPerItem" data-i18n="avg_cost_per_item">Custo Médio por Item</label>
+<label for="avgCostPerItem"
+       data-i18n="avg_cost_per_item"
+       data-doc-tooltip="Use um valor médio por item considerando salários, infraestrutura e demais custos."
+       data-doc-anchor="custo-medio-da-demanda">
+    Custo Médio por Item
+</label>
 <div class="input-group">
 <div class="input-group-prepend">
 <span class="input-group-text">R$</span>
 </div>
 <input class="form-control" id="avgCostPerItem" min="0" step="0.01" type="number" placeholder="Ex: 5000.00"/>
 </div>
-<small class="form-text text-muted" data-i18n="avg_cost_help">Custo médio histórico por item de trabalho</small>
+<small class="form-text text-muted" data-i18n="avg_cost_help">
+    Custo médio histórico por item de trabalho.
+    <a href="https://flow-forecaster.fly.dev/documentacao#custo-medio-da-demanda" target="_blank" rel="noopener noreferrer">Ver exemplo</a>
+</small>
 </div>
 </div>
 <div class="col-md-6 text-left">
-<h3 data-i18n="pert_estimates">Estimativas PERT</h3>
+<h3 data-i18n="pert_estimates"
+    data-doc-tooltip="Forneça a tripla PERT para estimar a distribuição de custo por item."
+    data-doc-anchor="distribuicao-pert-beta">
+    Estimativas PERT
+</h3>
 <div class="form-group">
-<label for="optimisticCost" data-i18n="optimistic_cost">Custo Otimista (a)</label>
+<label for="optimisticCost"
+       data-i18n="optimistic_cost"
+       data-doc-tooltip="Menor valor possível por item considerando alta eficiência."
+       data-doc-anchor="distribuicao-pert-beta">
+    Custo Otimista (a)
+</label>
 <div class="input-group">
 <div class="input-group-prepend">
 <span class="input-group-text">R$</span>
@@ -963,7 +1309,12 @@ Histograma mostrando a distribuição de probabilidade do esforço estimado usan
 </div>
 </div>
 <div class="form-group">
-<label for="mostLikelyCost" data-i18n="most_likely_cost">Custo Mais Provável (m)</label>
+<label for="mostLikelyCost"
+       data-i18n="most_likely_cost"
+       data-doc-tooltip="Melhor estimativa baseada no histórico recente."
+       data-doc-anchor="distribuicao-pert-beta">
+    Custo Mais Provável (m)
+</label>
 <div class="input-group">
 <div class="input-group-prepend">
 <span class="input-group-text">R$</span>
@@ -972,7 +1323,12 @@ Histograma mostrando a distribuição de probabilidade do esforço estimado usan
 </div>
 </div>
 <div class="form-group">
-<label for="pessimisticCost" data-i18n="pessimistic_cost">Custo Pessimista (b)</label>
+<label for="pessimisticCost"
+       data-i18n="pessimistic_cost"
+       data-doc-tooltip="Inclui cenários de sobrecusto, retrabalho ou contratação emergencial."
+       data-doc-anchor="distribuicao-pert-beta">
+    Custo Pessimista (b)
+</label>
 <div class="input-group">
 <div class="input-group-prepend">
 <span class="input-group-text">R$</span>
@@ -985,14 +1341,23 @@ Histograma mostrando a distribuição de probabilidade do esforço estimado usan
 <div class="row mt-3">
 <div class="col-md-6 text-left">
 <div class="form-group">
-<label for="costSimulations" data-i18n="num_sims">Número de Simulações</label>
+<label for="costSimulations"
+       data-i18n="num_sims"
+       data-doc-tooltip="Quantidade de execuções do modelo de custo. Recomendamos 10.000 ou mais."
+       data-doc-anchor="analise-de-custos">
+    Número de Simulações
+</label>
 <input class="form-control" id="costSimulations" max="100000" min="10000" type="number" value="10000"/>
 <small class="form-text text-muted" data-i18n="min_simulations">Mínimo: 10.000 simulações</small>
 </div>
 </div>
 <div class="col-md-6 text-left">
 <div class="form-group">
-<label data-i18n="backlog">Backlog</label>
+<label data-i18n="backlog"
+       data-doc-tooltip="Usa automaticamente o backlog da seção Monte Carlo para calcular custo total."
+       data-doc-anchor="backlog">
+    Backlog
+</label>
 <div class="alert alert-secondary mb-0" role="alert" data-i18n="uses_backlog">
                                         Usa o backlog definido na aba Monte Carlo
                                     </div>

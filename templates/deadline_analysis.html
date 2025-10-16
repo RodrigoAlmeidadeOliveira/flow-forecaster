@@ -136,6 +136,31 @@
             color: var(--primary-color);
             margin-bottom: 10px;
         }
+
+        .doc-hint-icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            margin-left: 6px;
+            color: rgba(255, 255, 255, 0.85);
+            font-size: 0.85rem;
+            text-decoration: none;
+        }
+
+        .card-body .doc-hint-icon,
+        label .doc-hint-icon {
+            color: #6c757d;
+        }
+
+        .doc-hint-icon:hover,
+        .doc-hint-icon:focus {
+            color: var(--warning-color);
+            text-decoration: none;
+        }
+
+        .doc-hint-icon i {
+            pointer-events: none;
+        }
     </style>
 </head>
 <body>
@@ -163,9 +188,16 @@
                 <div class="row">
                     <!-- Throughput Data -->
                     <div class="col-md-6">
-                        <h5><i class="fas fa-chart-line"></i> Dados Históricos</h5>
+                        <h5 data-doc-tooltip="Forneça o throughput semanal histórico que será reutilizado nesta análise."
+                            data-doc-anchor="throughput-vazao">
+                            <i class="fas fa-chart-line"></i> Dados Históricos
+                        </h5>
                         <div class="mb-3">
-                            <label class="form-label">Throughput Semanal (separado por vírgulas)</label>
+                            <label class="form-label"
+                                   data-doc-tooltip="Use números separados por vírgula (ex.: 5, 6, 7). Mínimo de 8 amostras para liberar Machine Learning."
+                                   data-doc-anchor="throughput-vazao">
+                                Throughput Semanal (separado por vírgulas)
+                            </label>
                             <textarea class="form-control" id="tpSamples" rows="3" placeholder="5, 6, 7, 4, 8, 6, 5, 7, 6, 8, 5, 7">4, 5, 6, 7, 5, 6, 7, 8, 5, 6, 4, 7</textarea>
                             <small class="text-muted">Histórico de items completados por semana</small>
                         </div>
@@ -173,18 +205,33 @@
 
                     <!-- Project Data -->
                     <div class="col-md-6">
-                        <h5><i class="fas fa-tasks"></i> Dados do Projeto</h5>
+                        <h5 data-doc-tooltip="Configure o backlog e as datas para avaliar a viabilidade do prazo."
+                            data-doc-anchor="analise-de-deadline">
+                            <i class="fas fa-tasks"></i> Dados do Projeto
+                        </h5>
                         <div class="mb-3">
-                            <label class="form-label">Backlog (items)</label>
+                            <label class="form-label"
+                                   data-doc-tooltip="Quantidade de itens restantes que precisam ser entregues."
+                                   data-doc-anchor="backlog">
+                                Backlog (items)
+                            </label>
                             <input type="number" class="form-control" id="backlog" value="20">
                         </div>
                         <div class="row">
                             <div class="col-6">
-                                <label class="form-label">Data Início</label>
+                                <label class="form-label"
+                                       data-doc-tooltip="Data planejada para começar o trabalho avaliado."
+                                       data-doc-anchor="analise-de-deadline">
+                                    Data Início
+                                </label>
                                 <input type="text" class="form-control" id="startDate" placeholder="DD/MM/YYYY" value="01/10/2025">
                             </div>
                             <div class="col-6">
-                                <label class="form-label">Deadline</label>
+                                <label class="form-label"
+                                       data-doc-tooltip="Prazo desejado para conclusão, usado como referência nas comparações de percentil."
+                                       data-doc-anchor="analise-de-deadline">
+                                    Deadline
+                                </label>
                                 <input type="text" class="form-control" id="deadlineDate" placeholder="DD/MM/YYYY" value="01/11/2025">
                             </div>
                         </div>
@@ -199,29 +246,53 @@
                     <div class="collapse mt-3" id="advancedParams">
                         <div class="row">
                             <div class="col-md-3">
-                                <label class="form-label">Tamanho da Equipe</label>
-                                <input type="number" class="form-control" id="teamSize" value="1">
+                                <label class="form-label"
+                                       data-doc-tooltip="Número de pessoas atualmente disponíveis para o projeto."
+                                       data-doc-anchor="1-simulacao-monte-carlo">
+                                    Tamanho da Equipe
+                                </label>
+                                <input type="number" class="form-control" id="teamSize" value="1" title="Quantidade atual de pessoas no time">
                             </div>
                             <div class="col-md-3">
-                                <label class="form-label">Min Contributors</label>
-                                <input type="number" class="form-control" id="minContributors" value="">
+                                <label class="form-label"
+                                       data-doc-tooltip="Limite inferior de contribuidores para simular reduções temporárias."
+                                       data-doc-anchor="planejamento">
+                                    Min Contributors
+                                </label>
+                                <input type="number" class="form-control" id="minContributors" value="" title="Mínimo de contribuidores esperado">
                             </div>
                             <div class="col-md-3">
-                                <label class="form-label">Max Contributors</label>
-                                <input type="number" class="form-control" id="maxContributors" value="">
+                                <label class="form-label"
+                                       data-doc-tooltip="Limite superior em caso de reforços temporários."
+                                       data-doc-anchor="planejamento">
+                                    Max Contributors
+                                </label>
+                                <input type="number" class="form-control" id="maxContributors" value="" title="Máximo de contribuidores esperado">
                             </div>
                             <div class="col-md-3">
-                                <label class="form-label">S-Curve Size (%)</label>
-                                <input type="number" class="form-control" id="sCurveSize" value="0" min="0" max="50">
+                                <label class="form-label"
+                                       data-doc-tooltip="Controla a rampa de aceleração/desaceleração produtiva."
+                                       data-doc-anchor="planejamento">
+                                    S-Curve Size (%)
+                                </label>
+                                <input type="number" class="form-control" id="sCurveSize" value="0" min="0" max="50" title="Percentual aplicado à curva-S">
                             </div>
                         </div>
                         <div class="row mt-3">
                             <div class="col-md-6">
-                                <label class="form-label">Lead Times (dias, separado por vírgulas)</label>
+                                <label class="form-label"
+                                       data-doc-tooltip="Lead Time histórico em dias. Aceita lista separada por vírgula."
+                                       data-doc-anchor="lead-time-tempo-de-ciclo">
+                                    Lead Times (dias, separado por vírgulas)
+                                </label>
                                 <input type="text" class="form-control" id="ltSamples" placeholder="1, 2, 3, 2, 1, 2">
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label">Split Rates (separado por vírgulas)</label>
+                                <label class="form-label"
+                                       data-doc-tooltip="Informe multiplicadores de divisão (ex.: 1.1). Útil quando itens se desdobram."
+                                       data-doc-anchor="split-rate-taxa-de-divisao">
+                                    Split Rates (separado por vírgulas)
+                                </label>
                                 <input type="text" class="form-control" id="splitRates" placeholder="1.0, 1.1, 1.2, 1.0">
                             </div>
                         </div>
@@ -258,6 +329,41 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const DOC_BASE_URL = 'https://flow-forecaster.fly.dev/documentacao';
+
+        function attachDocHintIcons() {
+            const targets = document.querySelectorAll('[data-doc-tooltip]');
+            targets.forEach((element) => {
+                if (element.querySelector('.doc-hint-icon')) return;
+
+                const tooltip = element.getAttribute('data-doc-tooltip');
+                if (!tooltip) return;
+
+                const anchor = element.getAttribute('data-doc-anchor');
+                const placement = element.getAttribute('data-doc-placement') || 'top';
+                const href = anchor ? `${DOC_BASE_URL}#${anchor}` : DOC_BASE_URL;
+
+                const icon = document.createElement('a');
+                icon.href = href;
+                icon.target = '_blank';
+                icon.rel = 'noopener noreferrer';
+                icon.className = 'doc-hint-icon';
+                icon.setAttribute('data-bs-toggle', 'tooltip');
+                icon.setAttribute('data-bs-placement', placement);
+                icon.setAttribute('title', tooltip);
+                icon.setAttribute('aria-label', 'Abrir documentação relacionada em nova aba');
+                icon.innerHTML = '<i class="fas fa-circle-question" aria-hidden="true"></i>';
+
+                element.appendChild(icon);
+                if (window.bootstrap && typeof window.bootstrap.Tooltip === 'function') {
+                    new window.bootstrap.Tooltip(icon);
+                }
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', attachDocHintIcons);
+    </script>
     <script>
         (function ensureChartRegistration() {
             try {

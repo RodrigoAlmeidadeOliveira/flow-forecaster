@@ -199,6 +199,35 @@ textarea.form-control {
     box-shadow: var(--shadow-md);
 }
 
+.doc-hint-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-left: 6px;
+    color: #6c757d;
+    font-size: 0.85rem;
+    text-decoration: none;
+}
+
+.doc-hint-icon:hover,
+.doc-hint-icon:focus {
+    color: var(--primary-color);
+    text-decoration: none;
+}
+
+.doc-hint-icon i {
+    pointer-events: none;
+}
+
+.table thead .doc-hint-icon {
+    color: rgba(255, 255, 255, 0.85);
+}
+
+.table thead .doc-hint-icon:hover,
+.table thead .doc-hint-icon:focus {
+    color: var(--accent-color);
+}
+
 .navbar-brand {
     font-weight: 700;
     font-size: 1.4rem;
