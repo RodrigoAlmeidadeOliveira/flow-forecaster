@@ -63,6 +63,13 @@
             tasks: 'tarefas',
             add_row: 'Adicionar linha',
 
+            // Tooltips de Riscos
+            tooltip_likelihood: 'Probabilidade do risco acontecer (%)',
+            tooltip_low_impact: 'Impacto mínimo em tarefas adicionais ou atraso',
+            tooltip_medium_impact: 'Impacto médio mais provável se o risco ocorrer',
+            tooltip_high_impact: 'Impacto máximo em tarefas adicionais ou atraso',
+            tooltip_risk_description: 'Descrição do risco',
+
             // Botões de ação
             run_simulation: 'Executar a simulação!',
             share: 'Compartilhar',
@@ -308,6 +315,13 @@
             tasks: 'tasks',
             add_row: 'Add row',
 
+            // Risk Tooltips
+            tooltip_likelihood: 'Probability of the risk occurring (%)',
+            tooltip_low_impact: 'Minimum impact on additional tasks or delay',
+            tooltip_medium_impact: 'Most likely medium impact if the risk occurs',
+            tooltip_high_impact: 'Maximum impact on additional tasks or delay',
+            tooltip_risk_description: 'Risk description',
+
             // Action buttons
             run_simulation: 'Run the simulation!',
             share: 'Share',
@@ -545,6 +559,13 @@
             description: 'Descripción',
             tasks: 'tareas',
             add_row: 'Agregar fila',
+
+            // Tooltips de Riesgos
+            tooltip_likelihood: 'Probabilidad de que ocurra el riesgo (%)',
+            tooltip_low_impact: 'Impacto mínimo en tareas adicionales o retraso',
+            tooltip_medium_impact: 'Impacto medio más probable si ocurre el riesgo',
+            tooltip_high_impact: 'Impacto máximo en tareas adicionales o retraso',
+            tooltip_risk_description: 'Descripción del riesgo',
 
             // Botones de acción
             run_simulation: '¡Ejecutar la simulación!',
