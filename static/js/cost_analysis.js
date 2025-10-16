@@ -432,9 +432,103 @@ $(document).ready(function() {
         runEffortCostAnalysis();
     });
 
+    // PERT-Beta simulation for effort
+    function runPertBetaEffortSimulation(optimistic, mostLikely, pessimistic, nSimulations) {
+        // Calculate PERT-Beta parameters
+        // Mean = (a + 4m + b) / 6
+        const mean = (optimistic + 4 * mostLikely + pessimistic) / 6;
+
+        // Standard deviation = (b - a) / 6
+        const stdDev = (pessimistic - optimistic) / 6;
+
+        // Calculate alpha and beta for Beta distribution
+        // Using method of moments
+        const range = pessimistic - optimistic;
+        const variance = stdDev * stdDev;
+
+        // Beta distribution parameters
+        const alpha = ((mean - optimistic) / range) * (((mean - optimistic) * (pessimistic - mean) / variance) - 1);
+        const beta = ((pessimistic - mean) / range) * (((mean - optimistic) * (pessimistic - mean) / variance) - 1);
+
+        // Generate samples using Beta distribution
+        const samples = [];
+        for (let i = 0; i < nSimulations; i++) {
+            // Generate beta-distributed random value
+            const betaValue = generateBetaRandom(alpha, beta);
+            // Scale to [optimistic, pessimistic] range
+            const effort = optimistic + betaValue * range;
+            samples.push(effort);
+        }
+
+        // Sort samples for percentile calculation
+        samples.sort((a, b) => a - b);
+
+        // Calculate percentiles
+        const p50Index = Math.floor(nSimulations * 0.50);
+        const p85Index = Math.floor(nSimulations * 0.85);
+        const p95Index = Math.floor(nSimulations * 0.95);
+
+        return {
+            p50: samples[p50Index],
+            p85: samples[p85Index],
+            p95: samples[p95Index]
+        };
+    }
+
+    // Generate Beta-distributed random number using Gamma distributions
+    function generateBetaRandom(alpha, beta) {
+        const x = generateGammaRandom(alpha);
+        const y = generateGammaRandom(beta);
+        return x / (x + y);
+    }
+
+    // Generate Gamma-distributed random number (Marsaglia and Tsang method)
+    function generateGammaRandom(shape) {
+        if (shape < 1) {
+            // Use rejection method for shape < 1
+            const u = Math.random();
+            return generateGammaRandom(shape + 1) * Math.pow(u, 1 / shape);
+        }
+
+        const d = shape - 1/3;
+        const c = 1 / Math.sqrt(9 * d);
+
+        while (true) {
+            let x, v;
+            do {
+                x = generateNormalRandom();
+                v = 1 + c * x;
+            } while (v <= 0);
+
+            v = v * v * v;
+            const u = Math.random();
+
+            if (u < 1 - 0.0331 * x * x * x * x) {
+                return d * v;
+            }
+
+            if (Math.log(u) < 0.5 * x * x + d * (1 - v + Math.log(v))) {
+                return d * v;
+            }
+        }
+    }
+
+    // Generate standard normal random number (Box-Muller transform)
+    function generateNormalRandom() {
+        const u1 = Math.random();
+        const u2 = Math.random();
+        return Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+    }
+
     function runEffortCostAnalysis() {
         const costPerWeek = parseFloat($('#costPerPersonWeek').val());
         const manualEffort = parseFloat($('#effortPersonWeeks').val());
+
+        // PERT-Beta fields
+        const effortOptimistic = parseFloat($('#effortOptimistic').val());
+        const effortMostLikely = parseFloat($('#effortMostLikely').val());
+        const effortPessimistic = parseFloat($('#effortPessimistic').val());
+        const effortSimulations = parseInt($('#effortSimulations').val()) || 10000;
 
         // Validation
         if (!costPerWeek || costPerWeek <= 0) {
@@ -442,10 +536,24 @@ $(document).ready(function() {
             return;
         }
 
-        // Try to get effort from Monte Carlo results (from window.lastSimulationResult)
+        // Try to get effort from PERT-Beta simulation first
         let effortData = null;
 
-        if (window.lastSimulationResult && window.lastSimulationResult.percentile_stats) {
+        if (effortOptimistic && effortMostLikely && effortPessimistic) {
+            // Validate PERT values
+            if (!(effortOptimistic < effortMostLikely && effortMostLikely < effortPessimistic)) {
+                alert('Os valores PERT devem seguir: Otimista < Mais Provável < Pessimista');
+                return;
+            }
+
+            // Run PERT-Beta simulation
+            effortData = runPertBetaEffortSimulation(
+                effortOptimistic,
+                effortMostLikely,
+                effortPessimistic,
+                effortSimulations
+            );
+        } else if (window.lastSimulationResult && window.lastSimulationResult.percentile_stats) {
             // Use Monte Carlo projections
             const percentiles = window.lastSimulationResult.percentile_stats;
             const teamSize = parseInt($('#totalContributors').val()) || 1;
@@ -463,7 +571,7 @@ $(document).ready(function() {
                 p95: manualEffort * 1.17    // Approximate P95
             };
         } else {
-            alert('Execute uma simulação Monte Carlo ou insira um esforço estimado manualmente.');
+            alert('Execute uma simulação Monte Carlo, insira um esforço estimado manualmente, ou preencha os campos PERT-Beta.');
             return;
         }
 

@@ -767,6 +767,72 @@ Usa o tamanho da equipe definido na aba Monte Carlo
 </div>
 </div>
 
+<hr class="my-4">
+
+<!-- PERT-Beta Effort Estimation -->
+<div class="row">
+<div class="col-12 text-left">
+<h3><i class="fas fa-chart-line"></i> Estimativa PERT-Beta de Esforço (Opcional)</h3>
+<p class="text-muted">Use estimativas otimista, mais provável e pessimista para simular o esforço do projeto com distribuição PERT-Beta</p>
+</div>
+</div>
+
+<div class="row">
+<div class="col-md-4 text-left">
+<div class="form-group">
+<label for="effortOptimistic">Esforço Otimista (a)</label>
+<div class="input-group">
+<input class="form-control" id="effortOptimistic" min="0" step="0.1" type="number" placeholder="Ex: 30.0"/>
+<div class="input-group-append">
+<span class="input-group-text">pessoa-semanas</span>
+</div>
+</div>
+<small class="form-text text-muted">Melhor cenário possível</small>
+</div>
+</div>
+
+<div class="col-md-4 text-left">
+<div class="form-group">
+<label for="effortMostLikely">Esforço Mais Provável (m)</label>
+<div class="input-group">
+<input class="form-control" id="effortMostLikely" min="0" step="0.1" type="number" placeholder="Ex: 50.0"/>
+<div class="input-group-append">
+<span class="input-group-text">pessoa-semanas</span>
+</div>
+</div>
+<small class="form-text text-muted">Cenário mais realista</small>
+</div>
+</div>
+
+<div class="col-md-4 text-left">
+<div class="form-group">
+<label for="effortPessimistic">Esforço Pessimista (b)</label>
+<div class="input-group">
+<input class="form-control" id="effortPessimistic" min="0" step="0.1" type="number" placeholder="Ex: 80.0"/>
+<div class="input-group-append">
+<span class="input-group-text">pessoa-semanas</span>
+</div>
+</div>
+<small class="form-text text-muted">Pior cenário possível</small>
+</div>
+</div>
+</div>
+
+<div class="row">
+<div class="col-md-6 text-left">
+<div class="form-group">
+<label for="effortSimulations">Número de Simulações PERT</label>
+<input class="form-control" id="effortSimulations" max="100000" min="10000" type="number" value="10000" placeholder="10000"/>
+<small class="form-text text-muted">Mínimo: 10.000 simulações</small>
+</div>
+</div>
+<div class="col-md-6 text-left">
+<div class="alert alert-info mb-0">
+<strong>Fórmula PERT</strong>: Esforço Esperado = (a + 4m + b) / 6
+</div>
+</div>
+</div>
+
 <div class="row mt-3">
 <div class="col-12 text-center">
 <button class="btn btn-success btn-lg" id="runEffortCostAnalysis" type="button">
