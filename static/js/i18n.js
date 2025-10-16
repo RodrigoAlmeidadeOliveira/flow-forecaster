@@ -766,7 +766,21 @@
         // Atualizar elementos com data-i18n
         document.querySelectorAll('[data-i18n]').forEach(element => {
             const key = element.getAttribute('data-i18n');
-            element.textContent = i18n(key);
+            if (!key) return;
+
+            const translated = i18n(key);
+            const hintIcon = element.querySelector('.doc-hint-icon');
+
+            if (hintIcon) {
+                const textNode = Array.from(element.childNodes).find(node => node.nodeType === Node.TEXT_NODE);
+                if (textNode) {
+                    textNode.textContent = translated;
+                } else {
+                    element.insertBefore(document.createTextNode(translated), hintIcon);
+                }
+            } else {
+                element.textContent = translated;
+            }
         });
 
         // Atualizar placeholders com data-i18n-placeholder
