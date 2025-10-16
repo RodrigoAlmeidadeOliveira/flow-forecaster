@@ -1,0 +1,1216 @@
+<h1 id="manual-do-usuario-flow-forecaster">📘 Manual do Usuário - Flow Forecaster</h1>
+<blockquote>
+<p>Guia completo para uso do Flow Forecaster: previsões probabilísticas de projetos com Machine Learning e Monte Carlo</p>
+</blockquote>
+<p><strong>Versão</strong>: 2.0
+<strong>Última atualização</strong>: Outubro 2025
+<strong>Acesso</strong>: https://flow-forecaster.fly.dev/</p>
+<hr />
+<h2 id="indice">📋 Índice</h2>
+<ol>
+<li><a href="#introdução">Introdução</a></li>
+<li><a href="#conceitos-fundamentais">Conceitos Fundamentais</a></li>
+<li><a href="#primeiros-passos">Primeiros Passos</a></li>
+<li><a href="#funcionalidades-principais">Funcionalidades Principais</a></li>
+<li><a href="#análise-de-custos">Análise de Custos</a></li>
+<li><a href="#análise-de-deadline">Análise de Deadline</a></li>
+<li><a href="#perguntas-frequentes">Perguntas Frequentes</a></li>
+<li><a href="#dicas-e-boas-práticas">Dicas e Boas Práticas</a></li>
+<li><a href="#solução-de-problemas">Solução de Problemas</a></li>
+<li><a href="#glossário">Glossário</a></li>
+</ol>
+<hr />
+<h2 id="introducao">🎯 Introdução</h2>
+<h3 id="o-que-e-o-flow-forecaster">O que é o Flow Forecaster?</h3>
+<p>O Flow Forecaster é uma ferramenta probabilística de previsão de projetos que combina:</p>
+<ul>
+<li><strong>Simulações Monte Carlo</strong>: 10.000+ iterações para análise probabilística robusta</li>
+<li><strong>Machine Learning</strong>: Modelos preditivos avançados (Random Forest, XGBoost, Gradient Boosting)</li>
+<li><strong>Análise de Custos</strong>: Estimativas baseadas em esforço e distribuição PERT-Beta</li>
+<li><strong>Análise de Deadline</strong>: Previsões sobre prazos e entregas</li>
+</ul>
+<h3 id="por-que-usar-previsoes-probabilisticas">Por que usar previsões probabilísticas?</h3>
+<p>Em vez de trabalhar com estimativas únicas ("o projeto termina em 10 semanas"), trabalhamos com <strong>distribuições de probabilidade</strong>:</p>
+<ul>
+<li><strong>P50 (Mediana)</strong>: 50% de chance de terminar neste prazo ou antes</li>
+<li><strong>P85 (Recomendado)</strong>: 85% de chance - equilibra confiança e realismo</li>
+<li><strong>P95 (Conservador)</strong>: 95% de chance - para contextos de alto risco</li>
+</ul>
+<h3 id="quando-usar-cada-metodo">Quando usar cada método?</h3>
+<table>
+<thead>
+<tr>
+<th>Método</th>
+<th>Use quando...</th>
+<th>Dados necessários</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Monte Carlo</strong></td>
+<td>• Dados voláteis<br>• Precisa modelar riscos<br>• Quer distribuições probabilísticas</td>
+<td>Mínimo 3-5 amostras de throughput</td>
+</tr>
+<tr>
+<td><strong>Machine Learning</strong></td>
+<td>• Existem tendências claras<br>• Dados são estáveis<br>• Precisa de previsões pontuais</td>
+<td>Mínimo 8 semanas de histórico</td>
+</tr>
+<tr>
+<td><strong>Combined</strong></td>
+<td>• Quer validação cruzada<br>• Precisa de análise robusta<br>• Relatórios para stakeholders</td>
+<td>8+ semanas de histórico</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="conceitos-fundamentais">📚 Conceitos Fundamentais</h2>
+<h3 id="throughput-vazao">Throughput (Vazão)</h3>
+<p><strong>Definição</strong>: Número de itens completados por período de tempo (geralmente por semana).</p>
+<p><strong>Exemplo</strong>: Se sua equipe completou 5, 6, 7, 4, 8 itens nas últimas 5 semanas, seu throughput histórico é: <code>[5, 6, 7, 4, 8]</code></p>
+<p><strong>Como coletar</strong>:
+1. Defina o período de coleta (ex: últimas 12 semanas)
+2. Conte quantos itens foram finalizados em cada semana
+3. Use dados de ferramentas como Jira, Azure DevOps, Trello, etc.</p>
+<p><strong>Dica</strong>: Quanto mais dados históricos, mais precisas as previsões.</p>
+<h3 id="backlog">Backlog</h3>
+<p><strong>Definição</strong>: Número total de itens pendentes que precisam ser completados.</p>
+<p><strong>Exemplo</strong>: Se você tem 50 user stories ainda não finalizadas, seu backlog é <code>50</code>.</p>
+<p><strong>Importante</strong>:
+- Conte apenas itens no mesmo nível de granularidade usado no throughput
+- Se throughput é em "stories", backlog também deve ser em "stories"
+- Não misture diferentes tipos de itens (ex: stories com bugs)</p>
+<h3 id="lead-time-tempo-de-ciclo">Lead Time (Tempo de Ciclo)</h3>
+<p><strong>Definição</strong>: Tempo que cada item leva desde o início até a conclusão.</p>
+<p><strong>Exemplo</strong>: Se 3 itens levaram 2, 3 e 4 dias para serem completados, seu lead time histórico é: <code>[2, 3, 4]</code></p>
+<p><strong>Quando usar</strong>: Útil para análises mais avançadas e modelagem de WIP (Work in Progress).</p>
+<h3 id="split-rate-taxa-de-divisao">Split Rate (Taxa de Divisão)</h3>
+<p><strong>Definição</strong>: Quantas vezes, em média, um item é dividido em sub-itens durante o desenvolvimento.</p>
+<p><strong>Formato</strong>: Use multiplicadores, não porcentagens:
+- <code>1.1</code> = item dividido em 10% a mais (1 item vira 1.1)
+- <code>1.5</code> = item dividido em 50% a mais (1 item vira 1.5)
+- <code>2.0</code> = item dobrado (1 item vira 2)</p>
+<p><strong>Exemplo</strong>: Se você estima 20 items mas historicamente eles viram 25, seu split rate é <code>1.25</code> (25% de aumento).</p>
+<h3 id="distribuicao-pert-beta">Distribuição PERT-Beta</h3>
+<p><strong>Definição</strong>: Técnica de estimativa de três pontos usada para modelar incertezas.</p>
+<p><strong>Componentes</strong>:
+- <strong>Otimista (a)</strong>: Melhor cenário possível
+- <strong>Mais Provável (m)</strong>: Cenário mais realista
+- <strong>Pessimista (b)</strong>: Pior cenário razoável</p>
+<p><strong>Fórmula</strong>:</p>
+<div class="codehilite"><pre><span></span><code>Média PERT = (a + 4m + b) / 6
+Desvio Padrão = (b - a) / 6
+</code></pre></div>
+
+<p><strong>Exemplo</strong>: Para estimar o esforço de um projeto:
+- Otimista: 30 pessoa-semanas
+- Mais Provável: 50 pessoa-semanas
+- Pessimista: 80 pessoa-semanas</p>
+<h3 id="percentis-p50-p85-p95">Percentis (P50, P85, P95)</h3>
+<p><strong>Definição</strong>: Pontos de corte em uma distribuição probabilística.</p>
+<ul>
+<li><strong>P50 (Mediana)</strong>: 50% dos cenários simulados terminam antes deste ponto</li>
+<li><strong>P85</strong>: 85% dos cenários terminam antes deste ponto (recomendado para planejamento)</li>
+<li><strong>P95</strong>: 95% dos cenários terminam antes deste ponto (planejamento conservador)</li>
+</ul>
+<p><strong>Interpretação</strong>:
+- Se P85 = 10 semanas, há 85% de chance de terminar em 10 semanas ou menos
+- Se P95 = 12 semanas, há apenas 5% de chance de levar mais que 12 semanas</p>
+<hr />
+<h2 id="primeiros-passos">🚀 Primeiros Passos</h2>
+<h3 id="1-acessando-o-sistema">1. Acessando o Sistema</h3>
+<p>Acesse: <strong>https://flow-forecaster.fly.dev/</strong></p>
+<h3 id="2-preparando-seus-dados">2. Preparando seus Dados</h3>
+<p>Antes de usar a ferramenta, colete:</p>
+<p><strong>Dados Obrigatórios</strong>:
+- ✅ Throughput histórico (mínimo 3-5 amostras, ideal 8+)
+- ✅ Backlog atual (número de itens pendentes)
+- ✅ Data de início do projeto
+- ✅ Data de deadline (se aplicável)</p>
+<p><strong>Dados Opcionais (Melhoram a Precisão)</strong>:
+- 📊 Lead times históricos
+- 📊 Split rates observados
+- 📊 Tamanho da equipe
+- 📊 Contribuidores mínimos/máximos
+- 📊 Riscos identificados</p>
+<h3 id="3-estrutura-da-interface">3. Estrutura da Interface</h3>
+<p>A interface possui <strong>4 abas principais</strong>:</p>
+<ol>
+<li><strong>Simulação Monte Carlo</strong>: Previsões probabilísticas tradicionais</li>
+<li><strong>Machine Learning</strong>: Previsões baseadas em tendências e padrões</li>
+<li><strong>Análise de Custos</strong>: Estimativas de custo baseadas em esforço e demanda</li>
+<li><strong>Análise de Deadline</strong>: Análise combinada de prazos e entregas</li>
+</ol>
+<hr />
+<h2 id="funcionalidades-principais">🎲 Funcionalidades Principais</h2>
+<h3 id="1-simulacao-monte-carlo">1️⃣ Simulação Monte Carlo</h3>
+<p><strong>O que faz</strong>: Executa 10.000+ simulações probabilísticas para prever quando o backlog será completado.</p>
+<p><strong>Como usar</strong>:</p>
+<ol>
+<li>
+<p><strong>Acesse a aba "Simulação Monte Carlo"</strong></p>
+</li>
+<li>
+<p><strong>Preencha os Dados do Projeto</strong>:
+   <code>Nome do Projeto: Meu Projeto
+   Número de Tarefas (Backlog): 50
+   Número de Simulações: 10000</code></p>
+</li>
+<li>
+<p><strong>Insira o Throughput Histórico</strong>:
+   <code>Throughput Semanal: 5, 6, 7, 4, 8, 6, 5, 7</code>
+   <strong>Formato</strong>: Números separados por vírgula</p>
+</li>
+<li>
+<p><strong>Configure Parâmetros Avançados</strong> (opcional):</p>
+</li>
+<li><strong>Tamanho da Equipe</strong>: Número de pessoas (ex: 5)</li>
+<li><strong>Min/Max Contributors</strong>: Variação na disponibilidade (ex: 3 a 5)</li>
+<li>
+<p><strong>Curva-S</strong>: Tamanho da rampa de produtividade (0 = sem rampa, 10 = rampa lenta)</p>
+</li>
+<li>
+<p><strong>Adicione Lead Times</strong> (opcional):
+   <code>Lead Times (dias): 2, 3, 4, 2, 5, 3</code></p>
+</li>
+<li>
+<p><strong>Adicione Split Rates</strong> (opcional):
+   <code>Split Rates: 1.1, 1.2, 1.15</code>
+   <strong>Lembre-se</strong>: Use multiplicadores, não porcentagens!</p>
+</li>
+<li>
+<p><strong>Defina Riscos</strong> (opcional):</p>
+</li>
+<li>Clique em "Adicionar Risco"</li>
+<li>
+<p>Preencha: Nome, Probabilidade (0-100%), Impacto em semanas</p>
+</li>
+<li>
+<p><strong>Execute a Simulação</strong>:</p>
+</li>
+<li>Clique em <strong>"Executar Simulação"</strong></li>
+<li>Aguarde o processamento (geralmente 2-5 segundos)</li>
+</ol>
+<p><strong>Interpretando os Resultados</strong>:</p>
+<div class="codehilite"><pre><span></span><code>📊 Resultados Probabilísticos:
+
+P50 (Mediana):      8.5 semanas   ← 50% de chance
+P85 (Recomendado):  10.2 semanas  ← 85% de chance (USE ESTE!)
+P95 (Conservador):  12.1 semanas  ← 95% de chance
+</code></pre></div>
+
+<p><strong>Gráficos Gerados</strong>:
+- <strong>Histograma de Distribuição</strong>: Mostra a distribuição de probabilidade dos cenários
+- <strong>Burn-down Trajectories</strong>: Trajetórias de conclusão do backlog
+- <strong>Estatísticas de Entrada</strong>: Análise dos dados históricos</p>
+<p><strong>Dica</strong>: Use <strong>P85</strong> para planejamento padrão. Reserve P95 para projetos críticos.</p>
+<hr />
+<h3 id="2-machine-learning">2️⃣ Machine Learning</h3>
+<p><strong>O que faz</strong>: Usa modelos preditivos (Random Forest, XGBoost, Gradient Boosting) para prever o throughput futuro baseado em tendências históricas.</p>
+<p><strong>Requisitos</strong>: Mínimo <strong>8 semanas</strong> de throughput histórico.</p>
+<p><strong>Como usar</strong>:</p>
+<ol>
+<li>
+<p><strong>Acesse a aba "Machine Learning"</strong></p>
+</li>
+<li>
+<p><strong>Insira o Throughput Histórico</strong>:
+   <code>Throughput Semanal: 5, 6, 7, 4, 8, 6, 5, 7, 6, 8, 7, 9</code>
+   <strong>Mínimo</strong>: 8 amostras</p>
+</li>
+<li>
+<p><strong>Configure os Parâmetros</strong>:</p>
+</li>
+<li><strong>Forecast Steps</strong>: Quantas semanas à frente prever (padrão: 4)</li>
+<li>
+<p><strong>Modelo</strong>: Escolha entre:</p>
+<ul>
+<li><code>ensemble</code> (recomendado): Combina todos os modelos</li>
+<li><code>random_forest</code>: Robusto, boa baseline</li>
+<li><code>xgboost</code>: Máxima precisão</li>
+<li><code>hist_gradient_boosting</code>: Melhor para intervalos de confiança</li>
+</ul>
+</li>
+<li>
+<p><strong>Defina Backlog e Data de Início</strong> (opcional):
+   <code>Backlog: 50
+   Data de Início: 01/10/2025</code></p>
+</li>
+<li>
+<p><strong>Execute a Previsão</strong>:</p>
+</li>
+<li>Clique em <strong>"Executar Previsão ML"</strong></li>
+<li>Aguarde o processamento (5-10 segundos)</li>
+</ol>
+<p><strong>Interpretando os Resultados</strong>:</p>
+<div class="codehilite"><pre><span></span><code>🤖 Machine Learning Forecast
+
+Risco Avaliado: LOW ✅
+Confiança: ALTA
+
+Previsão Média (próximas 4 semanas): 7.2, 7.5, 7.8, 8.0 items/semana
+
+Intervalos de Confiança:
+P10 (Pessimista): 5.5, 5.8, 6.0, 6.2
+P90 (Otimista):   9.0, 9.3, 9.6, 10.0
+
+Semanas para completar backlog (50 items): ~6.5 semanas
+</code></pre></div>
+
+<p><strong>Risk Assessment</strong>:
+- <strong>LOW</strong> ✅: Dados estáveis, previsão confiável
+- <strong>MEDIUM</strong> ⚠️: Alguma volatilidade, use com cautela
+- <strong>HIGH</strong> ❌: Dados muito voláteis, prefira Monte Carlo</p>
+<p><strong>Gráficos Gerados</strong>:
+- <strong>ML Forecast com Intervalos</strong>: Previsões futuras com bandas de confiança
+- <strong>Análise Histórica</strong>: Distribuição, autocorrelação, tendências
+- <strong>Walk-Forward Validation</strong>: Validação da precisão do modelo</p>
+<p><strong>Dica</strong>: Se o Risk Assessment for HIGH, prefira usar Monte Carlo em vez de ML.</p>
+<hr />
+<h3 id="3-analise-combinada-ml-monte-carlo">3️⃣ Análise Combinada (ML + Monte Carlo)</h3>
+<p><strong>O que faz</strong>: Executa ambas as análises (ML e MC) simultaneamente e compara os resultados.</p>
+<p><strong>Quando usar</strong>:
+- Quer validar uma previsão com outra
+- Precisa de análise robusta para stakeholders
+- Deseja entender divergências entre métodos</p>
+<p><strong>Como usar</strong>:</p>
+<ol>
+<li>
+<p><strong>Acesse a aba "Análise Combinada"</strong> (ou "Advanced Forecast")</p>
+</li>
+<li>
+<p><strong>Preencha todos os dados necessários</strong>:</p>
+</li>
+<li>Throughput histórico (8+ amostras)</li>
+<li>Backlog</li>
+<li>
+<p>Parâmetros avançados</p>
+</li>
+<li>
+<p><strong>Execute a Análise Combinada</strong>:</p>
+</li>
+<li>Clique em <strong>"Executar Análise Combinada"</strong></li>
+<li>Aguarde o processamento (10-15 segundos)</li>
+</ol>
+<p><strong>Interpretando os Resultados</strong>:</p>
+<div class="codehilite"><pre><span></span><code>📊 Comparação ML vs Monte Carlo
+
+Monte Carlo P85:     10.2 semanas
+Machine Learning P85: 9.8 semanas
+
+Diferença: 0.4 semanas (4%)
+
+Consenso: ✅ Ambos os métodos concordam
+Recomendação: Alta confiabilidade na previsão
+
+Explicação:
+✓ Ambos indicam viabilidade de completar em ~10 semanas
+✓ Pequena divergência sugere previsão robusta
+✓ Use a estimativa mais conservadora (10.2 semanas) para planejamento
+</code></pre></div>
+
+<p><strong>Gráfico de Comparação</strong>:
+- Mostra ambas as previsões lado a lado
+- Destaca divergências e consensos
+- Facilita comunicação com stakeholders</p>
+<p><strong>Interpretando Divergências</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>Diferença</th>
+<th>Interpretação</th>
+<th>Ação Recomendada</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>&lt; 10%</td>
+<td>Excelente consenso</td>
+<td>Use qualquer estimativa</td>
+</tr>
+<tr>
+<td>10-20%</td>
+<td>Divergência moderada</td>
+<td>Use a mais conservadora</td>
+</tr>
+<tr>
+<td>20-50%</td>
+<td>Divergência significativa</td>
+<td>Revise os dados</td>
+</tr>
+<tr>
+<td>&gt; 50%</td>
+<td>Divergência crítica</td>
+<td>Colete mais dados históricos</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="analise-de-custos">💰 Análise de Custos</h2>
+<p>A funcionalidade de análise de custos permite estimar o custo total do projeto baseado em esforço ou demanda.</p>
+<h3 id="custo-por-pessoa-semana">💼 Custo por Pessoa-Semana</h3>
+<p><strong>O que faz</strong>: Calcula custos baseados no esforço projetado (pessoa-semanas) multiplicado pelo custo semanal por pessoa.</p>
+<p><strong>Fórmula</strong>:</p>
+<div class="codehilite"><pre><span></span><code>Custo Total = Esforço (pessoa-semanas) × Custo por Pessoa-Semana
+</code></pre></div>
+
+<p><strong>Como usar</strong>:</p>
+<ol>
+<li>
+<p><strong>Acesse a aba "Análise de Custos"</strong></p>
+</li>
+<li>
+<p><strong>Localize a seção "💰 Custo por Pessoa-Semana"</strong></p>
+</li>
+<li>
+<p><strong>Defina o Custo por Pessoa-Semana</strong>:
+   <code>Custo por Pessoa-Semana (R$): 5000</code>
+   <strong>O que incluir</strong>: Salário + encargos + overhead + benefícios</p>
+</li>
+<li>
+<p><strong>Opção A: Usar Simulação Monte Carlo</strong>:</p>
+</li>
+<li>Execute uma simulação Monte Carlo primeiro</li>
+<li>A análise de custos usará automaticamente os resultados</li>
+<li>
+<p>Clique em <strong>"Calcular Custos por Esforço"</strong></p>
+</li>
+<li>
+<p><strong>Opção B: Usar Estimativa PERT-Beta</strong>:</p>
+</li>
+<li>Preencha os campos de estimativa de esforço:
+     <code>Esforço Otimista (a):      30.0 pessoa-semanas
+     Esforço Mais Provável (m): 50.0 pessoa-semanas
+     Esforço Pessimista (b):    80.0 pessoa-semanas</code></li>
+<li>Configure o número de simulações (padrão: 10.000)</li>
+<li>
+<p>Clique em <strong>"Calcular Custos por Esforço"</strong></p>
+</li>
+<li>
+<p><strong>Opção C: Esforço Manual</strong>:</p>
+</li>
+<li>Insira um esforço estimado diretamente:
+     <code>Esforço Estimado (pessoa-semanas): 45.0</code></li>
+<li>Clique em <strong>"Calcular Custos por Esforço"</strong></li>
+</ol>
+<p><strong>Interpretando os Resultados</strong>:</p>
+<div class="codehilite"><pre><span></span><code>💰 Custos Projetados por Esforço
+
+┌─────────────────────────────────────┐
+│ P50 (Mediana)                       │
+│ Custo: R$ 225,000.00                │
+│ Esforço: 45.0 pessoa-semanas        │
+└─────────────────────────────────────┘
+
+┌─────────────────────────────────────┐
+│ P85 (Recomendado) ✅                │
+│ Custo: R$ 275,000.00                │
+│ Esforço: 55.0 pessoa-semanas        │
+└─────────────────────────────────────┘
+
+┌─────────────────────────────────────┐
+│ P95 (Conservador)                   │
+│ Custo: R$ 325,000.00                │
+│ Esforço: 65.0 pessoa-semanas        │
+└─────────────────────────────────────┘
+
+📋 Taxas de Referência:
+Por Pessoa-Semana:  R$ 5,000.00
+Por Pessoa-Mês:     R$ 21,650.00 (4.33 semanas/mês)
+Por Pessoa-Ano:     R$ 260,000.00 (52 semanas/ano)
+</code></pre></div>
+
+<p><strong>Gráfico Gerado</strong>:
+- <strong>Histograma de Distribuição do Esforço (PERT-Beta)</strong>: Mostra a distribuição probabilística do esforço projetado</p>
+<p><strong>Dica</strong>: Use <strong>P85</strong> para orçamento padrão. Reserve P95 para projetos com alto risco ou contingências.</p>
+<hr />
+<h3 id="custo-medio-da-demanda">📊 Custo Médio da Demanda</h3>
+<p><strong>O que faz</strong>: Calcula custos baseados no custo médio por item do backlog usando distribuição PERT-Beta.</p>
+<p><strong>Fórmula</strong>:</p>
+<div class="codehilite"><pre><span></span><code>Custo Total = Custo Médio por Item × Backlog Total
+</code></pre></div>
+
+<p><strong>Como usar</strong>:</p>
+<ol>
+<li>
+<p><strong>Acesse a aba "Análise de Custos"</strong></p>
+</li>
+<li>
+<p><strong>Localize a seção "📊 Custo Médio da Demanda"</strong></p>
+</li>
+<li>
+<p><strong>Defina as Estimativas PERT-Beta</strong>:
+   <code>Custo Otimista por Item (a):      R$ 500
+   Custo Mais Provável por Item (m): R$ 1000
+   Custo Pessimista por Item (b):    R$ 2000</code></p>
+</li>
+<li>
+<p><strong>Defina o Backlog</strong>:
+   <code>Número de Itens (Backlog): 50</code></p>
+</li>
+<li>
+<p><strong>Configure Parâmetros Adicionais</strong> (opcional):</p>
+</li>
+<li><strong>Custo Médio Histórico</strong>: Se você tem dados reais de custos passados</li>
+<li><strong>Tamanho da Equipe</strong>: Número de pessoas</li>
+<li>
+<p><strong>Throughput Histórico</strong>: Amostras de throughput (para contexto)</p>
+</li>
+<li>
+<p><strong>Configure o Número de Simulações</strong>:
+   <code>Número de Simulações: 10000</code></p>
+</li>
+<li>
+<p><strong>Execute a Análise</strong>:</p>
+</li>
+<li>Clique em <strong>"Executar Análise de Custos"</strong></li>
+<li>Aguarde o processamento (2-5 segundos)</li>
+</ol>
+<p><strong>Interpretando os Resultados</strong>:</p>
+<div class="codehilite"><pre><span></span><code>📊 Análise de Custos por Demanda (PERT-Beta)
+
+Distribuição de Custos:
+P50 (Mediana):      R$ 52,500.00  (50% de chance)
+P85 (Recomendado):  R$ 62,000.00  (85% de chance) ✅
+P95 (Conservador):  R$ 71,000.00  (95% de chance)
+
+Custo Médio por Item: R$ 1,050.00
+Desvio Padrão: R$ 250.00
+
+Backlog Total: 50 items
+
+Parâmetros PERT-Beta:
+- Alpha (α): 2.5
+- Beta (β): 2.5
+- Média PERT: R$ 1,000.00
+- Desvio PERT: R$ 250.00
+
+📋 Métricas de Risco:
+- Probabilidade de exceder R$ 70,000: 8%
+- Probabilidade de ficar abaixo de R$ 50,000: 42%
+- Range de Confiança (80%): R$ 48,000 - R$ 65,000
+</code></pre></div>
+
+<p><strong>Gráficos Gerados</strong>:
+- <strong>Histograma de Custos</strong>: Distribuição de probabilidade dos custos totais
+- <strong>Curva Cumulativa</strong>: Probabilidade acumulada de custos
+- <strong>Box Plot</strong>: Visualização de quartis e outliers</p>
+<p><strong>Métricas de Risco</strong>:
+- <strong>Coefficient of Variation (CV)</strong>: Mede a variabilidade relativa
+  - CV &lt; 15%: Baixo risco
+  - CV 15-30%: Risco moderado
+  - CV &gt; 30%: Alto risco</p>
+<ul>
+<li><strong>Risk Score</strong>: Pontuação combinada baseada em variabilidade e desvio</li>
+</ul>
+<p><strong>Dica</strong>: Se o CV for muito alto (&gt;30%), considere refinar suas estimativas ou coletar mais dados históricos.</p>
+<hr />
+<h3 id="comparando-custo-por-esforco-vs-custo-por-demanda">💡 Comparando Custo por Esforço vs. Custo por Demanda</h3>
+<table>
+<thead>
+<tr>
+<th>Aspecto</th>
+<th>Custo por Pessoa-Semana</th>
+<th>Custo Médio da Demanda</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Base de Cálculo</strong></td>
+<td>Esforço (pessoa-semanas)</td>
+<td>Custo por item × Backlog</td>
+</tr>
+<tr>
+<td><strong>Quando usar</strong></td>
+<td>Projetos com equipe dedicada</td>
+<td>Projetos com custos variáveis por item</td>
+</tr>
+<tr>
+<td><strong>Precisão</strong></td>
+<td>Depende de estimativa de esforço</td>
+<td>Depende de histórico de custos</td>
+</tr>
+<tr>
+<td><strong>Melhor para</strong></td>
+<td>Projetos internos, equipes fixas</td>
+<td>Projetos terceirizados, desenvolvimento ágil</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Exemplo Prático</strong>:</p>
+<p><strong>Cenário</strong>: Desenvolvimento de 50 features</p>
+<p><strong>Opção 1 - Custo por Pessoa-Semana</strong>:
+- Esforço estimado (P85): 55 pessoa-semanas
+- Custo por pessoa-semana: R$ 5.000
+- <strong>Custo Total</strong>: R$ 275.000</p>
+<p><strong>Opção 2 - Custo Médio da Demanda</strong>:
+- Backlog: 50 features
+- Custo médio por feature (P85): R$ 5.200
+- <strong>Custo Total</strong>: R$ 260.000</p>
+<p><strong>Qual usar?</strong>
+- Se você tem uma <strong>equipe fixa dedicada</strong>, use Custo por Pessoa-Semana
+- Se você paga <strong>por entrega/item</strong>, use Custo Médio da Demanda
+- Para <strong>máxima robustez</strong>, execute ambas e compare</p>
+<hr />
+<h2 id="analise-de-deadline">📅 Análise de Deadline</h2>
+<p><strong>O que faz</strong>: Análise completa de viabilidade de prazo, combinando Monte Carlo e Machine Learning para responder:
+- ✅ É possível cumprir o deadline?
+- 📊 Quanto do escopo será completado até o deadline?
+- 📅 Quando o backlog completo será finalizado?</p>
+<p><strong>Como usar</strong>:</p>
+<ol>
+<li>
+<p><strong>Acesse a aba "Análise de Deadline"</strong> ou navegue para <code>/deadline-analysis</code></p>
+</li>
+<li>
+<p><strong>Preencha os Dados Históricos</strong>:
+   <code>Throughput Semanal: 5, 6, 7, 4, 8, 6, 5, 7, 6, 8</code></p>
+</li>
+<li>
+<p><strong>Preencha os Dados do Projeto</strong>:
+   <code>Backlog Total: 50 items
+   Data de Início: 01/10/2025
+   Deadline: 01/12/2025</code></p>
+</li>
+<li>
+<p><strong>Configure Parâmetros Avançados</strong> (opcional):</p>
+</li>
+<li>Tamanho da Equipe: 5 pessoas</li>
+<li>Contribuidores Mínimos: 3</li>
+<li>Contribuidores Máximos: 5</li>
+<li>Curva-S: 0 (sem rampa)</li>
+<li>Lead Times: [opcional]</li>
+<li>Split Rates: [opcional]</li>
+<li>
+<p>Custo por Pessoa-Semana: R$ 5.000</p>
+</li>
+<li>
+<p><strong>Execute a Análise</strong>:</p>
+</li>
+<li>Clique em <strong>"Análise de Deadline"</strong></li>
+<li>Aguarde o processamento (5-10 segundos)</li>
+</ol>
+<p><strong>Interpretando os Resultados</strong>:</p>
+<div class="codehilite"><pre><span></span><code>📅<span class="w"> </span><span class="nv">An</span>á<span class="nv">lise</span><span class="w"> </span><span class="nv">de</span><span class="w"> </span><span class="nv">Deadline</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="nv">Vis</span>ã<span class="nv">o</span><span class="w"> </span><span class="nv">Geral</span>
+
+<span class="nv">Deadline</span>:<span class="w"> </span><span class="mi">01</span><span class="o">/</span><span class="mi">12</span><span class="o">/</span><span class="mi">2025</span>
+<span class="nv">Data</span><span class="w"> </span><span class="nv">de</span><span class="w"> </span><span class="nv">In</span>í<span class="nv">cio</span>:<span class="w"> </span><span class="mi">01</span><span class="o">/</span><span class="mi">10</span><span class="o">/</span><span class="mi">2025</span>
+<span class="nv">Semanas</span><span class="w"> </span><span class="nv">at</span>é<span class="w"> </span><span class="nv">Deadline</span>:<span class="w"> </span><span class="mi">8</span>.<span class="mi">7</span><span class="w"> </span><span class="nv">semanas</span>
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🎲<span class="w"> </span><span class="nv">MONTE</span><span class="w"> </span><span class="nv">CARLO</span>
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+<span class="nv">Semanas</span><span class="w"> </span><span class="nv">Projetadas</span>:
+<span class="o">-</span><span class="w"> </span><span class="nv">P50</span><span class="w"> </span><span class="ss">(</span><span class="nv">Mediana</span><span class="ss">)</span>:<span class="w">      </span><span class="mi">8</span>.<span class="mi">2</span><span class="w"> </span><span class="nv">semanas</span><span class="w"> </span>✅
+<span class="o">-</span><span class="w"> </span><span class="nv">P85</span><span class="w"> </span><span class="ss">(</span><span class="nv">Recomendado</span><span class="ss">)</span>:<span class="w">  </span><span class="mi">9</span>.<span class="mi">8</span><span class="w"> </span><span class="nv">semanas</span><span class="w"> </span>⚠️
+<span class="o">-</span><span class="w"> </span><span class="nv">P95</span><span class="w"> </span><span class="ss">(</span><span class="nv">Conservador</span><span class="ss">)</span>:<span class="w">  </span><span class="mi">11</span>.<span class="mi">5</span><span class="w"> </span><span class="nv">semanas</span><span class="w"> </span>❌
+
+<span class="nv">Pode</span><span class="w"> </span><span class="nv">cumprir</span><span class="w"> </span><span class="nv">o</span><span class="w"> </span><span class="nv">deadline</span>?<span class="w"> </span>⚠️<span class="w"> </span><span class="nv">PARCIALMENTE</span>
+
+<span class="nv">Conclus</span>ã<span class="nv">o</span><span class="w"> </span><span class="k">do</span><span class="w"> </span><span class="nv">Backlog</span><span class="w"> </span><span class="ss">(</span><span class="nv">P85</span><span class="ss">)</span>:
+<span class="o">-</span><span class="w"> </span><span class="nv">Data</span><span class="w"> </span><span class="nv">Estimada</span>:<span class="w"> </span><span class="mi">10</span><span class="o">/</span><span class="mi">12</span><span class="o">/</span><span class="mi">2025</span>
+<span class="o">-</span><span class="w"> </span><span class="nv">Atraso</span><span class="w"> </span><span class="nv">Projetado</span>:<span class="w"> </span><span class="mi">1</span>.<span class="mi">1</span><span class="w"> </span><span class="nv">semanas</span>
+
+<span class="nv">Escopo</span><span class="w"> </span><span class="nv">at</span>é<span class="w"> </span><span class="nv">o</span><span class="w"> </span><span class="nv">Deadline</span><span class="w"> </span><span class="ss">(</span><span class="nv">P85</span><span class="ss">)</span>:
+<span class="o">-</span><span class="w"> </span><span class="nv">Items</span><span class="w"> </span><span class="nv">Completados</span>:<span class="w"> </span><span class="mi">42</span><span class="w"> </span><span class="nv">de</span><span class="w"> </span><span class="mi">50</span>
+<span class="o">-</span><span class="w"> </span><span class="nv">Percentual</span><span class="w"> </span><span class="nv">de</span><span class="w"> </span><span class="nv">Conclus</span>ã<span class="nv">o</span>:<span class="w"> </span><span class="mi">84</span><span class="o">%</span>
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🤖<span class="w"> </span><span class="nv">MACHINE</span><span class="w"> </span><span class="nv">LEARNING</span>
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+<span class="nv">Semanas</span><span class="w"> </span><span class="nv">Projetadas</span>:
+<span class="o">-</span><span class="w"> </span><span class="nv">P50</span><span class="w"> </span><span class="ss">(</span><span class="nv">Mediana</span><span class="ss">)</span>:<span class="w">      </span><span class="mi">8</span>.<span class="mi">0</span><span class="w"> </span><span class="nv">semanas</span><span class="w"> </span>✅
+<span class="o">-</span><span class="w"> </span><span class="nv">P85</span><span class="w"> </span><span class="ss">(</span><span class="nv">Recomendado</span><span class="ss">)</span>:<span class="w">  </span><span class="mi">9</span>.<span class="mi">5</span><span class="w"> </span><span class="nv">semanas</span><span class="w"> </span>⚠️
+<span class="o">-</span><span class="w"> </span><span class="nv">P95</span><span class="w"> </span><span class="ss">(</span><span class="nv">Conservador</span><span class="ss">)</span>:<span class="w">  </span><span class="mi">11</span>.<span class="mi">2</span><span class="w"> </span><span class="nv">semanas</span><span class="w"> </span>❌
+
+<span class="nv">Pode</span><span class="w"> </span><span class="nv">cumprir</span><span class="w"> </span><span class="nv">o</span><span class="w"> </span><span class="nv">deadline</span>?<span class="w"> </span>⚠️<span class="w"> </span><span class="nv">PARCIALMENTE</span>
+
+<span class="nv">Risk</span><span class="w"> </span><span class="nv">Assessment</span>:<span class="w"> </span><span class="nv">LOW</span><span class="w"> </span>✅
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🤝<span class="w"> </span><span class="nv">CONSENSO</span>
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅<span class="w"> </span><span class="nv">Ambos</span><span class="w"> </span><span class="nv">os</span><span class="w"> </span><span class="nv">m</span>é<span class="nv">todos</span><span class="w"> </span><span class="nv">concordam</span>
+
+<span class="nv">Recomenda</span>çã<span class="nv">o</span>:
+<span class="nv">Ambos</span><span class="w"> </span><span class="nv">os</span><span class="w"> </span><span class="nv">m</span>é<span class="nv">todos</span><span class="w"> </span><span class="nv">indicam</span><span class="w"> </span><span class="nv">que</span><span class="w"> </span><span class="nv">h</span>á<span class="w"> </span><span class="nv">risco</span><span class="w"> </span><span class="nv">moderado</span><span class="w"> </span><span class="nv">de</span><span class="w"> </span><span class="nv">n</span>ã<span class="nv">o</span><span class="w"> </span><span class="nv">cumprir</span>
+<span class="mi">100</span><span class="o">%</span><span class="w"> </span><span class="k">do</span><span class="w"> </span><span class="nv">escopo</span><span class="w"> </span><span class="nv">no</span><span class="w"> </span><span class="nv">deadline</span>.<span class="w"> </span><span class="nv">Considere</span>:
+
+<span class="mi">1</span>.<span class="w"> </span><span class="nv">Reduzir</span><span class="w"> </span><span class="nv">escopo</span><span class="w"> </span><span class="nv">para</span><span class="w"> </span><span class="mi">42</span><span class="w"> </span><span class="nv">items</span><span class="w"> </span><span class="ss">(</span><span class="nv">vi</span>á<span class="nv">vel</span><span class="w"> </span><span class="nv">com</span><span class="w"> </span><span class="mi">85</span><span class="o">%</span><span class="w"> </span><span class="nv">de</span><span class="w"> </span><span class="nv">confian</span>ç<span class="nv">a</span><span class="ss">)</span>
+<span class="mi">2</span>.<span class="w"> </span><span class="nv">Estender</span><span class="w"> </span><span class="nv">deadline</span><span class="w"> </span><span class="nv">em</span><span class="w"> </span><span class="o">~</span><span class="mi">1</span><span class="w"> </span><span class="nv">semana</span>
+<span class="mi">3</span>.<span class="w"> </span><span class="nv">Aumentar</span><span class="w"> </span><span class="nv">a</span><span class="w"> </span><span class="nv">equipe</span><span class="w"> </span><span class="nv">temporariamente</span>
+
+<span class="nv">Diferen</span>ç<span class="nv">a</span><span class="w"> </span><span class="nv">entre</span><span class="w"> </span><span class="nv">m</span>é<span class="nv">todos</span>:<span class="w"> </span><span class="mi">0</span>.<span class="mi">3</span><span class="w"> </span><span class="nv">semanas</span><span class="w"> </span><span class="ss">(</span><span class="mi">3</span><span class="o">%</span><span class="ss">)</span>
+</code></pre></div>
+
+<p><strong>Visualizações Disponíveis</strong>:
+1. <strong>Gráfico de Viabilidade</strong>: Compara semanas disponíveis vs. projetadas
+2. <strong>Distribuição de Conclusão</strong>: Probabilidade de terminar em cada semana
+3. <strong>Burn-down Projetado</strong>: Trajetória esperada de conclusão do backlog
+4. <strong>Comparação ML vs MC</strong>: Lado a lado das previsões</p>
+<p><strong>Cenários de Resposta</strong>:</p>
+<h3 id="cenario-1-deadline-viavel">✅ Cenário 1: Deadline Viável</h3>
+<div class="codehilite"><pre><span></span><code>Pode cumprir deadline? ✅ SIM
+
+Monte Carlo P85: 7.5 semanas
+Deadline: 8.7 semanas
+Margem de Segurança: 1.2 semanas (14%)
+
+Recomendação:
+✓ Deadline viável com 85% de confiança
+✓ Há margem para imprevistos
+✓ Prossiga com o planejamento atual
+</code></pre></div>
+
+<h3 id="cenario-2-deadline-parcialmente-viavel">⚠️ Cenário 2: Deadline Parcialmente Viável</h3>
+<div class="codehilite"><pre><span></span><code><span class="nv">Pode</span><span class="w"> </span><span class="nv">cumprir</span><span class="w"> </span><span class="nv">deadline</span>?<span class="w"> </span>⚠️<span class="w"> </span><span class="nv">PARCIALMENTE</span>
+
+<span class="nv">Monte</span><span class="w"> </span><span class="nv">Carlo</span><span class="w"> </span><span class="nv">P85</span>:<span class="w"> </span><span class="mi">9</span>.<span class="mi">8</span><span class="w"> </span><span class="nv">semanas</span>
+<span class="nv">Deadline</span>:<span class="w"> </span><span class="mi">8</span>.<span class="mi">7</span><span class="w"> </span><span class="nv">semanas</span>
+<span class="nv">D</span>é<span class="nv">ficit</span>:<span class="w"> </span><span class="mi">1</span>.<span class="mi">1</span><span class="w"> </span><span class="nv">semanas</span><span class="w"> </span><span class="ss">(</span><span class="mi">11</span><span class="o">%</span><span class="ss">)</span>
+
+<span class="nv">Escopo</span><span class="w"> </span><span class="nv">vi</span>á<span class="nv">vel</span><span class="w"> </span><span class="nv">no</span><span class="w"> </span><span class="nv">deadline</span><span class="w"> </span><span class="ss">(</span><span class="nv">P85</span><span class="ss">)</span>:<span class="w"> </span><span class="mi">84</span><span class="o">%</span>
+
+<span class="nv">Recomenda</span>çã<span class="nv">o</span>:
+⚠️<span class="w"> </span><span class="nv">Risco</span><span class="w"> </span><span class="nv">moderado</span><span class="w"> </span><span class="nv">de</span><span class="w"> </span><span class="nv">atraso</span>
+⚠️<span class="w"> </span><span class="nv">Considere</span><span class="w"> </span><span class="nv">reduzir</span><span class="w"> </span><span class="nv">escopo</span><span class="w"> </span><span class="nv">ou</span><span class="w"> </span><span class="nv">estender</span><span class="w"> </span><span class="nv">prazo</span>
+⚠️<span class="w"> </span><span class="nv">Alternativa</span>:<span class="w"> </span><span class="nv">Priorize</span><span class="w"> </span><span class="mi">84</span><span class="o">%</span><span class="w"> </span><span class="k">do</span><span class="w"> </span><span class="nv">backlog</span><span class="w"> </span><span class="nv">mais</span><span class="w"> </span><span class="nv">cr</span>í<span class="nv">tico</span>
+</code></pre></div>
+
+<h3 id="cenario-3-deadline-inviavel">❌ Cenário 3: Deadline Inviável</h3>
+<div class="codehilite"><pre><span></span><code>Pode cumprir deadline? ❌ NÃO
+
+Monte Carlo P85: 12.5 semanas
+Deadline: 8.7 semanas
+Déficit: 3.8 semanas (44%)
+
+Escopo viável no deadline (P85): 64%
+
+Recomendação:
+❌ Alta probabilidade de não cumprir o deadline
+❌ Ações necessárias:
+   1. Renegociar prazo (sugestão: +4 semanas)
+   2. Reduzir escopo significativamente (para ~32 items)
+   3. Aumentar equipe (considerar +2 pessoas)
+</code></pre></div>
+
+<p><strong>Análise de Custos Integrada</strong>:</p>
+<p>Se você configurou o custo por pessoa-semana, verá:</p>
+<div class="codehilite"><pre><span></span><code>💰<span class="w"> </span><span class="nv">An</span>á<span class="nv">lise</span><span class="w"> </span><span class="nv">de</span><span class="w"> </span><span class="nv">Custos</span><span class="w"> </span><span class="k">do</span><span class="w"> </span><span class="nv">Projeto</span>
+
+<span class="nv">Monte</span><span class="w"> </span><span class="nv">Carlo</span><span class="w"> </span><span class="ss">(</span><span class="nv">P85</span><span class="ss">)</span>:
+<span class="o">-</span><span class="w"> </span><span class="nv">Esfor</span>ç<span class="nv">o</span>:<span class="w"> </span><span class="mi">49</span>.<span class="mi">0</span><span class="w"> </span><span class="nv">pessoa</span><span class="o">-</span><span class="nv">semanas</span>
+<span class="o">-</span><span class="w"> </span><span class="nv">Custo</span><span class="w"> </span><span class="nv">Total</span>:<span class="w"> </span><span class="nv">R</span>$<span class="w"> </span><span class="mi">245</span>,<span class="mi">000</span>.<span class="mi">00</span>
+
+<span class="nv">Machine</span><span class="w"> </span><span class="nv">Learning</span><span class="w"> </span><span class="ss">(</span><span class="nv">P85</span><span class="ss">)</span>:
+<span class="o">-</span><span class="w"> </span><span class="nv">Esfor</span>ç<span class="nv">o</span>:<span class="w"> </span><span class="mi">47</span>.<span class="mi">5</span><span class="w"> </span><span class="nv">pessoa</span><span class="o">-</span><span class="nv">semanas</span>
+<span class="o">-</span><span class="w"> </span><span class="nv">Custo</span><span class="w"> </span><span class="nv">Total</span>:<span class="w"> </span><span class="nv">R</span>$<span class="w"> </span><span class="mi">237</span>,<span class="mi">500</span>.<span class="mi">00</span>
+
+<span class="nv">Taxas</span><span class="w"> </span><span class="nv">de</span><span class="w"> </span><span class="nv">Refer</span>ê<span class="nv">ncia</span>:
+<span class="o">-</span><span class="w"> </span><span class="nv">Por</span><span class="w"> </span><span class="nv">Pessoa</span><span class="o">-</span><span class="nv">Semana</span>:<span class="w"> </span><span class="nv">R</span>$<span class="w"> </span><span class="mi">5</span>,<span class="mi">000</span>.<span class="mi">00</span>
+<span class="o">-</span><span class="w"> </span><span class="nv">Por</span><span class="w"> </span><span class="nv">Pessoa</span><span class="o">-</span><span class="nv">M</span>ê<span class="nv">s</span>:<span class="w"> </span><span class="nv">R</span>$<span class="w"> </span><span class="mi">21</span>,<span class="mi">650</span>.<span class="mi">00</span>
+<span class="o">-</span><span class="w"> </span><span class="nv">Por</span><span class="w"> </span><span class="nv">Pessoa</span><span class="o">-</span><span class="nv">Ano</span>:<span class="w"> </span><span class="nv">R</span>$<span class="w"> </span><span class="mi">260</span>,<span class="mi">000</span>.<span class="mi">00</span>
+</code></pre></div>
+
+<p><strong>Respostas a Perguntas-Chave</strong>:</p>
+<p><strong>Pergunta 1: "Quando o projeto termina?"</strong></p>
+<div class="codehilite"><pre><span></span><code>📅 Data de Conclusão Projetada
+
+P50 (50% confiança):  25/11/2025
+P85 (85% confiança):  10/12/2025  ← Recomendado
+P95 (95% confiança):  20/12/2025
+</code></pre></div>
+
+<p><strong>Pergunta 2: "Quantos items consigo entregar até o deadline?"</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="err">📦</span><span class="w"> </span><span class="n">Entregas</span><span class="w"> </span><span class="n">até</span><span class="w"> </span><span class="n">o</span><span class="w"> </span><span class="n">Deadline</span><span class="w"> </span><span class="p">(</span><span class="mh">01</span><span class="o">/</span><span class="mh">12</span><span class="o">/</span><span class="mh">2025</span><span class="p">)</span>
+
+<span class="n">P50</span><span class="w"> </span><span class="p">(</span><span class="mh">50</span><span class="o">%</span><span class="w"> </span><span class="n">confiança</span><span class="p">)</span><span class="o">:</span><span class="w">  </span><span class="mh">45</span><span class="w"> </span><span class="n">items</span><span class="w"> </span><span class="p">(</span><span class="mh">90</span><span class="o">%</span><span class="p">)</span>
+<span class="n">P85</span><span class="w"> </span><span class="p">(</span><span class="mh">85</span><span class="o">%</span><span class="w"> </span><span class="n">confiança</span><span class="p">)</span><span class="o">:</span><span class="w">  </span><span class="mh">42</span><span class="w"> </span><span class="n">items</span><span class="w"> </span><span class="p">(</span><span class="mh">84</span><span class="o">%</span><span class="p">)</span><span class="w">  </span><span class="err">←</span><span class="w"> </span><span class="n">Recomendado</span>
+<span class="n">P95</span><span class="w"> </span><span class="p">(</span><span class="mh">95</span><span class="o">%</span><span class="w"> </span><span class="n">confiança</span><span class="p">)</span><span class="o">:</span><span class="w">  </span><span class="mh">38</span><span class="w"> </span><span class="n">items</span><span class="w"> </span><span class="p">(</span><span class="mh">76</span><span class="o">%</span><span class="p">)</span>
+</code></pre></div>
+
+<p><strong>Pergunta 3: "Preciso aumentar a equipe?"</strong></p>
+<div class="codehilite"><pre><span></span><code>👥 Análise de Equipe
+
+Equipe Atual: 5 pessoas
+Semanas Disponíveis: 8.7
+Semanas Necessárias (P85): 9.8
+
+Cenário 1 - Manter equipe:
+- Resultado: Atraso de 1.1 semanas
+
+Cenário 2 - Aumentar equipe para 6 pessoas:
+- Semanas Projetadas: ~8.2 semanas
+- Resultado: ✅ Cumpre deadline com margem
+- Custo adicional: R$ 41,000.00
+</code></pre></div>
+
+<hr />
+<h2 id="perguntas-frequentes">❓ Perguntas Frequentes</h2>
+<h3 id="p1-quantos-dados-historicos-eu-preciso">P1: Quantos dados históricos eu preciso?</h3>
+<p><strong>Resposta</strong>:
+- <strong>Mínimo absoluto</strong>: 3-5 amostras de throughput
+- <strong>Recomendado para Monte Carlo</strong>: 8-12 amostras
+- <strong>Necessário para Machine Learning</strong>: 8+ amostras (ideal 12+)</p>
+<p><strong>Por quê?</strong>
+- Com poucos dados, as previsões têm baixa confiabilidade
+- Com 12+ semanas, você captura ciclos e sazonalidades
+- Quanto mais dados, mais precisas as previsões</p>
+<hr />
+<h3 id="p2-como-coletar-throughput-se-minha-equipe-nao-trabalha-em-sprints-fixos">P2: Como coletar throughput se minha equipe não trabalha em sprints fixos?</h3>
+<p><strong>Resposta</strong>:
+1. Defina um período fixo (ex: semanas corridas, não sprints)
+2. Conte itens <strong>finalizados</strong> (done) em cada período
+3. Use a mesma definição de "done" consistentemente
+4. Não importa quando começaram, apenas quando terminaram</p>
+<p><strong>Exemplo</strong>:</p>
+<div class="codehilite"><pre><span></span><code>Semana 1 (01-07 Out): 5 items finalizados
+Semana 2 (08-14 Out): 7 items finalizados
+Semana 3 (15-21 Out): 4 items finalizados
+...
+</code></pre></div>
+
+<hr />
+<h3 id="p3-meus-dados-sao-muito-volateis-o-que-fazer">P3: Meus dados são muito voláteis. O que fazer?</h3>
+<p><strong>Resposta</strong>:
+1. <strong>Prefira Monte Carlo</strong>: Lida melhor com volatilidade
+2. <strong>Evite ML</strong>: Pode produzir previsões instáveis
+3. <strong>Colete mais dados</strong>: 16+ semanas ajudam a estabilizar
+4. <strong>Analise causas</strong>: Investigar por que há volatilidade
+   - WIP muito alto?
+   - Items de tamanhos muito diferentes?
+   - Dependências externas?</p>
+<p><strong>Indicadores de volatilidade</strong>:
+- Coefficient of Variation (CV) &gt; 30%
+- Risk Assessment = HIGH no ML
+- Grande diferença entre P50 e P95 (&gt;100%)</p>
+<hr />
+<h3 id="p4-quando-usar-percentis-diferentes-p50-p85-p95">P4: Quando usar percentis diferentes (P50, P85, P95)?</h3>
+<p><strong>Resposta</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>Percentil</th>
+<th>Quando usar</th>
+<th>Contexto</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>P50</strong></td>
+<td>Previsões otimistas</td>
+<td>Planejamento interno, baixo risco</td>
+</tr>
+<tr>
+<td><strong>P85</strong></td>
+<td>Planejamento padrão ✅</td>
+<td>Commitments com stakeholders</td>
+</tr>
+<tr>
+<td><strong>P95</strong></td>
+<td>Planejamento conservador</td>
+<td>Projetos críticos, contratos fixos</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Regra prática</strong>:
+- Use <strong>P85</strong> como padrão
+- Use <strong>P95</strong> se o custo de atraso for muito alto
+- Use <strong>P50</strong> apenas para discussões internas</p>
+<hr />
+<h3 id="p5-como-interpretar-risk-assessment-high">P5: Como interpretar "Risk Assessment: HIGH"?</h3>
+<p><strong>Resposta</strong>:</p>
+<p><strong>HIGH</strong> significa que os dados históricos são muito voláteis/instáveis para previsões ML confiáveis.</p>
+<p><strong>Possíveis causas</strong>:
+- Throughput varia muito (ex: 2, 10, 3, 15, 1 items/semana)
+- Poucos dados históricos (&lt;10 semanas)
+- Mudanças recentes no processo/equipe
+- Items de tamanhos muito diferentes</p>
+<p><strong>Ações recomendadas</strong>:
+1. ✅ Use <strong>Monte Carlo</strong> em vez de ML
+2. ✅ Colete mais dados (16+ semanas)
+3. ✅ Padronize tamanho dos items
+4. ✅ Estabilize WIP (Work in Progress)
+5. ⚠️ Comunique incerteza aos stakeholders</p>
+<hr />
+<h3 id="p6-posso-usar-o-flow-forecaster-para-estimativas-ageis-de-longo-prazo">P6: Posso usar o Flow Forecaster para estimativas ágeis de longo prazo?</h3>
+<p><strong>Resposta</strong>: Sim, mas com cuidados:</p>
+<p><strong>✅ Funciona bem para</strong>:
+- Roadmaps de 3-6 meses
+- Releases com múltiplas funcionalidades
+- OKRs trimestrais</p>
+<p><strong>⚠️ Limitações</strong>:
+- Previsões &gt;6 meses têm baixa confiabilidade
+- Assume que processo permanece estável
+- Não captura mudanças de equipe/tecnologia</p>
+<p><strong>Dica</strong>:
+- Para previsões &gt;3 meses, revise a cada mês
+- Atualize com novos dados históricos
+- Considere usar ranges amplos (P50-P95)</p>
+<hr />
+<h3 id="p7-como-explicar-previsoes-probabilisticas-para-stakeholders-nao-tecnicos">P7: Como explicar previsões probabilísticas para stakeholders não-técnicos?</h3>
+<p><strong>Resposta</strong>: Use analogias do dia-a-dia:</p>
+<p><strong>Analogia da Previsão do Tempo</strong>:</p>
+<div class="codehilite"><pre><span></span><code><span class="err">&quot;Assim como a previsão do tempo diz &#39;há 80% de chance de</span>
+<span class="err">chuva&#39;, nosso P85 diz &#39;há 85% de chance de terminar em</span>
+<span class="err">10 semanas ou menos&#39;. Não é uma promessa, é uma</span>
+<span class="nv">probabilidade</span><span class="w"> </span><span class="nv">baseada</span><span class="w"> </span><span class="nv">em</span><span class="w"> </span><span class="nv">dados</span><span class="w"> </span><span class="nv">hist</span>ó<span class="nv">ricos</span>.<span class="err">&quot;</span>
+</code></pre></div>
+
+<p><strong>Analogia de Viagem</strong>:</p>
+<div class="codehilite"><pre><span></span><code>&quot;Imagine que você vai dirigir de São Paulo a Rio.
+O GPS diz &#39;5 horas&#39;. Mas pode ser:
+- P50: 5 horas (se não tiver trânsito)
+- P85: 6 horas (considerando trânsito normal)
+- P95: 7 horas (se der tudo errado)
+
+Nosso P85 é como planejar &#39;6 horas&#39; - realista e seguro.&quot;
+</code></pre></div>
+
+<p><strong>Visualização Simples</strong>:</p>
+<div class="codehilite"><pre><span></span><code><span class="n">Chances</span><span class="w"> </span><span class="n">de</span><span class="w"> </span><span class="n">entregar</span><span class="w"> </span><span class="n">em</span><span class="w"> </span><span class="n">cada</span><span class="w"> </span><span class="nl">prazo:</span>
+
+<span class="mh">8</span><span class="w"> </span><span class="nl">semanas:</span><span class="w">  </span><span class="err">███████░░░░░░░░</span><span class="w">  </span><span class="mh">50</span><span class="o">%</span><span class="w"> </span><span class="p">(</span><span class="n">P50</span><span class="p">)</span>
+<span class="mh">10</span><span class="w"> </span><span class="nl">semanas:</span><span class="w"> </span><span class="err">███████████████░</span><span class="w">  </span><span class="mh">85</span><span class="o">%</span><span class="w"> </span><span class="p">(</span><span class="n">P85</span><span class="p">)</span><span class="w"> </span><span class="err">←</span><span class="w"> </span><span class="n">Recomendado</span>
+<span class="mh">12</span><span class="w"> </span><span class="nl">semanas:</span><span class="w"> </span><span class="err">█████████████████</span><span class="w"> </span><span class="mh">95</span><span class="o">%</span><span class="w"> </span><span class="p">(</span><span class="n">P95</span><span class="p">)</span>
+</code></pre></div>
+
+<hr />
+<h3 id="p8-o-que-fazer-se-monte-carlo-e-ml-divergirem-muito">P8: O que fazer se Monte Carlo e ML divergirem muito?</h3>
+<p><strong>Resposta</strong>:</p>
+<p><strong>Divergência &lt; 10%</strong>: Normal, use qualquer estimativa.</p>
+<p><strong>Divergência 10-20%</strong>:
+- Use a mais conservadora (maior)
+- Investigue qual método é mais apropriado para seus dados
+- Comunique incerteza ao stakeholder</p>
+<p><strong>Divergência &gt; 20%</strong>:</p>
+<div class="codehilite"><pre><span></span><code>⚠️ Divergência Significativa Detectada
+
+Monte Carlo: 10 semanas
+ML: 15 semanas
+Diferença: 50%
+
+Possíveis causas:
+1. Dados insuficientes (colete mais)
+2. Mudança recente no processo
+3. Tendência forte (crescimento/queda)
+4. Alta volatilidade
+
+Recomendação:
+❌ NÃO use nenhuma estimativa ainda
+✅ Colete mais 4-6 semanas de dados
+✅ Investigue mudanças recentes
+✅ Revise definições (done, item size)
+</code></pre></div>
+
+<hr />
+<h2 id="dicas-e-boas-praticas">💡 Dicas e Boas Práticas</h2>
+<h3 id="coleta-de-dados">📊 Coleta de Dados</h3>
+<p><strong>✅ Faça</strong>:
+- Mantenha consistência na definição de "done"
+- Use períodos fixos (ex: semanas corridas)
+- Registre dados semanalmente
+- Documente mudanças significativas (férias, novos membros, etc.)
+- Use items de tamanho similar</p>
+<p><strong>❌ Evite</strong>:
+- Misturar tipos de items (stories com bugs)
+- Pular semanas sem dados
+- Alterar definições no meio do caminho
+- Incluir items parcialmente completos
+- Comparar throughputs de equipes diferentes</p>
+<hr />
+<h3 id="planejamento">🎯 Planejamento</h3>
+<p><strong>Use P85 como padrão</strong>:
+- 85% de confiança é o equilíbrio ideal entre otimismo e conservadorismo
+- Stakeholders geralmente aceitam "15% de risco" como razoável
+- Reserve P95 apenas para contextos críticos</p>
+<p><strong>Comunique incertezas</strong>:
+- Não diga: "O projeto termina em 10 semanas"
+- Diga: "Há 85% de chance de terminar em 10 semanas ou menos"
+- Sempre apresente ranges (P50-P95)</p>
+<p><strong>Revise frequentemente</strong>:
+- Atualize previsões a cada 2-4 semanas
+- Incorpore novos dados históricos
+- Recalcule se mudanças significativas ocorrerem</p>
+<hr />
+<h3 id="validacao-de-previsoes">🔍 Validação de Previsões</h3>
+<p><strong>Backtesting</strong>:
+1. Execute uma previsão com dados até N semanas atrás
+2. Compare com o que realmente aconteceu
+3. Ajuste parâmetros se necessário</p>
+<p><strong>Calibração</strong>:
+- Se P85 consistentemente superestima, considere usar P75-P80
+- Se P85 consistentemente subestima, considere usar P90-P95
+- Documente desvios e aprenda com eles</p>
+<hr />
+<h3 id="machine-learning">📈 Machine Learning</h3>
+<p><strong>Quando confiar no ML</strong>:
+- ✅ Risk Assessment = LOW ou MEDIUM
+- ✅ Dados estáveis e suficientes (12+ semanas)
+- ✅ Validação walk-forward mostra boa precisão
+- ✅ Não houve mudanças recentes no processo</p>
+<p><strong>Quando desconfiar do ML</strong>:
+- ❌ Risk Assessment = HIGH
+- ❌ Poucos dados (&lt;10 semanas)
+- ❌ Grande volatilidade (CV &gt; 40%)
+- ❌ Mudanças recentes (nova equipe, nova tecnologia)</p>
+<hr />
+<h3 id="analise-de-custos_1">💰 Análise de Custos</h3>
+<p><strong>Defina custo realista por pessoa-semana</strong>:</p>
+<div class="codehilite"><pre><span></span><code>Salário bruto mensal: R$ 10,000
++ Encargos (80%):     R$ 8,000
++ Overhead (30%):     R$ 3,000
++ Benefícios:         R$ 1,000
+━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Total mensal:         R$ 22,000
+÷ 4.33 semanas:       R$ 5,081/semana
+</code></pre></div>
+
+<p><strong>Use estimativas PERT-Beta realistas</strong>:
+- <strong>Otimista</strong>: Melhor cenário razoável (não ideal impossível)
+- <strong>Mais Provável</strong>: Baseado em experiência similar
+- <strong>Pessimista</strong>: Pior cenário razoável (não apocalipse)</p>
+<p><strong>Valide retroativamente</strong>:
+- Compare custos estimados vs. reais em projetos passados
+- Ajuste parâmetros baseado em desvios históricos
+- Documente premissas e contexto</p>
+<hr />
+<h2 id="solucao-de-problemas">🔧 Solução de Problemas</h2>
+<h3 id="problema-1-resultados-parecem-irrealistas">Problema 1: "Resultados parecem irrealistas"</h3>
+<p><strong>Sintomas</strong>:
+- Previsões muito otimistas ou muito pessimistas
+- Grande diferença entre métodos (&gt;50%)
+- Percentis muito próximos ou muito distantes</p>
+<p><strong>Soluções</strong>:
+1. <strong>Verifique os dados de entrada</strong>:
+   - Throughput está no formato correto? (números separados por vírgula)
+   - Backlog está correto?
+   - Datas no formato DD/MM/YYYY?</p>
+<ol>
+<li><strong>Valide qualidade dos dados</strong>:</li>
+<li>Há outliers extremos? (ex: 1, 5, 6, 7, 50, 6)</li>
+<li>Dados são consistentes na granularidade?</li>
+<li>
+<p>Definição de "done" é clara?</p>
+</li>
+<li>
+<p><strong>Revise parâmetros avançados</strong>:</p>
+</li>
+<li>Curva-S muito alta pode distorcer resultados</li>
+<li>Split rates devem usar multiplicadores, não porcentagens</li>
+<li>Contribuidores min/max devem ser realistas</li>
+</ol>
+<hr />
+<h3 id="problema-2-machine-learning-nao-esta-disponivel">Problema 2: "Machine Learning não está disponível"</h3>
+<p><strong>Sintomas</strong>:
+- Mensagem: "Need at least 8 historical throughput samples for ML forecasting"
+- Resultados ML não aparecem</p>
+<p><strong>Soluções</strong>:
+1. <strong>Colete mais dados</strong>: ML requer mínimo 8 amostras
+2. <strong>Use Monte Carlo</strong>: Funciona com apenas 3-5 amostras
+3. <strong>Aguarde</strong>: Colete dados por mais 2-4 semanas antes de usar ML</p>
+<hr />
+<h3 id="problema-3-risk-assessment-sempre-high">Problema 3: "Risk Assessment sempre HIGH"</h3>
+<p><strong>Sintomas</strong>:
+- ML sempre retorna Risk Assessment = HIGH
+- Previsões ML divergem muito de Monte Carlo</p>
+<p><strong>Causas comuns</strong>:
+1. <strong>Alta volatilidade nos dados</strong>: Throughput varia muito semana a semana
+2. <strong>Poucos dados</strong>: &lt;10 semanas de histórico
+3. <strong>Items de tamanhos muito diferentes</strong>: Alguns levam 1 dia, outros 2 semanas
+4. <strong>WIP descontrolado</strong>: Muitos items em progresso simultaneamente</p>
+<p><strong>Soluções</strong>:
+1. <strong>Curto prazo</strong>: Use Monte Carlo em vez de ML
+2. <strong>Médio prazo</strong>:
+   - Padronize tamanho dos items (use story points, splits)
+   - Limite WIP (ex: máximo 2-3 items por pessoa)
+   - Colete mais dados (16+ semanas)
+3. <strong>Longo prazo</strong>:
+   - Melhore processo (Kanban, Scrum mais disciplinado)
+   - Treine equipe em quebra de items
+   - Estabeleça Definition of Ready/Done claras</p>
+<hr />
+<h3 id="problema-4-simulacao-demora-muito">Problema 4: "Simulação demora muito"</h3>
+<p><strong>Sintomas</strong>:
+- Análise leva &gt;30 segundos
+- Timeout errors
+- Navegador trava</p>
+<p><strong>Soluções</strong>:
+1. <strong>Reduza número de simulações</strong>:
+   - Padrão: 10,000 (recomendado)
+   - Se muito lento: use 5,000 (ainda confiável)
+   - Mínimo: 1,000 (apenas para testes)</p>
+<ol>
+<li><strong>Simplifique parâmetros</strong>:</li>
+<li>Remova riscos desnecessários</li>
+<li>Desabilite curva-S se não aplicável</li>
+<li>
+<p>Use menos dados históricos (últimas 20 semanas)</p>
+</li>
+<li>
+<p><strong>Verifique navegador</strong>:</p>
+</li>
+<li>Use Chrome ou Firefox (mais rápidos para JavaScript)</li>
+<li>Feche outras abas</li>
+<li>Limpe cache</li>
+</ol>
+<hr />
+<h3 id="problema-5-graficos-nao-aparecem">Problema 5: "Gráficos não aparecem"</h3>
+<p><strong>Sintomas</strong>:
+- Resultados numéricos aparecem, mas gráficos não
+- Erro de "Chart is not defined"</p>
+<p><strong>Soluções</strong>:
+1. <strong>Verifique conexão com internet</strong>: Bibliotecas de gráficos são carregadas via CDN
+2. <strong>Desabilite bloqueadores de anúncios</strong>: Podem bloquear CDNs
+3. <strong>Atualize página</strong>: Ctrl+F5 (força recarga)
+4. <strong>Use navegador moderno</strong>: Chrome, Firefox, Edge atualizados</p>
+<hr />
+<h2 id="glossario">📖 Glossário</h2>
+<h3 id="a">A</h3>
+<p><strong>Alfa (α) - PERT-Beta</strong>
+Parâmetro da distribuição Beta que controla a forma da curva. Calculado automaticamente a partir das estimativas otimista, mais provável e pessimista.</p>
+<p><strong>Autocorrelação</strong>
+Medida de quanto os valores de throughput de uma semana influenciam a semana seguinte. Alta autocorrelação indica tendências.</p>
+<h3 id="b">B</h3>
+<p><strong>Backlog</strong>
+Conjunto de itens pendentes que precisam ser completados. Deve estar no mesmo nível de granularidade do throughput.</p>
+<p><strong>Beta (β) - PERT-Beta</strong>
+Parâmetro da distribuição Beta complementar ao alfa. Juntos definem a forma da curva de probabilidade.</p>
+<p><strong>Burn-down</strong>
+Gráfico que mostra a evolução da conclusão do backlog ao longo do tempo.</p>
+<h3 id="c">C</h3>
+<p><strong>Coefficient of Variation (CV)</strong>
+Medida de variabilidade relativa. CV = (desvio padrão / média) × 100%. Indica instabilidade dos dados.</p>
+<p><strong>Curva-S</strong>
+Padrão de produtividade onde a equipe começa lenta (rampa de aprendizado), acelera, e depois desacelera no final.</p>
+<h3 id="d">D</h3>
+<p><strong>Deadline</strong>
+Data limite para conclusão do projeto ou release.</p>
+<p><strong>Distribuição de Probabilidade</strong>
+Função matemática que descreve a probabilidade de diferentes resultados. Ex: distribuição normal, Beta, etc.</p>
+<h3 id="e">E</h3>
+<p><strong>Ensemble Forecasting</strong>
+Técnica de ML que combina previsões de múltiplos modelos para maior precisão e robustez.</p>
+<p><strong>Esforço (pessoa-semanas)</strong>
+Quantidade de trabalho medida em semanas × número de pessoas. Ex: 5 pessoas × 10 semanas = 50 pessoa-semanas.</p>
+<h3 id="f">F</h3>
+<p><strong>Forecast</strong>
+Previsão baseada em dados históricos e modelos estatísticos/ML.</p>
+<h3 id="g">G</h3>
+<p><strong>Gradient Boosting</strong>
+Algoritmo de ML que constrói modelos sequencialmente, cada um corrigindo erros do anterior.</p>
+<h3 id="h">H</h3>
+<p><strong>Histograma</strong>
+Gráfico de barras que mostra a distribuição de frequência dos resultados simulados.</p>
+<p><strong>Hist Gradient Boosting</strong>
+Variante do Gradient Boosting otimizada para grandes datasets e quantile regression.</p>
+<h3 id="i">I</h3>
+<p><strong>Intervalo de Confiança</strong>
+Range de valores dentro do qual esperamos que o resultado real esteja com certa probabilidade. Ex: P10-P90.</p>
+<h3 id="k">K</h3>
+<p><strong>K-Fold Cross-Validation</strong>
+Técnica de validação de modelos ML que divide dados em K partes, treina em K-1 e testa na parte restante, rotacionando.</p>
+<h3 id="l">L</h3>
+<p><strong>Lead Time</strong>
+Tempo que um item leva desde o início do trabalho até a conclusão.</p>
+<h3 id="m">M</h3>
+<p><strong>Machine Learning (ML)</strong>
+Técnicas computacionais que aprendem padrões dos dados para fazer previsões.</p>
+<p><strong>Monte Carlo</strong>
+Método estatístico que usa amostragem aleatória repetida para simular milhares de cenários possíveis.</p>
+<h3 id="o">O</h3>
+<p><strong>Otimista (a)</strong>
+Estimativa de melhor cenário razoável na técnica PERT-Beta.</p>
+<p><strong>Overhead</strong>
+Custos indiretos (infraestrutura, gestão, ferramentas, etc.) incluídos no custo por pessoa-semana.</p>
+<h3 id="p">P</h3>
+<p><strong>P50 (Percentil 50 / Mediana)</strong>
+Valor onde 50% dos cenários simulados terminam antes deste ponto. Representa o cenário "típico".</p>
+<p><strong>P85 (Percentil 85)</strong>
+Valor onde 85% dos cenários simulados terminam antes deste ponto. Recomendado para planejamento padrão.</p>
+<p><strong>P95 (Percentil 95)</strong>
+Valor onde 95% dos cenários simulados terminam antes deste ponto. Usado para planejamento conservador.</p>
+<p><strong>PERT (Program Evaluation and Review Technique)</strong>
+Técnica de estimativa de três pontos (otimista, mais provável, pessimista) que usa distribuição Beta.</p>
+<p><strong>Pessoa-Semana</strong>
+Unidade de esforço: uma pessoa trabalhando em tempo integral por uma semana.</p>
+<p><strong>Pessimista (b)</strong>
+Estimativa de pior cenário razoável na técnica PERT-Beta.</p>
+<h3 id="q">Q</h3>
+<p><strong>Quantile Regression</strong>
+Técnica de ML que prevê percentis específicos (P10, P90) em vez de apenas a média.</p>
+<h3 id="r">R</h3>
+<p><strong>Random Forest</strong>
+Algoritmo de ML que combina múltiplas árvores de decisão para previsões robustas.</p>
+<p><strong>Risk Assessment</strong>
+Avaliação automática da confiabilidade de previsões ML baseada na volatilidade dos dados (LOW/MEDIUM/HIGH).</p>
+<h3 id="s">S</h3>
+<p><strong>Split Rate</strong>
+Taxa de divisão de items. Formato: multiplicador (ex: 1.2 = item aumenta 20%).</p>
+<p><strong>Simulação</strong>
+Processo de gerar milhares de cenários possíveis para análise probabilística.</p>
+<h3 id="t">T</h3>
+<p><strong>Throughput</strong>
+Vazão: número de items completados por período de tempo (ex: items/semana).</p>
+<p><strong>Time Series</strong>
+Série temporal: dados coletados em intervalos regulares ao longo do tempo.</p>
+<h3 id="w">W</h3>
+<p><strong>Walk-Forward Validation</strong>
+Técnica de validação que simula previsões futuras usando dados históricos, movendo-se passo a passo no tempo.</p>
+<p><strong>WIP (Work in Progress)</strong>
+Trabalho em andamento: número de items sendo trabalhados simultaneamente mas ainda não finalizados.</p>
+<h3 id="x">X</h3>
+<p><strong>XGBoost (eXtreme Gradient Boosting)</strong>
+Implementação otimizada de Gradient Boosting conhecida por alta precisão e velocidade.</p>
+<hr />
+<h2 id="suporte-e-recursos">📞 Suporte e Recursos</h2>
+<h3 id="links-uteis">🌐 Links Úteis</h3>
+<ul>
+<li><strong>Aplicação Web</strong>: https://flow-forecaster.fly.dev/</li>
+<li><strong>Documentação Técnica</strong>: Consulte <code>README_ADVANCED.md</code> no repositório</li>
+<li><strong>Guia de Parâmetros</strong>: Consulte <code>PARAMETERS_GUIDE.md</code></li>
+<li><strong>Guia de Deploy</strong>: Consulte <code>FLY_DEPLOY.md</code></li>
+</ul>
+<h3 id="contato">📧 Contato</h3>
+<p>Para questões, sugestões ou problemas:
+- Abra uma issue no repositório GitHub
+- Consulte a documentação técnica complementar
+- Revise este manual e as seções de FAQ</p>
+<h3 id="aprenda-mais">🎓 Aprenda Mais</h3>
+<p><strong>Conceitos Estatísticos</strong>:
+- <a href="https://pt.wikipedia.org/wiki/M%C3%A9todo_de_Monte_Carlo">Simulações Monte Carlo (Wikipedia)</a>
+- <a href="https://pt.wikipedia.org/wiki/Distribui%C3%A7%C3%A3o_beta">Distribuição Beta (Wikipedia)</a>
+- <a href="https://pt.wikipedia.org/wiki/PERT">Análise PERT (Wikipedia)</a></p>
+<p><strong>Machine Learning</strong>:
+- <a href="https://scikit-learn.org/stable/modules/ensemble.html#forest">Random Forest (scikit-learn)</a>
+- <a href="https://xgboost.readthedocs.io/">XGBoost Documentation</a>
+- <a href="https://scikit-learn.org/stable/modules/ensemble.html#gradient-boosting">Gradient Boosting (scikit-learn)</a></p>
+<p><strong>Métodos Ágeis</strong>:
+- <a href="https://www.kanban.org/">Kanban Guide</a>
+- <a href="https://scrumguides.org/">Scrum Guide</a>
+- <a href="https://github.com/FocusedObjective/FocusedObjective.Resources">Agile Forecasting (Troy Magennis)</a></p>
+<hr />
+<h2 id="notas-da-versao">📄 Notas da Versão</h2>
+<p><strong>Versão 2.0</strong> (Outubro 2025)
+- ✅ Análise de Custos por Pessoa-Semana com PERT-Beta
+- ✅ Análise de Custos Médio da Demanda
+- ✅ Histogramas de distribuição PERT-Beta
+- ✅ Análise de Deadline integrada com custos
+- ✅ Consenso entre Monte Carlo e Machine Learning
+- ✅ Interface aprimorada com separação clara de funcionalidades</p>
+<p><strong>Versão 1.5</strong> (Setembro 2025)
+- ✅ Machine Learning (Random Forest, XGBoost, Gradient Boosting)
+- ✅ K-Fold Cross-Validation
+- ✅ Walk-Forward Validation
+- ✅ Risk Assessment automático</p>
+<p><strong>Versão 1.0</strong> (Agosto 2025)
+- ✅ Simulações Monte Carlo básicas
+- ✅ Análise de throughput e lead-time
+- ✅ Modelagem de riscos
+- ✅ Curva-S de produtividade</p>
+<hr />
+<p><strong>Bom uso do Flow Forecaster! 🚀</strong></p>
+<p><em>Para dúvidas ou sugestões de melhoria deste manual, consulte a documentação técnica ou abra uma issue no repositório.</em></p>

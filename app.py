@@ -82,6 +82,23 @@ def advanced():
     return redirect(url_for('index') + '#advanced-forecast')
 
 
+@app.route('/documentacao')
+def documentation():
+    """Render the user manual/documentation page."""
+    try:
+        return render_template('documentacao.html')
+    except Exception as e:
+        return f"""
+        <html>
+        <head><title>Documentação - Error</title></head>
+        <body>
+            <h1>Template Error</h1>
+            <p>Error loading documentation template: {str(e)}</p>
+        </body>
+        </html>
+        """, 500
+
+
 @app.route('/api/simulate', methods=['POST'])
 def simulate():
     """
