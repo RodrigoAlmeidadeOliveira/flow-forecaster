@@ -183,7 +183,15 @@ Desvio Padrão = (b - a) / 6
 </li>
 <li>Clique em "Adicionar Risco"</li>
 <li>
-<p>Preencha: Nome, Probabilidade (0-100%), Impacto em semanas</p>
+<p>Preencha os campos:</p>
+<ul>
+<li><strong>Probabilidade</strong>: Chance (0-100%) de o risco ocorrer</li>
+<li><strong>Impacto Baixo</strong>: Cenário otimista (menor impacto em tarefas)</li>
+<li><strong>Impacto Médio</strong>: Cenário mais provável (impacto esperado em tarefas)</li>
+<li><strong>Impacto Alto</strong>: Cenário pessimista (maior impacto em tarefas)</li>
+<li><strong>Descrição</strong>: Nome ou descrição do risco</li>
+</ul>
+<p><strong>Nota</strong>: O sistema usa <strong>distribuição triangular</strong> para simular o impacto, onde o valor médio é mais provável de ocorrer que os extremos (baixo/alto).</p>
 </li>
 <li>
 <p><strong>Execute a Simulação</strong>:</p>
@@ -1090,7 +1098,9 @@ Padrão de produtividade onde a equipe começa lenta (rampa de aprendizado), ace
 <p><strong>Deadline</strong>
 Data limite para conclusão do projeto ou release.</p>
 <p><strong>Distribuição de Probabilidade</strong>
-Função matemática que descreve a probabilidade de diferentes resultados. Ex: distribuição normal, Beta, etc.</p>
+Função matemática que descreve a probabilidade de diferentes resultados. Ex: distribuição normal, Beta, triangular, etc.</p>
+<p><strong>Distribuição Triangular</strong>
+Distribuição de probabilidade definida por três parâmetros: mínimo (baixo), moda (médio - valor mais provável) e máximo (alto). Usada na modelagem de riscos para fazer o valor médio mais provável de ocorrer que os extremos.</p>
 <h3 id="e">E</h3>
 <p><strong>Ensemble Forecasting</strong>
 Técnica de ML que combina previsões de múltiplos modelos para maior precisão e robustez.</p>
