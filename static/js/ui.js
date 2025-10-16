@@ -764,14 +764,17 @@ $(window).on("load", function () {
             const risk = {
                 likelihood: $el.find("input[name='likelihood']").val(),
                 lowImpact: $el.find("input[name='lowImpact']").val(),
+                mediumImpact: $el.find("input[name='mediumImpact']").val(),
                 highImpact: $el.find("input[name='highImpact']").val(),
                 description: $el.find("input[name='description']").val(),
             };
-            if (risk.likelihood && (risk.lowImpact || risk.highImpact)) {
-                if (!risk.lowImpact) risk.lowImpact = '1';
-                else if (!risk.highImpact) risk.highImpact = risk.lowImpact;
+            if (risk.likelihood && (risk.lowImpact || risk.mediumImpact || risk.highImpact)) {
+                if (!risk.lowImpact) risk.lowImpact = '0';
+                if (!risk.mediumImpact) risk.mediumImpact = risk.lowImpact || '0';
+                if (!risk.highImpact) risk.highImpact = risk.mediumImpact || risk.lowImpact || '0';
                 risk.likelihood = parseInt(risk.likelihood) || 0;
                 risk.lowImpact = parseInt(risk.lowImpact) || 0;
+                risk.mediumImpact = parseInt(risk.mediumImpact) || 0;
                 risk.highImpact = parseInt(risk.highImpact) || 0;
                 risks.push(risk);
             }
@@ -789,6 +792,7 @@ $(window).on("load", function () {
     function fillRisk(risk, $row) {
         $row.find("input[name='likelihood']").val(risk.likelihood);
         $row.find("input[name='lowImpact']").val(risk.lowImpact);
+        $row.find("input[name='mediumImpact']").val(risk.mediumImpact);
         $row.find("input[name='highImpact']").val(risk.highImpact);
         $row.find("input[name='description']").val(risk.description);
     }

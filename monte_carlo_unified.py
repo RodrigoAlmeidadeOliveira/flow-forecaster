@@ -372,11 +372,18 @@ def simulate_burn_down(simulation_data: Dict[str, Any]) -> Dict[str, Any]:
     random_split_rate = (random_sample_average(split_rate_samples, 1, len(split_rate_samples) * 3)
                         if split_rate_samples else 1.0)
 
-    # Calculate random impacts for this round
+    # Calculate random impacts for this round using triangular distribution
     impact_tasks = 0
     for risk in risks:
         if random.random() <= risk['likelihood']:
-            impact_tasks += random_integer(risk['lowImpact'], risk['highImpact'])
+            # Use triangular distribution with low, medium (mode), and high impacts
+            low = risk.get('lowImpact', 0)
+            medium = risk.get('mediumImpact', (low + risk.get('highImpact', low)) / 2)
+            high = risk.get('highImpact', low)
+
+            # Triangular distribution: more likely to hit medium value
+            impact = random.triangular(low, high, medium)
+            impact_tasks += round(impact)
 
     # Calculate the number of tasks for this round
     total_tasks = round((number_of_tasks + impact_tasks) * random_split_rate)

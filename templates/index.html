@@ -486,12 +486,19 @@
 <a class="doc-hint-icon" href="https://flow-forecaster.fly.dev/documentacao#planejamento" target="_blank" rel="noopener noreferrer" aria-label="Abrir documentação relacionada em nova aba" data-toggle="tooltip" data-placement="top" data-bs-toggle="tooltip" data-bs-placement="top" title="Impacto mínimo esperado caso o risco ocorra (ex.: tarefas extras)."><i class="fas fa-circle-question" aria-hidden="true"></i></a></th>
 <th class="col-2"
     scope="col"
+    data-i18n="medium_impact"
+    data-doc-tooltip="Impacto médio mais provável caso o risco ocorra."
+    data-doc-anchor="planejamento">
+    Impacto médio
+<a class="doc-hint-icon" href="https://flow-forecaster.fly.dev/documentacao#planejamento" target="_blank" rel="noopener noreferrer" aria-label="Abrir documentação relacionada em nova aba" data-toggle="tooltip" data-placement="top" data-bs-toggle="tooltip" data-bs-placement="top" title="Impacto médio mais provável caso o risco ocorra."><i class="fas fa-circle-question" aria-hidden="true"></i></a></th>
+<th class="col-2"
+    scope="col"
     data-i18n="high_impact"
     data-doc-tooltip="Impacto máximo estimado caso o risco ocorra."
     data-doc-anchor="planejamento">
     Impacto alto
 <a class="doc-hint-icon" href="https://flow-forecaster.fly.dev/documentacao#planejamento" target="_blank" rel="noopener noreferrer" aria-label="Abrir documentação relacionada em nova aba" data-toggle="tooltip" data-placement="top" data-bs-toggle="tooltip" data-bs-placement="top" title="Impacto máximo estimado caso o risco ocorra."><i class="fas fa-circle-question" aria-hidden="true"></i></a></th>
-<th class="col-6"
+<th class="col-4"
     scope="col"
     data-i18n="description"
     data-doc-tooltip="Descreva o risco e quais gatilhos ou eventos desencadeiam o impacto."
@@ -518,7 +525,7 @@
 <td class="col-2">
 <div class="input-group mb-3">
 <input class="form-control"
-       max="100"
+       max="1000"
        min="0"
        name="lowImpact"
        title="Impacto mínimo em tarefas adicionais ou atraso"
@@ -531,8 +538,21 @@
 <td class="col-2">
 <div class="input-group mb-3">
 <input class="form-control"
-       max="100"
-       min="1"
+       max="1000"
+       min="0"
+       name="mediumImpact"
+       title="Impacto médio mais provável se o risco ocorrer"
+       type="number"/>
+<div class="input-group-append d-none d-lg-block">
+<span class="input-group-text" data-i18n="tasks">tarefas</span>
+</div>
+</div>
+</td>
+<td class="col-2">
+<div class="input-group mb-3">
+<input class="form-control"
+       max="1000"
+       min="0"
        name="highImpact"
        title="Impacto máximo esperado se o risco ocorrer"
        type="number"/>
@@ -541,7 +561,7 @@
 </div>
 </div>
 </td>
-<td class="col-6"><input class="form-control"
+<td class="col-4"><input class="form-control"
        name="description"
        title="Descrição sucinta do risco e gatilhos associados"
        type="text"/></td>
@@ -550,7 +570,8 @@
 <td class="col-2"></td>
 <td class="col-2"></td>
 <td class="col-2"></td>
-<td class="col-6">
+<td class="col-2"></td>
+<td class="col-4">
 <button class="btn btn-secondary btn-sm" id="addRisk" type="button" data-i18n="add_row">Adicionar linha</button>
 </td>
 </tr>
