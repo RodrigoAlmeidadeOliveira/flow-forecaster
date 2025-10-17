@@ -851,17 +851,20 @@
             element.setAttribute('data-doc-tooltip', translatedTooltip);
 
             // Encontrar e atualizar o ícone .doc-hint-icon correspondente
-            const hintIcon = element.querySelector('.doc-hint-icon');
-            if (hintIcon && typeof $ !== 'undefined') {
-                // Destruir tooltip existente
-                if ($(hintIcon).data('bs.tooltip')) {
-                    $(hintIcon).tooltip('dispose');
+            // Buscar dentro do elemento e em todos os descendentes
+            const hintIcons = element.querySelectorAll('.doc-hint-icon');
+            hintIcons.forEach(hintIcon => {
+                if (typeof $ !== 'undefined') {
+                    // Destruir tooltip existente
+                    if ($(hintIcon).data('bs.tooltip')) {
+                        $(hintIcon).tooltip('dispose');
+                    }
+                    // Atualizar o atributo title
+                    hintIcon.setAttribute('title', translatedTooltip);
+                    // Re-inicializar o tooltip
+                    $(hintIcon).tooltip({ delay: 500 });
                 }
-                // Atualizar o atributo title
-                hintIcon.setAttribute('title', translatedTooltip);
-                // Re-inicializar o tooltip
-                $(hintIcon).tooltip({ delay: 500 });
-            }
+            });
         });
 
         // Atualizar HTML do documento
