@@ -816,7 +816,15 @@
         // Atualizar títulos com data-i18n-title
         document.querySelectorAll('[data-i18n-title]').forEach(element => {
             const key = element.getAttribute('data-i18n-title');
-            element.title = i18n(key);
+            const translatedTitle = i18n(key);
+            element.title = translatedTitle;
+
+            // Atualizar tooltip do Bootstrap se existir
+            if (typeof $ !== 'undefined' && $(element).data('bs.tooltip')) {
+                $(element).tooltip('dispose');
+                $(element).attr('title', translatedTitle);
+                $(element).tooltip();
+            }
         });
 
         // Atualizar HTML do documento
