@@ -70,6 +70,11 @@
             tooltip_high_impact: 'Impacto máximo em tarefas adicionais ou atraso',
             tooltip_risk_description: 'Descrição do risco',
 
+            // Tooltips de Documentação
+            tooltip_num_simulations: 'Quanto maior o número de simulações, mais estável o resultado. Recomendamos pelo menos 10.000 execuções para cenários confiáveis.',
+            tooltip_team_size: 'Informe quantas pessoas efetivamente entregam itens por semana. Esse valor é usado para converter semanas em esforço (pessoa-semana) e compor análises de custo.',
+            tooltip_scurve: 'Tamanho da rampa de produtividade. Quanto maior, mais lenta é a adaptação inicial da equipe.',
+
             // Botões de ação
             run_simulation: 'Executar a simulação!',
             share: 'Compartilhar',
@@ -322,6 +327,11 @@
             tooltip_high_impact: 'Maximum impact on additional tasks or delay',
             tooltip_risk_description: 'Risk description',
 
+            // Documentation Tooltips
+            tooltip_num_simulations: 'The higher the number of simulations, the more stable the result. We recommend at least 10,000 runs for reliable scenarios.',
+            tooltip_team_size: 'Enter how many people effectively deliver items per week. This value is used to convert weeks into effort (person-weeks) and compose cost analyses.',
+            tooltip_scurve: 'Size of the productivity ramp. The larger, the slower the team\'s initial adaptation.',
+
             // Action buttons
             run_simulation: 'Run the simulation!',
             share: 'Share',
@@ -566,6 +576,11 @@
             tooltip_medium_impact: 'Impacto medio más probable si ocurre el riesgo',
             tooltip_high_impact: 'Impacto máximo en tareas adicionales o retraso',
             tooltip_risk_description: 'Descripción del riesgo',
+
+            // Tooltips de Documentación
+            tooltip_num_simulations: 'Cuanto mayor sea el número de simulaciones, más estable será el resultado. Recomendamos al menos 10.000 ejecuciones para escenarios confiables.',
+            tooltip_team_size: 'Ingrese cuántas personas entregan efectivamente elementos por semana. Este valor se utiliza para convertir semanas en esfuerzo (persona-semanas) y componer análisis de costos.',
+            tooltip_scurve: 'Tamaño de la rampa de productividad. Cuanto mayor, más lenta es la adaptación inicial del equipo.',
 
             // Botones de acción
             run_simulation: '¡Ejecutar la simulación!',
@@ -824,6 +839,28 @@
                 $(element).tooltip('dispose');
                 $(element).attr('title', translatedTitle);
                 $(element).tooltip();
+            }
+        });
+
+        // Atualizar tooltips de documentação com data-i18n-tooltip
+        document.querySelectorAll('[data-i18n-tooltip]').forEach(element => {
+            const key = element.getAttribute('data-i18n-tooltip');
+            const translatedTooltip = i18n(key);
+
+            // Atualizar data-doc-tooltip (usado pelo sistema de documentação)
+            element.setAttribute('data-doc-tooltip', translatedTooltip);
+
+            // Encontrar e atualizar o ícone .doc-hint-icon correspondente
+            const hintIcon = element.querySelector('.doc-hint-icon');
+            if (hintIcon && typeof $ !== 'undefined') {
+                // Destruir tooltip existente
+                if ($(hintIcon).data('bs.tooltip')) {
+                    $(hintIcon).tooltip('dispose');
+                }
+                // Atualizar o atributo title
+                hintIcon.setAttribute('title', translatedTooltip);
+                // Re-inicializar o tooltip
+                $(hintIcon).tooltip({ delay: 500 });
             }
         });
 
