@@ -7,9 +7,10 @@ from flask import Flask, render_template, request, jsonify, redirect, url_for
 import json
 import base64
 import numpy as np
-from datetime import datetime
+from datetime import datetime, timedelta
+from typing import Optional
 from monte_carlo import run_monte_carlo_simulation, simulate_throughput_forecast
-from monte_carlo_unified import analyze_deadline, forecast_how_many, forecast_when
+from monte_carlo_unified import analyze_deadline, forecast_how_many, forecast_when, percentile as mc_percentile
 from ml_forecaster import MLForecaster
 from ml_deadline_forecaster import ml_analyze_deadline, ml_forecast_how_many, ml_forecast_when
 from visualization import ForecastVisualizer
@@ -49,6 +50,26 @@ def convert_to_native_types(obj):
         return [convert_to_native_types(item) for item in obj]
     else:
         return obj
+
+
+def parse_flexible_date(date_str: str) -> datetime:
+    """
+    Parse a date string in common day-month-year formats.
+
+    Raises:
+        ValueError: If the string doesn't match supported formats.
+    """
+    if not date_str or not isinstance(date_str, str):
+        raise ValueError("Date must be provided in DD/MM/YY, DD/MM/YYYY, YYYY-MM-DD, or similar day-month-year format")
+    value = date_str.strip()
+    if not value:
+        raise ValueError("Date must be provided in DD/MM/YY, DD/MM/YYYY, YYYY-MM-DD, or similar day-month-year format")
+    for fmt in ['%d/%m/%y', '%d/%m/%Y', '%Y-%m-%d', '%d-%m-%y', '%d-%m-%Y', '%Y/%m/%d', '%d.%m.%Y']:
+        try:
+            return datetime.strptime(value, fmt)
+        except ValueError:
+            continue
+    raise ValueError(f"Date {date_str} doesn't match expected day-month-year formats")
 
 
 @app.route('/health')
@@ -150,6 +171,52 @@ def simulate():
 
         # Run the simulation
         result = run_monte_carlo_simulation(simulation_data)
+
+        # Compute 30-day probability table for quick planning
+        items_forecast_30_days = None
+        try:
+            tp_samples = simulation_data.get('tpSamples', [])
+            if tp_samples:
+                start_date_raw = simulation_data.get('startDate') or datetime.now().strftime('%d/%m/%Y')
+                start_dt = parse_flexible_date(start_date_raw)
+                horizon_dt = start_dt + timedelta(days=30)
+                horizon_str = horizon_dt.strftime('%d/%m/%Y')
+                forecast_30_days = forecast_how_many(
+                    tp_samples=tp_samples,
+                    start_date=start_date_raw,
+                    end_date=horizon_str,
+                    n_simulations=simulation_data.get('numberOfSimulations', 10000)
+                )
+                distribution_30 = forecast_30_days.get('distribution') or []
+                probability_rows_30 = []
+                if distribution_30:
+                    seen_probs = set()
+                    for prob in range(100, 0, -5):
+                        percentile_value = mc_percentile(distribution_30, prob / 100)
+                        probability_rows_30.append({
+                            'probability': prob,
+                            'items': int(round(percentile_value))
+                        })
+                        seen_probs.add(prob)
+                    if 1 not in seen_probs:
+                        percentile_value = mc_percentile(distribution_30, 0.01)
+                        probability_rows_30.append({
+                            'probability': 1,
+                            'items': int(round(percentile_value))
+                        })
+
+                items_forecast_30_days = {
+                    'start_date': forecast_30_days.get('start_date', start_dt.strftime('%d/%m/%Y')),
+                    'end_date': forecast_30_days.get('end_date', horizon_str),
+                    'days': forecast_30_days.get('days', 30),
+                    'weeks': forecast_30_days.get('weeks'),
+                    'items_mean': forecast_30_days.get('items_mean'),
+                    'probability_table': probability_rows_30
+                }
+        except Exception:
+            items_forecast_30_days = None
+
+        result['items_forecast_30_days'] = items_forecast_30_days
 
         return jsonify(result)
 
@@ -451,19 +518,6 @@ def api_deadline_analysis():
         data = request.json
         print(f"Received data keys: {list(data.keys()) if data else 'None'}", flush=True)
 
-        def parse_date(date_str: str) -> datetime:
-            if not date_str or not isinstance(date_str, str):
-                raise ValueError("Date must be provided in DD/MM/YY, DD/MM/YYYY, YYYY-MM-DD, or similar day-month-year format")
-            value = date_str.strip()
-            if not value:
-                raise ValueError("Date must be provided in DD/MM/YY, DD/MM/YYYY, YYYY-MM-DD, or similar day-month-year format")
-            for fmt in ['%d/%m/%y', '%d/%m/%Y', '%Y-%m-%d', '%d-%m-%y', '%d-%m-%Y', '%Y/%m/%d', '%d.%m.%Y']:
-                try:
-                    return datetime.strptime(value, fmt)
-                except ValueError:
-                    continue
-            raise ValueError(f"Date {date_str} doesn't match expected day-month-year formats")
-
         tp_samples = data.get('tpSamples', [])
         backlog = data.get('backlog', 0)
         deadline_date = data.get('deadlineDate')
@@ -515,8 +569,8 @@ def api_deadline_analysis():
             return jsonify({'error': 'Backlog must be greater than zero'}), 400
 
         try:
-            start_dt = parse_date(start_date)
-            deadline_dt = parse_date(deadline_date)
+            start_dt = parse_flexible_date(start_date)
+            deadline_dt = parse_flexible_date(deadline_date)
         except ValueError as exc:
             return jsonify({'error': str(exc)}), 400
 
@@ -552,6 +606,46 @@ def api_deadline_analysis():
         items_possible_p95 = work_by_deadline.get('items_p95', 0)
         items_possible_p85 = work_by_deadline.get('items_p85', 0)
         items_possible_p50 = work_by_deadline.get('items_p50', 0)
+
+        # Additional 30-day forecast to power probability report
+        items_forecast_30_days = None
+        try:
+            horizon_30_dt = start_dt + timedelta(days=30)
+            horizon_30_str = horizon_30_dt.strftime('%d/%m/%Y')
+            forecast_30_days = forecast_how_many(
+                tp_samples=tp_samples,
+                start_date=start_date,
+                end_date=horizon_30_str,
+                n_simulations=n_simulations
+            )
+            distribution_30 = forecast_30_days.get('distribution') or []
+            probability_rows_30 = []
+            if distribution_30:
+                seen_probs = set()
+                for prob in range(100, 0, -5):
+                    percentile_value = mc_percentile(distribution_30, prob / 100)
+                    probability_rows_30.append({
+                        'probability': prob,
+                        'items': int(round(percentile_value))
+                    })
+                    seen_probs.add(prob)
+                if 1 not in seen_probs:
+                    percentile_value = mc_percentile(distribution_30, 0.01)
+                    probability_rows_30.append({
+                        'probability': 1,
+                        'items': int(round(percentile_value))
+                    })
+
+            items_forecast_30_days = {
+                'start_date': forecast_30_days.get('start_date', start_dt.strftime('%d/%m/%Y')),
+                'end_date': forecast_30_days.get('end_date', horizon_30_str),
+                'days': forecast_30_days.get('days', 30),
+                'weeks': forecast_30_days.get('weeks'),
+                'items_mean': forecast_30_days.get('items_mean'),
+                'probability_table': probability_rows_30
+            }
+        except Exception:
+            items_forecast_30_days = None
 
         # For scope completion: how many items from the backlog will be completed by the deadline?
         # This is the MINIMUM between what's possible and what's in the backlog
@@ -594,8 +688,47 @@ def api_deadline_analysis():
             'percentile_stats': percentile_stats,
             'deadline_date_raw': deadline_dt.strftime('%Y-%m-%d'),
             'start_date_raw': start_dt.strftime('%Y-%m-%d'),
-            'input_stats': input_stats
+            'input_stats': input_stats,
+            'items_forecast_30_days': items_forecast_30_days
         }
+
+        # Estimated effort (person-weeks) using average contributors
+        avg_contributors: Optional[float] = None
+        base_contributors = None
+        if simulation_data:
+            base_contributors = simulation_data.get('totalContributors')
+        if base_contributors is None or base_contributors == 0:
+            base_contributors = team_size or 1
+
+        min_contrib_val = None
+        max_contrib_val = None
+        if simulation_data:
+            min_contrib_val = simulation_data.get('minContributors')
+            max_contrib_val = simulation_data.get('maxContributors')
+        if min_contrib_val is None:
+            min_contrib_val = min_contributors
+        if max_contrib_val is None:
+            max_contrib_val = max_contributors
+
+        if min_contrib_val and max_contrib_val:
+            avg_contributors = (min_contrib_val + max_contrib_val) / 2
+        else:
+            avg_contributors = base_contributors or 1
+
+        def effort_for_weeks(weeks_value: float) -> Optional[int]:
+            if weeks_value is None:
+                return None
+            try:
+                weeks = float(weeks_value)
+            except (TypeError, ValueError):
+                return None
+            if weeks <= 0 or not avg_contributors:
+                return None
+            return int(round(weeks * avg_contributors))
+
+        mc_result['projected_effort_p50'] = effort_for_weeks(projected_weeks_p50)
+        mc_result['projected_effort_p85'] = effort_for_weeks(projected_weeks_p85)
+        mc_result['projected_effort_p95'] = effort_for_weeks(projected_weeks_p95)
 
         # Machine Learning Analysis (if enough data)
         ml_result = None
@@ -630,13 +763,11 @@ def api_deadline_analysis():
 
         # Estimate effort for Monte Carlo using team size
         # Effort = average contributors × weeks
-        avg_contributors = team_size
-        if min_contributors and max_contributors:
-            avg_contributors = (min_contributors + max_contributors) / 2
+        avg_contributors_cost = avg_contributors or (team_size or 1)
 
-        mc_effort_p50 = mc_projected_weeks_p50 * avg_contributors
-        mc_effort_p85 = mc_projected_weeks_p85 * avg_contributors
-        mc_effort_p95 = mc_projected_weeks_p95 * avg_contributors
+        mc_effort_p50 = mc_projected_weeks_p50 * avg_contributors_cost
+        mc_effort_p85 = mc_projected_weeks_p85 * avg_contributors_cost
+        mc_effort_p95 = mc_projected_weeks_p95 * avg_contributors_cost
 
         # Calculate costs for Monte Carlo percentiles
         mc_cost_percentiles = calculate_effort_based_cost_with_percentiles(
@@ -670,7 +801,7 @@ def api_deadline_analysis():
             'explanation': f'Monte Carlo: Com esforço de {mc_effort_p85:.1f} pessoa-semanas e custo de {mc_cost_p85["formatted_per_week"]} por semana, o custo total estimado (P85) é {mc_cost_p85["formatted_total"]}',
             'team_info': {
                 'team_size': team_size,
-                'avg_contributors': avg_contributors,
+                'avg_contributors': avg_contributors_cost,
                 'cost_per_week': cost_per_person_week
             }
         }
@@ -688,8 +819,8 @@ def api_deadline_analysis():
                 projected_weeks_p95 = percentile_stats.get('p95', 0)
 
                 # Estimate effort for different percentiles using team size
-                ml_effort_p50 = projected_weeks_p50 * avg_contributors
-                ml_effort_p95 = projected_weeks_p95 * avg_contributors
+                ml_effort_p50 = projected_weeks_p50 * avg_contributors_cost
+                ml_effort_p95 = projected_weeks_p95 * avg_contributors_cost
 
                 # Calculate costs for all percentiles
                 ml_cost_percentiles = calculate_effort_based_cost_with_percentiles(

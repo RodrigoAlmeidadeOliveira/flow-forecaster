@@ -970,6 +970,77 @@ $(window).on("load", function () {
             $('#show-more-row').hide();
         });
 
+        const probabilityReportContainer = $('#probability-report-30-days');
+        probabilityReportContainer.empty();
+
+        const itemsForecast30 = result.items_forecast_30_days;
+        if (itemsForecast30 && Array.isArray(itemsForecast30.probability_table) && itemsForecast30.probability_table.length) {
+            const probabilityRows = [...itemsForecast30.probability_table]
+                .map(entry => ({
+                    probability: Number(entry.probability),
+                    items: entry.items != null ? entry.items : '—'
+                }))
+                .sort((a, b) => b.probability - a.probability);
+
+            let highCount = 0;
+            let mediumCount = 0;
+            let lowCount = 0;
+
+            const rowsHtml = probabilityRows.map(entry => {
+                const probability = entry.probability;
+                const items = entry.items;
+                let rowClass;
+                if (probability >= 80) {
+                    rowClass = 'probability-row-high';
+                    highCount += 1;
+                } else if (probability >= 55) {
+                    rowClass = 'probability-row-medium';
+                    mediumCount += 1;
+                } else {
+                    rowClass = 'probability-row-low';
+                    lowCount += 1;
+                }
+                return `<tr class="${rowClass}"><td>${probability}%</td><td>${items}</td></tr>`;
+            }).join('');
+
+            if (highCount === 0) highCount = 1;
+            if (mediumCount === 0) mediumCount = 1;
+            if (lowCount === 0) lowCount = 1;
+
+            const periodStart = itemsForecast30.start_date || (simulationData.startDate || '—');
+            const periodEnd = itemsForecast30.end_date || '—';
+            const periodLabel = itemsForecast30.days ? `${itemsForecast30.days} dias` : '30 dias';
+
+            probabilityReportContainer.html(`
+                <div class="probability-report-wrapper mt-3">
+                    <div class="probability-report-title">Itens estimados em 30 dias</div>
+                    <div class="probability-report-content">
+                        <div class="probability-table-wrapper">
+                            <table class="table table-sm probability-table mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>Probabilidade</th>
+                                        <th>Itens em 30 dias</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${rowsHtml}
+                                </tbody>
+                            </table>
+                            <div class="probability-report-meta small text-muted mt-2">
+                                Horizonte: ${periodStart} → ${periodEnd} (${periodLabel})
+                            </div>
+                        </div>
+                        <div class="probability-legend">
+                            <div class="legend-item legend-high" style="flex:${highCount};">Quase certo</div>
+                            <div class="legend-item legend-medium" style="flex:${mediumCount};">Algum grau de certeza</div>
+                            <div class="legend-item legend-low" style="flex:${lowCount};">Chances baixas</div>
+                        </div>
+                    </div>
+                </div>
+            `);
+        }
+
         // Draw charts
         drawHistogram('res-duration-histogram', durationValues, confidenceLevel);
         drawBurnDowns('res-burn-downs', result.burnDowns);
@@ -1354,12 +1425,14 @@ $(window).on("load", function () {
                                     <p class="mb-1"><strong>P85 completion:</strong> ${formatWeeks(mcWeeks.p85)} weeks</p>
                                     <p class="mb-1"><strong>P50 completion:</strong> ${formatWeeks(mcWeeks.p50)} weeks</p>
                                     <p class="mb-1"><strong>Projected work (P85):</strong> ${mc.projected_work_p85 ?? '—'} tasks</p>
+                                    <p class="mb-1"><strong>Projected effort (P85):</strong> ${mc.projected_effort_p85 ?? '—'} person-weeks</p>
                                     <div class="mt-2">${verdictBadge(mc.can_meet_deadline)}</div>
                                 </div>
                                 <div class="col-md-6">
                                     <h6>Machine Learning</h6>
                                     <p class="mb-1"><strong>P85 completion:</strong> ${formatWeeks(mlWeeks.p85)} weeks</p>
                                     <p class="mb-1"><strong>P50 completion:</strong> ${formatWeeks(mlWeeks.p50)} weeks</p>
+                                    <p class="mb-1"><strong>Projected work (P85):</strong> ${ml.projected_work_p85 ?? '—'} tasks</p>
                                     <p class="mb-1"><strong>Projected effort (P85):</strong> ${ml.projected_effort_p85 ?? '—'} person-weeks</p>
                                     <div class="mt-2">${verdictBadge(ml.can_meet_deadline)}</div>
                                 </div>

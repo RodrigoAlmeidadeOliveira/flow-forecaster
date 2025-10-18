@@ -122,6 +122,113 @@ canvas {
     padding: 8px;
 }
 
+/* 30-day probability report */
+.probability-report-wrapper {
+    background-color: #ffffff;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 16px;
+    box-shadow: var(--shadow-sm);
+}
+
+.probability-report-title {
+    font-weight: 600;
+    margin-bottom: 12px;
+    color: var(--text-primary);
+}
+
+.probability-report-content {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.probability-table-wrapper {
+    flex: 1;
+}
+
+.probability-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.probability-table thead th {
+    background-color: #1f2937;
+    color: #ffffff;
+    font-weight: 600;
+    text-align: center;
+}
+
+.probability-table tbody td {
+    text-align: center;
+    font-weight: 600;
+    border-top: 1px solid var(--border-color);
+}
+
+.probability-row-high td {
+    background-color: #d9f5d6;
+}
+
+.probability-row-medium td {
+    background-color: #fdf1d0;
+}
+
+.probability-row-low td {
+    background-color: #fbe0e0;
+}
+
+.probability-legend {
+    display: flex;
+    flex-direction: column;
+    justify-content: stretch;
+    min-width: 160px;
+    border-left: 4px solid var(--primary-color);
+    border-radius: 6px;
+    overflow: hidden;
+    background-color: #e1e9ff;
+}
+
+.probability-legend .legend-item {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    font-weight: 600;
+    color: #ffffff;
+    padding: 12px 10px;
+}
+
+.probability-legend .legend-high {
+    background-color: #1f7a1f;
+}
+
+.probability-legend .legend-medium {
+    background-color: #d68910;
+}
+
+.probability-legend .legend-low {
+    background-color: #b71c1c;
+}
+
+.probability-report-meta {
+    font-style: italic;
+}
+
+@media (min-width: 768px) {
+    .probability-report-content {
+        flex-direction: row;
+        align-items: stretch;
+    }
+
+    .probability-legend {
+        margin-left: 16px;
+    }
+}
+
 /* Responsive adjustments */
 @media (max-width: 768px) {
     .input-group-text {
