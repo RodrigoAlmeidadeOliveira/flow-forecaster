@@ -192,14 +192,17 @@ def simulate():
                 if distribution_30:
                     seen_probs = set()
                     for prob in range(100, 0, -5):
-                        percentile_value = mc_percentile(distribution_30, prob / 100)
+                        # FIX: Probability interpretation
+                        # 100% probability = percentile 0 (minimum value that occurs in 100% of cases)
+                        # 1% probability = percentile 99 (value that only 1% of cases exceed)
+                        percentile_value = mc_percentile(distribution_30, (100 - prob) / 100)
                         probability_rows_30.append({
                             'probability': prob,
                             'items': int(round(percentile_value))
                         })
                         seen_probs.add(prob)
                     if 1 not in seen_probs:
-                        percentile_value = mc_percentile(distribution_30, 0.01)
+                        percentile_value = mc_percentile(distribution_30, 0.99)
                         probability_rows_30.append({
                             'probability': 1,
                             'items': int(round(percentile_value))
@@ -623,14 +626,17 @@ def api_deadline_analysis():
             if distribution_30:
                 seen_probs = set()
                 for prob in range(100, 0, -5):
-                    percentile_value = mc_percentile(distribution_30, prob / 100)
+                    # FIX: Probability interpretation
+                    # 100% probability = percentile 0 (minimum value that occurs in 100% of cases)
+                    # 1% probability = percentile 99 (value that only 1% of cases exceed)
+                    percentile_value = mc_percentile(distribution_30, (100 - prob) / 100)
                     probability_rows_30.append({
                         'probability': prob,
                         'items': int(round(percentile_value))
                     })
                     seen_probs.add(prob)
                 if 1 not in seen_probs:
-                    percentile_value = mc_percentile(distribution_30, 0.01)
+                    percentile_value = mc_percentile(distribution_30, 0.99)
                     probability_rows_30.append({
                         'probability': 1,
                         'items': int(round(percentile_value))
