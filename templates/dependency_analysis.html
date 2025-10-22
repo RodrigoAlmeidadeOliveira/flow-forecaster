@@ -1,31 +1,62 @@
 <!DOCTYPE html>
-<html lang="pt">
+<html lang="pt-BR">
 <head>
-    <title>Análise de Dependências - Flow Forecasting</title>
-    <meta charset="utf-8"/>
-    <meta content="width=device-width, initial-scale=1" name="viewport"/>
-    <!-- Google Fonts - Inter -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <!-- Bootstrap CSS -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@4.5.0/dist/css/bootstrap.min.css" rel="stylesheet"/>
-    <!-- Font Awesome -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"/>
-    <!-- Custom CSS -->
-    <link href="{{ url_for('static', filename='css/style.css') }}?v=20241130" rel="stylesheet"/>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Análise de Dependências - Project Forecaster</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
+        :root {
+            --primary-color: #4A90E2;
+            --success-color: #28a745;
+            --danger-color: #dc3545;
+            --warning-color: #ffc107;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .main-container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .card {
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+
+        .card-header {
+            background: linear-gradient(135deg, var(--primary-color) 0%, #357ABD 100%);
+            color: white;
+            border-radius: 15px 15px 0 0 !important;
+            padding: 20px;
+        }
+
+        .section-title {
+            font-size: 1.5rem;
+            font-weight: bold;
+            margin-bottom: 1rem;
+            color: var(--primary-color);
+        }
+
         .dependency-card {
             background: white;
             padding: 20px;
-            border-radius: 8px;
+            border-radius: 10px;
             margin-bottom: 15px;
-            border-left: 4px solid #007bff;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            border-left: 4px solid var(--primary-color);
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
         }
 
         .dependency-card.critical {
-            border-left-color: #dc3545;
+            border-left-color: var(--danger-color);
         }
 
         .dependency-card.high {
@@ -33,70 +64,88 @@
         }
 
         .dependency-card.medium {
-            border-left-color: #ffc107;
+            border-left-color: var(--warning-color);
         }
 
         .dependency-card.low {
-            border-left-color: #28a745;
-        }
-
-        .add-dependency-btn {
-            margin-top: 20px;
-        }
-
-        .results-section {
-            display: none;
-            margin-top: 30px;
+            border-left-color: var(--success-color);
         }
 
         .metric-box {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
+            background: white;
             padding: 25px;
             border-radius: 10px;
-            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
             text-align: center;
+            margin-bottom: 20px;
         }
 
-        .metric-box h3 {
+        .metric-value {
             font-size: 2.5rem;
-            margin: 0;
             font-weight: bold;
+            color: var(--primary-color);
         }
 
-        .metric-box p {
-            margin: 5px 0 0 0;
-            opacity: 0.9;
+        .metric-label {
+            color: #6c757d;
+            font-size: 0.9rem;
+            margin-top: 5px;
         }
 
-        .risk-critical {
-            background: linear-gradient(135deg, #ff416c 0%, #ff4b2b 100%);
+        .metric-box.risk-critical .metric-value {
+            color: var(--danger-color);
         }
 
-        .risk-high {
-            background: linear-gradient(135deg, #f77062 0%, #fe5196 100%);
+        .metric-box.risk-high .metric-value {
+            color: #fd7e14;
         }
 
-        .risk-medium {
-            background: linear-gradient(135deg, #fbc531 0%, #ff9800 100%);
+        .metric-box.risk-medium .metric-value {
+            color: var(--warning-color);
         }
 
-        .risk-low {
-            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+        .metric-box.risk-low .metric-value {
+            color: var(--success-color);
         }
 
-        .recommendation-card {
+        .result-card {
+            border-left: 4px solid var(--primary-color);
             background: #f8f9fa;
             padding: 15px;
-            border-radius: 6px;
-            margin-bottom: 10px;
-            border-left: 3px solid #007bff;
+            margin-bottom: 15px;
+            border-radius: 8px;
         }
 
-        .loading-spinner {
+        .spinner-container {
             display: none;
             text-align: center;
             padding: 40px;
+        }
+
+        .insight-box {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+
+        .btn-add-dependency {
+            background: var(--success-color);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: bold;
+        }
+
+        .btn-add-dependency:hover {
+            background: #218838;
+            color: white;
+        }
+
+        .probability-slider {
+            width: 100%;
         }
 
         .critical-path-item {
@@ -104,211 +153,190 @@
             padding: 12px;
             border-radius: 6px;
             margin-bottom: 8px;
-            border-left: 3px solid #dc3545;
+            border-left: 3px solid var(--danger-color);
         }
 
-        .probability-slider {
-            width: 100%;
-        }
-
-        .form-section {
+        .recommendation-card {
             background: #f8f9fa;
-            padding: 25px;
-            border-radius: 10px;
-            margin-bottom: 30px;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            border-left: 3px solid var(--primary-color);
         }
 
-        .insights-box {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 20px;
-            border-radius: 10px;
-            margin: 20px 0;
+        .form-label {
+            font-weight: 600;
+            color: #495057;
         }
 
-        .insights-box h4 {
-            margin-top: 0;
+        .required-field {
+            color: var(--danger-color);
         }
     </style>
 </head>
 <body>
-    <!-- Navbar -->
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
-        <div class="container">
-            <a class="navbar-brand" href="/">
-                <i class="fas fa-chart-line"></i> Flow Forecasting
-            </a>
-            <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav">
-                <span class="navbar-toggler-icon"></span>
-            </button>
-            <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav ml-auto">
-                    <li class="nav-item">
-                        <a class="nav-link" href="/">
-                            <i class="fas fa-home"></i> Simulação
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="/deadline-analysis">
-                            <i class="fas fa-calendar-check"></i> Análise de Deadline
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="/advanced">
-                            <i class="fas fa-brain"></i> ML Forecast
-                        </a>
-                    </li>
-                    <li class="nav-item active">
-                        <a class="nav-link" href="/dependency-analysis">
-                            <i class="fas fa-project-diagram"></i> Dependências
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="/docs">
-                            <i class="fas fa-book"></i> Docs
-                        </a>
-                    </li>
-                </ul>
+    <div class="main-container">
+        <!-- Header Card -->
+        <div class="card">
+            <div class="card-header">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h1 class="mb-0">
+                            <i class="fas fa-project-diagram"></i> Análise de Impacto de Dependências
+                        </h1>
+                        <p class="mb-0 mt-2">Entenda como dependências entre projetos afetam suas chances de entrega no prazo</p>
+                    </div>
+                    <a href="/" class="btn btn-light">
+                        <i class="fas fa-home"></i> Voltar
+                    </a>
+                </div>
             </div>
-        </div>
-    </nav>
-
-    <div class="container mt-4">
-        <!-- Header -->
-        <div class="text-center mb-4">
-            <h1><i class="fas fa-project-diagram"></i> Análise de Impacto de Dependências</h1>
-            <p class="lead">
-                Entenda como dependências entre projetos afetam suas chances de entrega no prazo
-            </p>
         </div>
 
         <!-- Key Insight -->
-        <div class="insights-box">
+        <div class="insight-box">
             <h4><i class="fas fa-lightbulb"></i> Insight Chave: O Problema 2^n</h4>
-            <p>
+            <p class="mb-2">
                 Para cada dependência, existe uma chance de atraso. Com <strong>n dependências</strong>,
                 a probabilidade de todas serem entregues no prazo é de <strong>1 em 2^n</strong>.
             </p>
-            <p class="mb-0">
-                <strong>Cada dependência removida DOBRA suas chances de sucesso!</strong>
+            <p class="mb-3">
+                <strong><i class="fas fa-exclamation-triangle"></i> Cada dependência removida DOBRA suas chances de sucesso!</strong>
             </p>
-            <ul class="mt-2 mb-0">
-                <li>1 dependência = 50% chance (1/2)</li>
-                <li>3 dependências = 12.5% chance (1/8)</li>
-                <li>7 dependências = 0.78% chance (1/128)</li>
-            </ul>
+            <div class="row text-center">
+                <div class="col-md-4">
+                    <strong>1 dependência</strong><br>50% chance (1/2)
+                </div>
+                <div class="col-md-4">
+                    <strong>3 dependências</strong><br>12.5% chance (1/8)
+                </div>
+                <div class="col-md-4">
+                    <strong>7 dependências</strong><br>0.78% chance (1/128)
+                </div>
+            </div>
         </div>
 
-        <!-- Form Section -->
-        <div class="form-section">
-            <h3><i class="fas fa-plus-circle"></i> Configurar Dependências</h3>
-
-            <div id="dependencies-container">
-                <!-- Dependencies will be added here dynamically -->
+        <!-- Input Form -->
+        <div class="card">
+            <div class="card-header">
+                <h3 class="mb-0"><i class="fas fa-plus-circle"></i> Configurar Dependências</h3>
             </div>
+            <div class="card-body">
+                <div id="dependencies-container">
+                    <!-- Dependencies will be added here -->
+                </div>
 
-            <button class="btn btn-success add-dependency-btn" onclick="addDependency()">
-                <i class="fas fa-plus"></i> Adicionar Dependência
-            </button>
+                <button class="btn btn-add-dependency w-100 mb-4" onclick="addDependency()">
+                    <i class="fas fa-plus"></i> Adicionar Dependência
+                </button>
 
-            <hr class="my-4">
+                <hr>
 
-            <div class="form-group">
-                <label for="numSimulations">
-                    <i class="fas fa-dice"></i> Número de Simulações Monte Carlo:
-                </label>
-                <input type="number" class="form-control" id="numSimulations"
-                       value="10000" min="1000" max="100000" step="1000">
-                <small class="form-text text-muted">
-                    Mais simulações = maior precisão (mas mais lento)
-                </small>
+                <div class="row">
+                    <div class="col-md-6">
+                        <label class="form-label">
+                            <i class="fas fa-dice"></i> Número de Simulações Monte Carlo:
+                        </label>
+                        <input type="number" class="form-control" id="numSimulations"
+                               value="10000" min="1000" max="100000" step="1000">
+                        <small class="text-muted">Mais simulações = maior precisão (mas mais lento)</small>
+                    </div>
+                </div>
+
+                <button class="btn btn-primary btn-lg w-100 mt-4" onclick="runAnalysis()">
+                    <i class="fas fa-chart-bar"></i> Executar Análise
+                </button>
             </div>
-
-            <button class="btn btn-primary btn-lg btn-block" onclick="runAnalysis()">
-                <i class="fas fa-chart-bar"></i> Executar Análise
-            </button>
         </div>
 
         <!-- Loading Spinner -->
-        <div class="loading-spinner" id="loadingSpinner">
-            <div class="spinner-border text-primary" role="status" style="width: 3rem; height: 3rem;">
-                <span class="sr-only">Carregando...</span>
+        <div class="spinner-container" id="loadingSpinner">
+            <div class="spinner-border text-light" style="width: 4rem; height: 4rem;" role="status">
+                <span class="visually-hidden">Carregando...</span>
             </div>
-            <p class="mt-3">Analisando dependências...</p>
+            <h4 class="text-white mt-3">Analisando dependências...</h4>
         </div>
 
         <!-- Results Section -->
-        <div class="results-section" id="resultsSection">
-            <h2 class="mb-4"><i class="fas fa-chart-pie"></i> Resultados da Análise</h2>
-
+        <div id="resultsSection" style="display: none;">
             <!-- Key Metrics -->
-            <div class="row">
-                <div class="col-md-6">
-                    <div class="metric-box" id="onTimeMetric">
-                        <h3 id="onTimeValue">--</h3>
-                        <p>Probabilidade de Entrega no Prazo</p>
-                        <small id="oddsRatio">--</small>
-                    </div>
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="mb-0"><i class="fas fa-chart-pie"></i> Resultados da Análise</h3>
                 </div>
-                <div class="col-md-6">
-                    <div class="metric-box" id="riskMetric">
-                        <h3 id="riskValue">--</h3>
-                        <p>Nível de Risco</p>
-                        <small id="riskScore">--</small>
-                    </div>
-                </div>
-            </div>
-
-            <div class="row">
-                <div class="col-md-6">
-                    <div class="metric-box metric-box-secondary">
-                        <h3 id="delayValue">--</h3>
-                        <p>Atraso Esperado (se houver atraso)</p>
-                    </div>
-                </div>
-                <div class="col-md-6">
-                    <div class="metric-box metric-box-secondary">
-                        <h3 id="delayedProbValue">--</h3>
-                        <p>Probabilidade de Pelo Menos Uma Atrasar</p>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3">
+                            <div class="metric-box" id="onTimeMetric">
+                                <div class="metric-value" id="onTimeValue">--</div>
+                                <div class="metric-label">Probabilidade de Entrega no Prazo</div>
+                                <small class="text-muted" id="oddsRatio">--</small>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="metric-box" id="riskMetric">
+                                <div class="metric-value" id="riskValue">--</div>
+                                <div class="metric-label">Nível de Risco</div>
+                                <small class="text-muted" id="riskScore">--</small>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="metric-box">
+                                <div class="metric-value text-warning" id="delayValue">--</div>
+                                <div class="metric-label">Atraso Esperado (dias)</div>
+                                <small class="text-muted">Se houver atraso</small>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="metric-box">
+                                <div class="metric-value text-danger" id="delayedProbValue">--</div>
+                                <div class="metric-label">Prob. de Atraso</div>
+                                <small class="text-muted">Pelo menos uma</small>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
 
             <!-- Visualization -->
-            <div class="card mt-4">
+            <div class="card">
                 <div class="card-header">
-                    <h4><i class="fas fa-chart-area"></i> Visualização de Impacto</h4>
+                    <h3 class="mb-0"><i class="fas fa-chart-area"></i> Visualização de Impacto</h3>
                 </div>
                 <div class="card-body">
-                    <img id="visualizationImage" src="" alt="Análise de Dependências" class="img-fluid">
+                    <img id="visualizationImage" src="" alt="Análise de Dependências" class="img-fluid rounded">
                 </div>
             </div>
 
-            <!-- Critical Path -->
-            <div class="card mt-4">
-                <div class="card-header">
-                    <h4><i class="fas fa-exclamation-triangle"></i> Caminho Crítico</h4>
+            <!-- Critical Path and Recommendations -->
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h4 class="mb-0"><i class="fas fa-exclamation-triangle"></i> Caminho Crítico</h4>
+                        </div>
+                        <div class="card-body">
+                            <p class="text-muted">As dependências mais críticas (maior impacto):</p>
+                            <div id="criticalPathList"></div>
+                        </div>
+                    </div>
                 </div>
-                <div class="card-body">
-                    <p>As dependências mais críticas (maior impacto):</p>
-                    <div id="criticalPathList"></div>
-                </div>
-            </div>
-
-            <!-- Recommendations -->
-            <div class="card mt-4">
-                <div class="card-header">
-                    <h4><i class="fas fa-lightbulb"></i> Recomendações</h4>
-                </div>
-                <div class="card-body">
-                    <div id="recommendationsList"></div>
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h4 class="mb-0"><i class="fas fa-lightbulb"></i> Recomendações</h4>
+                        </div>
+                        <div class="card-body">
+                            <div id="recommendationsList"></div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
             <!-- Delay Percentiles -->
-            <div class="card mt-4">
+            <div class="card">
                 <div class="card-header">
-                    <h4><i class="fas fa-chart-line"></i> Distribuição de Atrasos</h4>
+                    <h4 class="mb-0"><i class="fas fa-chart-line"></i> Distribuição de Atrasos</h4>
                 </div>
                 <div class="card-body">
                     <table class="table table-striped">
@@ -326,18 +354,7 @@
         </div>
     </div>
 
-    <!-- Footer -->
-    <footer class="mt-5">
-        <div class="container text-center">
-            <p>Flow Forecasting - Análise de Dependências</p>
-            <p><small>Baseado no modelo probabilístico 2^n</small></p>
-        </div>
-    </footer>
-
-    <!-- Scripts -->
-    <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.5.0/dist/js/bootstrap.bundle.min.js"></script>
-
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         let dependencyCount = 0;
 
@@ -352,69 +369,69 @@
             const container = document.getElementById('dependencies-container');
 
             const depCard = document.createElement('div');
-            depCard.className = 'dependency-card';
+            depCard.className = 'dependency-card ' + crit.toLowerCase();
             depCard.id = `dep-${dependencyCount}`;
             depCard.innerHTML = `
                 <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h5><i class="fas fa-link"></i> Dependência ${dependencyCount}</h5>
+                    <h5 class="mb-0"><i class="fas fa-link"></i> Dependência ${dependencyCount}</h5>
                     <button class="btn btn-sm btn-danger" onclick="removeDependency(${dependencyCount})">
-                        <i class="fas fa-trash"></i>
+                        <i class="fas fa-trash"></i> Remover
                     </button>
                 </div>
 
                 <div class="row">
                     <div class="col-md-6">
-                        <div class="form-group">
-                            <label>ID:</label>
-                            <input type="text" class="form-control dep-id" value="DEP-${dependencyCount}" required>
+                        <div class="mb-3">
+                            <label class="form-label">ID:</label>
+                            <input type="text" class="form-control dep-id" value="DEP-${dependencyCount}">
                         </div>
                     </div>
                     <div class="col-md-6">
-                        <div class="form-group">
-                            <label>Nome: <span class="text-danger">*</span></label>
-                            <input type="text" class="form-control dep-name" placeholder="Ex: API Authentication" value="${name}" required>
+                        <div class="mb-3">
+                            <label class="form-label">Nome: <span class="required-field">*</span></label>
+                            <input type="text" class="form-control dep-name" placeholder="Ex: API Authentication" value="${name}">
                         </div>
                     </div>
                 </div>
 
                 <div class="row">
                     <div class="col-md-6">
-                        <div class="form-group">
-                            <label>Projeto Fonte (bloqueado): <span class="text-danger">*</span></label>
-                            <input type="text" class="form-control dep-source" placeholder="Ex: Mobile App" value="${source}" required>
+                        <div class="mb-3">
+                            <label class="form-label">Projeto Fonte (bloqueado): <span class="required-field">*</span></label>
+                            <input type="text" class="form-control dep-source" placeholder="Ex: Mobile App" value="${source}">
                         </div>
                     </div>
                     <div class="col-md-6">
-                        <div class="form-group">
-                            <label>Projeto Alvo (bloqueador): <span class="text-danger">*</span></label>
-                            <input type="text" class="form-control dep-target" placeholder="Ex: Backend Team" value="${target}" required>
+                        <div class="mb-3">
+                            <label class="form-label">Projeto Alvo (bloqueador): <span class="required-field">*</span></label>
+                            <input type="text" class="form-control dep-target" placeholder="Ex: Backend Team" value="${target}">
                         </div>
                     </div>
                 </div>
 
                 <div class="row">
                     <div class="col-md-4">
-                        <div class="form-group">
-                            <label>Probabilidade de Entrega no Prazo:</label>
-                            <input type="range" class="probability-slider dep-probability"
+                        <div class="mb-3">
+                            <label class="form-label">Probabilidade de Entrega no Prazo:</label>
+                            <input type="range" class="form-range probability-slider dep-probability"
                                    min="0" max="100" value="${prob}" step="5"
                                    oninput="updateProbabilityLabel(this)">
                             <div class="text-center mt-1">
                                 <strong class="prob-label">${prob}%</strong>
                             </div>
-                            <small class="form-text text-muted">Use dados históricos</small>
+                            <small class="text-muted">Use dados históricos</small>
                         </div>
                     </div>
                     <div class="col-md-4">
-                        <div class="form-group">
-                            <label>Impacto de Atraso (dias):</label>
+                        <div class="mb-3">
+                            <label class="form-label">Impacto de Atraso (dias):</label>
                             <input type="number" class="form-control dep-delay" value="${delay}" min="0" step="1">
                         </div>
                     </div>
                     <div class="col-md-4">
-                        <div class="form-group">
-                            <label>Criticidade:</label>
-                            <select class="form-control dep-criticality" onchange="updateCardColor(this)">
+                        <div class="mb-3">
+                            <label class="form-label">Criticidade:</label>
+                            <select class="form-select dep-criticality" onchange="updateCardColor(this)">
                                 <option value="LOW" ${crit === 'LOW' ? 'selected' : ''}>Baixa</option>
                                 <option value="MEDIUM" ${crit === 'MEDIUM' ? 'selected' : ''}>Média</option>
                                 <option value="HIGH" ${crit === 'HIGH' ? 'selected' : ''}>Alta</option>
@@ -426,93 +443,10 @@
             `;
 
             container.appendChild(depCard);
-            updateCardColor(depCard.querySelector('.dep-criticality'));
         }
 
         function addDependency() {
-            // Call the helper function with empty values
             addDependencyWithExample('', '', '', 50, 10, 'MEDIUM');
-        }
-
-        function addDependencyOld() {
-            dependencyCount++;
-            const container = document.getElementById('dependencies-container');
-
-            const depCard = document.createElement('div');
-            depCard.className = 'dependency-card';
-            depCard.id = `dep-${dependencyCount}`;
-            depCard.innerHTML = `
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h5><i class="fas fa-link"></i> Dependência ${dependencyCount}</h5>
-                    <button class="btn btn-sm btn-danger" onclick="removeDependency(${dependencyCount})">
-                        <i class="fas fa-trash"></i>
-                    </button>
-                </div>
-
-                <div class="row">
-                    <div class="col-md-6">
-                        <div class="form-group">
-                            <label>ID:</label>
-                            <input type="text" class="form-control dep-id" value="DEP-${dependencyCount}" required>
-                        </div>
-                    </div>
-                    <div class="col-md-6">
-                        <div class="form-group">
-                            <label>Nome:</label>
-                            <input type="text" class="form-control dep-name" placeholder="Ex: API Service" required>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="row">
-                    <div class="col-md-6">
-                        <div class="form-group">
-                            <label>Projeto Fonte (bloqueado):</label>
-                            <input type="text" class="form-control dep-source" placeholder="Ex: Mobile App" required>
-                        </div>
-                    </div>
-                    <div class="col-md-6">
-                        <div class="form-group">
-                            <label>Projeto Alvo (bloqueador):</label>
-                            <input type="text" class="form-control dep-target" placeholder="Ex: Backend Team" required>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="row">
-                    <div class="col-md-4">
-                        <div class="form-group">
-                            <label>Probabilidade de Entrega no Prazo:</label>
-                            <input type="range" class="probability-slider dep-probability"
-                                   min="0" max="100" value="50" step="5"
-                                   oninput="updateProbabilityLabel(this)">
-                            <div class="text-center mt-1">
-                                <strong class="prob-label">50%</strong>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-4">
-                        <div class="form-group">
-                            <label>Impacto de Atraso (dias):</label>
-                            <input type="number" class="form-control dep-delay" value="10" min="0" step="1">
-                        </div>
-                    </div>
-                    <div class="col-md-4">
-                        <div class="form-group">
-                            <label>Criticidade:</label>
-                            <select class="form-control dep-criticality" onchange="updateCardColor(this)">
-                                <option value="LOW">Baixa</option>
-                                <option value="MEDIUM" selected>Média</option>
-                                <option value="HIGH">Alta</option>
-                                <option value="CRITICAL">Crítica</option>
-                            </select>
-                        </div>
-                    </div>
-                </div>
-            `;
-
-            container.appendChild(depCard);
-            updateCardColor(depCard.querySelector('.dep-criticality'));
         }
 
         function removeDependency(id) {
@@ -543,22 +477,13 @@
                 const source = card.querySelector('.dep-source').value.trim();
                 const target = card.querySelector('.dep-target').value.trim();
 
-                // Check if any field is filled (partially filled dependency)
                 const hasAnyData = name || source || target;
 
                 if (hasAnyData) {
-                    // If partially filled, all must be filled
-                    if (!name) {
-                        errors.push(`Dependência ${index + 1}: Campo "Nome" é obrigatório`);
-                    }
-                    if (!source) {
-                        errors.push(`Dependência ${index + 1}: Campo "Projeto Fonte" é obrigatório`);
-                    }
-                    if (!target) {
-                        errors.push(`Dependência ${index + 1}: Campo "Projeto Alvo" é obrigatório`);
-                    }
+                    if (!name) errors.push(`Dependência ${index + 1}: Campo "Nome" é obrigatório`);
+                    if (!source) errors.push(`Dependência ${index + 1}: Campo "Projeto Fonte" é obrigatório`);
+                    if (!target) errors.push(`Dependência ${index + 1}: Campo "Projeto Alvo" é obrigatório`);
 
-                    // If all required fields are filled, add to list
                     if (name && source && target) {
                         const dep = {
                             id: card.querySelector('.dep-id').value,
@@ -580,13 +505,11 @@
         async function runAnalysis() {
             const result = collectDependencies();
 
-            // Show validation errors if any
             if (result.errors.length > 0) {
                 alert('Erros de validação:\n\n' + result.errors.join('\n'));
                 return;
             }
 
-            // Check if we have at least one dependency
             if (result.dependencies.length === 0) {
                 alert('Por favor, preencha os campos de pelo menos uma dependência!\n\n' +
                       'Campos obrigatórios:\n' +
@@ -620,8 +543,8 @@
                     throw new Error('Erro na análise: ' + response.statusText);
                 }
 
-                const result = await response.json();
-                displayResults(result);
+                const resultData = await response.json();
+                displayResults(resultData);
 
             } catch (error) {
                 alert('Erro ao executar análise: ' + error.message);
@@ -632,28 +555,19 @@
         }
 
         function displayResults(result) {
-            // Show results section
             document.getElementById('resultsSection').style.display = 'block';
 
             // Update key metrics
-            document.getElementById('onTimeValue').textContent =
-                result.on_time_probability_percentage.toFixed(1) + '%';
+            document.getElementById('onTimeValue').textContent = result.on_time_probability_percentage.toFixed(1) + '%';
             document.getElementById('oddsRatio').textContent = result.odds_ratio;
-
             document.getElementById('riskValue').textContent = result.risk_level;
-            document.getElementById('riskScore').textContent =
-                'Score: ' + result.risk_score.toFixed(0) + '/100';
+            document.getElementById('riskScore').textContent = 'Score: ' + result.risk_score.toFixed(0) + '/100';
+            document.getElementById('delayValue').textContent = result.expected_delay_days.toFixed(1);
+            document.getElementById('delayedProbValue').textContent = result.at_least_one_delayed_probability_percentage.toFixed(1) + '%';
 
-            document.getElementById('delayValue').textContent =
-                result.expected_delay_days.toFixed(1) + ' dias';
-
-            document.getElementById('delayedProbValue').textContent =
-                result.at_least_one_delayed_probability_percentage.toFixed(1) + '%';
-
-            // Update metric box colors based on risk
+            // Update metric box colors
             const riskMetric = document.getElementById('riskMetric');
-            riskMetric.className = 'metric-box';
-            riskMetric.classList.add('risk-' + result.risk_level.toLowerCase());
+            riskMetric.className = 'metric-box risk-' + result.risk_level.toLowerCase();
 
             const onTimeMetric = document.getElementById('onTimeMetric');
             onTimeMetric.className = 'metric-box';
@@ -670,7 +584,7 @@
             // Generate visualization
             generateVisualization(result);
 
-            // Display critical path
+            // Critical path
             const criticalPathList = document.getElementById('criticalPathList');
             criticalPathList.innerHTML = '';
             result.critical_path.forEach((dep, index) => {
@@ -681,7 +595,7 @@
                 `;
             });
 
-            // Display recommendations
+            // Recommendations
             const recList = document.getElementById('recommendationsList');
             recList.innerHTML = '';
             result.recommendations.forEach(rec => {
@@ -692,13 +606,13 @@
                 `;
             });
 
-            // Display percentiles
+            // Percentiles
             const percTable = document.getElementById('percentilesTable');
             percTable.innerHTML = '';
             Object.entries(result.delay_percentiles).forEach(([p, value]) => {
                 percTable.innerHTML += `
                     <tr>
-                        <td>${p.toUpperCase()}</td>
+                        <td><strong>${p.toUpperCase()}</strong></td>
                         <td>${value.toFixed(1)} dias</td>
                     </tr>
                 `;

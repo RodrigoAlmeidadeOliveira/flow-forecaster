@@ -586,6 +586,85 @@
 <div class="col-12 px-3" id="probability-report-30-days"></div>
 </div>
 </div>
+
+<!-- Dependencies Section -->
+<div class="container-fluid bg-12 text-center">
+<h2 data-i18n="dependencies_optional"
+    data-doc-tooltip="Modele dependências entre projetos para entender o impacto no prazo de entrega."
+    data-doc-anchor="planejamento">
+    Dependências entre Projetos (opcional)
+<a class="doc-hint-icon" href="https://flow-forecaster.fly.dev/documentacao#planejamento" target="_blank" rel="noopener noreferrer" aria-label="Abrir documentação relacionada em nova aba" data-toggle="tooltip" data-placement="top" data-bs-toggle="tooltip" data-bs-placement="top" title="Modele dependências entre projetos para entender o impacto no prazo de entrega."><i class="fas fa-circle-question" aria-hidden="true"></i></a></h2>
+<p class="text-muted">
+    Cada dependência DOBRA o risco de atraso! Use dados históricos para estimar probabilidades.
+    <strong>Insight: Com n dependências, a chance de sucesso é 1 em 2^n</strong>
+</p>
+<div class="row">
+<table class="table table-sm" id="dependencies">
+<thead>
+<tr class="d-flex">
+<th class="col-2" scope="col" data-i18n="dep_name">
+    Nome da Dependência
+</th>
+<th class="col-2" scope="col" data-i18n="dep_source">
+    Projeto Fonte
+</th>
+<th class="col-2" scope="col" data-i18n="dep_target">
+    Projeto Alvo
+</th>
+<th class="col-2" scope="col"
+    data-doc-tooltip="Probabilidade histórica de entrega no prazo (0-100%). Ex: se 7 de 10 entregas foram no prazo, use 70%">
+    Prob. On-Time (%)
+<a class="doc-hint-icon" href="#" data-toggle="tooltip" title="Probabilidade histórica de entrega no prazo (0-100%)"><i class="fas fa-circle-question"></i></a></th>
+<th class="col-2" scope="col"
+    data-doc-tooltip="Impacto em dias se a dependência atrasar">
+    Atraso (dias)
+<a class="doc-hint-icon" href="#" data-toggle="tooltip" title="Impacto em dias se a dependência atrasar"><i class="fas fa-circle-question"></i></a></th>
+<th class="col-2" scope="col" data-i18n="dep_criticality">
+    Criticidade
+</th>
+</tr>
+</thead>
+<tbody>
+<tr class="d-flex dependency-row" id="dependency-row-template">
+<td class="col-2">
+<input class="form-control form-control-sm" name="dep_name" placeholder="Ex: API Service" type="text"/>
+</td>
+<td class="col-2">
+<input class="form-control form-control-sm" name="dep_source" placeholder="Ex: Mobile App" type="text"/>
+</td>
+<td class="col-2">
+<input class="form-control form-control-sm" name="dep_target" placeholder="Ex: Backend Team" type="text"/>
+</td>
+<td class="col-2">
+<input class="form-control form-control-sm" name="dep_probability" placeholder="50" type="number" min="0" max="100" value="50"/>
+</td>
+<td class="col-2">
+<input class="form-control form-control-sm" name="dep_delay" placeholder="10" type="number" min="0" value="10"/>
+</td>
+<td class="col-2">
+<select class="form-control form-control-sm" name="dep_criticality">
+<option value="LOW">Baixa</option>
+<option value="MEDIUM" selected>Média</option>
+<option value="HIGH">Alta</option>
+<option value="CRITICAL">Crítica</option>
+</select>
+</td>
+</tr>
+<tr class="d-flex" id="add-dependency-row">
+<td class="col-2"></td>
+<td class="col-2"></td>
+<td class="col-2"></td>
+<td class="col-2"></td>
+<td class="col-2"></td>
+<td class="col-2">
+<button class="btn btn-secondary btn-sm" id="addDependency" type="button">Adicionar linha</button>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+
 <div class="container-fluid bg-12 text-center">
 <button class="btn btn-primary" id="run" type="button" data-i18n="run_simulation">Executar a simulação!</button>
 <button class="btn btn-secondary" id="share" title="Share simulation" type="button" data-i18n="share">Compartilhar</button>
@@ -658,6 +737,62 @@
 <canvas id="res-duration-histogram"></canvas>
 <canvas id="res-burn-downs"></canvas>
 <canvas id="res-effort-scatter-plot"></canvas>
+
+<!-- Dependency Analysis Results -->
+<div id="dependency-results" style="display:none; margin-top: 30px;">
+<h3>📊 Análise de Dependências</h3>
+<div class="row" style="margin-bottom: 20px;">
+<div class="col-md-3">
+<div class="card text-center">
+<div class="card-body">
+<h6 class="card-subtitle mb-2 text-muted">Prob. On-Time</h6>
+<h3 class="card-title" id="dep-on-time-prob" style="color: #dc3545;">-</h3>
+<p class="small text-muted" id="dep-odds-ratio">-</p>
+</div>
+</div>
+</div>
+<div class="col-md-3">
+<div class="card text-center">
+<div class="card-body">
+<h6 class="card-subtitle mb-2 text-muted">Atraso Esperado</h6>
+<h3 class="card-title" id="dep-expected-delay" style="color: #ffc107;">-</h3>
+<p class="small text-muted">Média dos cenários</p>
+</div>
+</div>
+</div>
+<div class="col-md-3">
+<div class="card text-center">
+<div class="card-body">
+<h6 class="card-subtitle mb-2 text-muted">Nível de Risco</h6>
+<h3 class="card-title" id="dep-risk-level" style="color: #6c757d;">-</h3>
+<p class="small text-muted" id="dep-risk-score">-</p>
+</div>
+</div>
+</div>
+<div class="col-md-3">
+<div class="card text-center">
+<div class="card-body">
+<h6 class="card-subtitle mb-2 text-muted">Total Dependências</h6>
+<h3 class="card-title" id="dep-total" style="color: #17a2b8;">-</h3>
+<p class="small text-muted">Removendo 1 dobra a chance!</p>
+</div>
+</div>
+</div>
+</div>
+<div class="row">
+<div class="col-md-6">
+<h5>🎯 Caminho Crítico</h5>
+<ul id="dep-critical-path" class="list-group">
+</ul>
+</div>
+<div class="col-md-6">
+<h5>💡 Recomendações</h5>
+<ul id="dep-recommendations" class="list-group">
+</ul>
+</div>
+</div>
+</div>
+
 <h3 data-i18n="simulation_report">Relatório da simulação</h3>
 <textarea class="col-sm-12 text-monospace" id="results" readonly="" rows="23"></textarea>
 </div>

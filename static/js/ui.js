@@ -797,6 +797,44 @@ $(window).on("load", function () {
         $row.find("input[name='description']").val(risk.description);
     }
 
+    // Dependencies handling functions
+    function parseDependencies(selector) {
+        const dependencies = [];
+        $(selector).find('tbody').find('.dependency-row').each((_index, el) => {
+            const $el = $(el);
+            const dep = {
+                id: `DEP-${_index + 1}`,
+                name: $el.find("input[name='dep_name']").val(),
+                source_project: $el.find("input[name='dep_source']").val(),
+                target_project: $el.find("input[name='dep_target']").val(),
+                on_time_probability: parseFloat($el.find("input[name='dep_probability']").val()) / 100 || 0.5,
+                delay_impact_days: parseFloat($el.find("input[name='dep_delay']").val()) || 0,
+                criticality: $el.find("select[name='dep_criticality']").val() || 'MEDIUM'
+            };
+            // Only add if name, source and target are filled
+            if (dep.name && dep.source_project && dep.target_project) {
+                dependencies.push(dep);
+            }
+        });
+        return dependencies;
+    }
+
+    const $dependencyRowTemplate = $('#dependency-row-template').clone();
+    function addDependency() {
+        const $row = $dependencyRowTemplate.clone();
+        $row.insertBefore($('#add-dependency-row'));
+        return $row;
+    }
+
+    function fillDependency(dep, $row) {
+        $row.find("input[name='dep_name']").val(dep.name);
+        $row.find("input[name='dep_source']").val(dep.source_project);
+        $row.find("input[name='dep_target']").val(dep.target_project);
+        $row.find("input[name='dep_probability']").val((dep.on_time_probability * 100) || 50);
+        $row.find("input[name='dep_delay']").val(dep.delay_impact_days || 10);
+        $row.find("select[name='dep_criticality']").val(dep.criticality || 'MEDIUM');
+    }
+
     const $probabilitiesRowTemplate = $('#probabilities').find('.probabilities-row').clone();
     function addProbabilityRow() {
         const $row = $probabilitiesRowTemplate.clone();
@@ -842,6 +880,7 @@ $(window).on("load", function () {
             ltSamples: parseSamples('#ltSamples'),
             splitRateSamples: parseSamples('#splitRateSamples'),
             risks: parseRisks('#risks'),
+            dependencies: parseDependencies('#dependencies'),
             numberOfTasks: parseInt($('#numberOfTasks').val()),
             totalContributors: parseInt($('#totalContributors').val()),
             minContributors: parseInt($('#minContributors').val()) || parseInt($('#totalContributors').val()),
@@ -1072,6 +1111,62 @@ $(window).on("load", function () {
 
         if (window.renderInputStats) {
             window.renderInputStats('#input-stats', result.input_stats);
+        }
+
+        // Display dependency analysis if available
+        if (result.dependency_analysis) {
+            displayDependencyResults(result.dependency_analysis);
+        }
+    }
+
+    function displayDependencyResults(depAnalysis) {
+        const $container = $('#dependency-results');
+
+        // Show container
+        $container.show();
+
+        // Populate metrics
+        const onTimeProb = (depAnalysis.on_time_probability * 100).toFixed(1);
+        $('#dep-on-time-prob').text(onTimeProb + '%');
+        $('#dep-odds-ratio').text(depAnalysis.odds_ratio || '');
+
+        const expectedDelay = depAnalysis.expected_delay_days.toFixed(1);
+        $('#dep-expected-delay').text(expectedDelay + ' dias');
+
+        // Set risk level color
+        const riskLevel = depAnalysis.risk_level;
+        const riskColors = {
+            'LOW': '#28a745',
+            'MEDIUM': '#ffc107',
+            'HIGH': '#fd7e14',
+            'CRITICAL': '#dc3545'
+        };
+        const riskColor = riskColors[riskLevel] || '#6c757d';
+        $('#dep-risk-level').text(riskLevel).css('color', riskColor);
+        $('#dep-risk-score').text(`Score: ${depAnalysis.risk_score.toFixed(0)}/100`);
+
+        $('#dep-total').text(depAnalysis.total_dependencies);
+
+        // Critical path
+        const $criticalPath = $('#dep-critical-path');
+        $criticalPath.empty();
+        if (depAnalysis.critical_path && depAnalysis.critical_path.length > 0) {
+            depAnalysis.critical_path.forEach(dep => {
+                $criticalPath.append(`<li class="list-group-item">${dep}</li>`);
+            });
+        } else {
+            $criticalPath.append('<li class="list-group-item text-muted">Nenhuma dependência crítica</li>');
+        }
+
+        // Recommendations
+        const $recommendations = $('#dep-recommendations');
+        $recommendations.empty();
+        if (depAnalysis.recommendations && depAnalysis.recommendations.length > 0) {
+            depAnalysis.recommendations.slice(0, 5).forEach(rec => {
+                $recommendations.append(`<li class="list-group-item">${rec}</li>`);
+            });
+        } else {
+            $recommendations.append('<li class="list-group-item text-muted">Sem recomendações</li>');
         }
     }
 
@@ -1833,6 +1928,7 @@ ${generateProgressBar(p50Items, backlog, 'P50 (arriscado)  ', Math.round((p50Ite
     };
 
     $('#addRisk').on('click', addRisk);
+    $('#addDependency').on('click', addDependency);
     $('#share').on('click', share);
     $('#run').on('click', runSimulation);
     $('#runDeadlineAnalysis').on('click', runDeadlineAnalysis);
