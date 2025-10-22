@@ -1324,10 +1324,10 @@ Para questões, sugestões ou problemas:
 - [XGBoost Documentation](https://xgboost.readthedocs.io/)
 - [Gradient Boosting (scikit-learn)](https://scikit-learn.org/stable/modules/ensemble.html#gradient-boosting)
 
-**Métodos Ágeis**:
-- [Kanban Guide](https://www.kanban.org/)
-- [Scrum Guide](https://scrumguides.org/)
+**Gestão de fluxo**:
+- [Kanban Guide](https://all.kanban.plus/en/content/kanbanplus/)
 - [Agile Forecasting (Troy Magennis)](https://github.com/FocusedObjective/FocusedObjective.Resources)
+- [Aspercom ](https://www.aspercom.com.br)
 
 ---
 
