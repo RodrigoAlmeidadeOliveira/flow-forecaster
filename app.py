@@ -103,6 +103,23 @@ def advanced():
     return redirect(url_for('index') + '#advanced-forecast')
 
 
+@app.route('/dependency-analysis')
+def dependency_analysis_page():
+    """Render the dependency analysis page."""
+    try:
+        return render_template('dependency_analysis.html')
+    except Exception as e:
+        return f"""
+        <html>
+        <head><title>Dependency Analysis - Error</title></head>
+        <body>
+            <h1>Template Error</h1>
+            <p>Error loading dependency analysis template: {str(e)}</p>
+        </body>
+        </html>
+        """, 500
+
+
 @app.route('/documentacao')
 def documentation():
     """Render the user manual/documentation page."""
@@ -118,6 +135,12 @@ def documentation():
         </body>
         </html>
         """, 500
+
+
+@app.route('/docs')
+def docs_redirect():
+    """Redirect /docs to /documentacao."""
+    return redirect(url_for('documentation'))
 
 
 @app.route('/api/simulate', methods=['POST'])
@@ -1251,6 +1274,40 @@ def dependency_analysis():
     except Exception as e:
         return jsonify({
             'error': f'Error analyzing dependencies: {str(e)}'
+        }), 500
+
+
+@app.route('/api/visualize-dependencies', methods=['POST'])
+def visualize_dependencies():
+    """
+    Generate visualization for dependency analysis results.
+
+    Expected JSON payload: The result dictionary from dependency analysis
+
+    Returns:
+        JSON with base64 encoded image
+    """
+    try:
+        data = request.json
+
+        if not data:
+            return jsonify({
+                'error': 'No data provided'
+            }), 400
+
+        # Create visualizer
+        visualizer = ForecastVisualizer()
+
+        # Generate visualization
+        image_b64 = visualizer.plot_dependency_impact(data)
+
+        return jsonify({
+            'image': image_b64
+        })
+
+    except Exception as e:
+        return jsonify({
+            'error': f'Error generating visualization: {str(e)}'
         }), 500
 
 
