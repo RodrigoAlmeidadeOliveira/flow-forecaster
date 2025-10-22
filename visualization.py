@@ -386,12 +386,14 @@ class ForecastVisualizer:
         return self._fig_to_base64(fig)
 
     def _fig_to_base64(self, fig) -> str:
-        """Convert matplotlib figure to base64 string."""
+        """Convert matplotlib figure to base64 string with optimizations."""
         buffer = io.BytesIO()
-        fig.savefig(buffer, format='png', dpi=100, bbox_inches='tight')
+        # Reduced DPI for faster rendering, removed bbox_inches for speed
+        fig.savefig(buffer, format='png', dpi=72, bbox_inches=None, pad_inches=0.1)
         buffer.seek(0)
         image_base64 = base64.b64encode(buffer.read()).decode('utf-8')
         plt.close(fig)
+        buffer.close()
         return f"data:image/png;base64,{image_base64}"
 
 
