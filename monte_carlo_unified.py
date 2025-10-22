@@ -666,8 +666,9 @@ class WeibullFitter:
 
     def _refill_pool(self):
         """Refill the sample pool with new random samples"""
+        # Ensure truly random samples by using random_state=None (uses global numpy RNG)
         self._sample_pool = stats.weibull_min.rvs(
-            self.shape, scale=self.scale, size=self._pool_size
+            self.shape, scale=self.scale, size=self._pool_size, random_state=None
         )
         self._pool_index = 0
 
@@ -692,7 +693,7 @@ class WeibullFitter:
 
     def generate_samples(self, n: int) -> np.ndarray:
         """Generate multiple random samples from the fitted distribution"""
-        return stats.weibull_min.rvs(self.shape, scale=self.scale, size=n)
+        return stats.weibull_min.rvs(self.shape, scale=self.scale, size=n, random_state=None)
 
 
 class WeibullMonteCarloSimulator:
