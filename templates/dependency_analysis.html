@@ -341,13 +341,100 @@
     <script>
         let dependencyCount = 0;
 
-        // Add initial dependency on page load
+        // Add initial dependencies with examples on page load
         document.addEventListener('DOMContentLoaded', function() {
-            addDependency();
-            addDependency();
+            addDependencyWithExample('API Service', 'Mobile App', 'Backend Team', 60, 10, 'HIGH');
+            addDependencyWithExample('Database Schema', 'Mobile App', 'DBA Team', 70, 5, 'MEDIUM');
         });
 
+        function addDependencyWithExample(name = '', source = '', target = '', prob = 50, delay = 10, crit = 'MEDIUM') {
+            dependencyCount++;
+            const container = document.getElementById('dependencies-container');
+
+            const depCard = document.createElement('div');
+            depCard.className = 'dependency-card';
+            depCard.id = `dep-${dependencyCount}`;
+            depCard.innerHTML = `
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5><i class="fas fa-link"></i> Dependência ${dependencyCount}</h5>
+                    <button class="btn btn-sm btn-danger" onclick="removeDependency(${dependencyCount})">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label>ID:</label>
+                            <input type="text" class="form-control dep-id" value="DEP-${dependencyCount}" required>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label>Nome: <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control dep-name" placeholder="Ex: API Authentication" value="${name}" required>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label>Projeto Fonte (bloqueado): <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control dep-source" placeholder="Ex: Mobile App" value="${source}" required>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label>Projeto Alvo (bloqueador): <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control dep-target" placeholder="Ex: Backend Team" value="${target}" required>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-4">
+                        <div class="form-group">
+                            <label>Probabilidade de Entrega no Prazo:</label>
+                            <input type="range" class="probability-slider dep-probability"
+                                   min="0" max="100" value="${prob}" step="5"
+                                   oninput="updateProbabilityLabel(this)">
+                            <div class="text-center mt-1">
+                                <strong class="prob-label">${prob}%</strong>
+                            </div>
+                            <small class="form-text text-muted">Use dados históricos</small>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="form-group">
+                            <label>Impacto de Atraso (dias):</label>
+                            <input type="number" class="form-control dep-delay" value="${delay}" min="0" step="1">
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="form-group">
+                            <label>Criticidade:</label>
+                            <select class="form-control dep-criticality" onchange="updateCardColor(this)">
+                                <option value="LOW" ${crit === 'LOW' ? 'selected' : ''}>Baixa</option>
+                                <option value="MEDIUM" ${crit === 'MEDIUM' ? 'selected' : ''}>Média</option>
+                                <option value="HIGH" ${crit === 'HIGH' ? 'selected' : ''}>Alta</option>
+                                <option value="CRITICAL" ${crit === 'CRITICAL' ? 'selected' : ''}>Crítica</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            container.appendChild(depCard);
+            updateCardColor(depCard.querySelector('.dep-criticality'));
+        }
+
         function addDependency() {
+            // Call the helper function with empty values
+            addDependencyWithExample('', '', '', 50, 10, 'MEDIUM');
+        }
+
+        function addDependencyOld() {
             dependencyCount++;
             const container = document.getElementById('dependencies-container');
 
@@ -449,34 +536,67 @@
         function collectDependencies() {
             const dependencies = [];
             const cards = document.querySelectorAll('.dependency-card');
+            const errors = [];
 
-            cards.forEach(card => {
-                const dep = {
-                    id: card.querySelector('.dep-id').value,
-                    name: card.querySelector('.dep-name').value,
-                    source_project: card.querySelector('.dep-source').value,
-                    target_project: card.querySelector('.dep-target').value,
-                    on_time_probability: parseFloat(card.querySelector('.dep-probability').value) / 100,
-                    delay_impact_days: parseFloat(card.querySelector('.dep-delay').value),
-                    criticality: card.querySelector('.dep-criticality').value
-                };
+            cards.forEach((card, index) => {
+                const name = card.querySelector('.dep-name').value.trim();
+                const source = card.querySelector('.dep-source').value.trim();
+                const target = card.querySelector('.dep-target').value.trim();
 
-                // Validate
-                if (dep.name && dep.source_project && dep.target_project) {
-                    dependencies.push(dep);
+                // Check if any field is filled (partially filled dependency)
+                const hasAnyData = name || source || target;
+
+                if (hasAnyData) {
+                    // If partially filled, all must be filled
+                    if (!name) {
+                        errors.push(`Dependência ${index + 1}: Campo "Nome" é obrigatório`);
+                    }
+                    if (!source) {
+                        errors.push(`Dependência ${index + 1}: Campo "Projeto Fonte" é obrigatório`);
+                    }
+                    if (!target) {
+                        errors.push(`Dependência ${index + 1}: Campo "Projeto Alvo" é obrigatório`);
+                    }
+
+                    // If all required fields are filled, add to list
+                    if (name && source && target) {
+                        const dep = {
+                            id: card.querySelector('.dep-id').value,
+                            name: name,
+                            source_project: source,
+                            target_project: target,
+                            on_time_probability: parseFloat(card.querySelector('.dep-probability').value) / 100,
+                            delay_impact_days: parseFloat(card.querySelector('.dep-delay').value),
+                            criticality: card.querySelector('.dep-criticality').value
+                        };
+                        dependencies.push(dep);
+                    }
                 }
             });
 
-            return dependencies;
+            return { dependencies, errors };
         }
 
         async function runAnalysis() {
-            const dependencies = collectDependencies();
+            const result = collectDependencies();
 
-            if (dependencies.length === 0) {
-                alert('Por favor, adicione pelo menos uma dependência!');
+            // Show validation errors if any
+            if (result.errors.length > 0) {
+                alert('Erros de validação:\n\n' + result.errors.join('\n'));
                 return;
             }
+
+            // Check if we have at least one dependency
+            if (result.dependencies.length === 0) {
+                alert('Por favor, preencha os campos de pelo menos uma dependência!\n\n' +
+                      'Campos obrigatórios:\n' +
+                      '• Nome da dependência\n' +
+                      '• Projeto Fonte (bloqueado)\n' +
+                      '• Projeto Alvo (bloqueador)');
+                return;
+            }
+
+            const dependencies = result.dependencies;
 
             // Show loading
             document.getElementById('loadingSpinner').style.display = 'block';
