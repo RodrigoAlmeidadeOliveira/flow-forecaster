@@ -1540,10 +1540,11 @@ $(window).on("load", function () {
         }
 
         function generateConclusion(backlog, p85Value, canMeet) {
+            const percentageP85 = Math.round((p85Value / backlog) * 100);
+
             if (canMeet) {
-                return `✅ <strong>Conclusão:</strong> Com os dados atuais, você <strong>CONSEGUIRÁ</strong> completar os ${backlog} itens no prazo. A equipe tem capacidade para entregar o backlog completo.`;
+                return `✅ <strong>Conclusão:</strong> Com os dados atuais, você <strong>CONSEGUIRÁ</strong> completar os ${backlog} itens no prazo. A equipe tem capacidade para entregar o backlog completo com ${percentageP85}% de confiança.`;
             } else {
-                const percentageP85 = Math.round((p85Value / backlog) * 100);
                 let fractionText = '';
                 if (percentageP85 >= 90) fractionText = 'praticamente todo o backlog';
                 else if (percentageP85 >= 75) fractionText = 'aproximadamente 3/4 do backlog';
@@ -1552,7 +1553,7 @@ $(window).on("load", function () {
                 else if (percentageP85 >= 33) fractionText = 'aproximadamente 1/3 do backlog';
                 else fractionText = 'menos de 1/3 do backlog';
 
-                return `⚠️ <strong>Conclusão:</strong> Com os dados atuais, você <strong>NÃO conseguirá</strong> completar os ${backlog} itens em ${daysToDeadline} dias. Prepare-se para entregar ${fractionText} com boa confiança.`;
+                return `⚠️ <strong>Conclusão:</strong> Com os dados atuais, você <strong>NÃO conseguirá</strong> completar todos os ${backlog} itens no prazo. Prepare-se para entregar ${fractionText} (${percentageP85}%) com boa confiança (P85).`;
             }
         }
 

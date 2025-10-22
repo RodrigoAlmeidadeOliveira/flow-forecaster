@@ -666,7 +666,9 @@ def api_deadline_analysis():
         completion_date_p50 = completion_forecast.get('date_p50', '')
 
         # Calculate percentages - DON'T limit to 100% to show real values
-        scope_completion_pct_raw = (weeks_to_deadline / projected_weeks_p85 * 100) if projected_weeks_p85 > 0 else 100
+        # scope_completion_pct = how much of the BACKLOG will be completed by the deadline
+        scope_completion_pct_raw = (projected_work_p85 / backlog * 100) if backlog > 0 else 100
+        # deadline_completion_pct = how much of the DEADLINE TIME will be used
         deadline_completion_pct_raw = (projected_weeks_p85 / weeks_to_deadline * 100) if weeks_to_deadline > 0 else 100
 
         mc_result = {

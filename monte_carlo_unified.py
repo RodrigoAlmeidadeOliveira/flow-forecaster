@@ -987,10 +987,15 @@ def analyze_deadline(
     # Calculate how much work can be done by deadline
     # Run reverse simulation: how much work in N weeks?
     work_by_deadline_result = forecast_how_many(tp_samples, start_date, deadline_date, n_simulations)
-    projected_work_p85 = work_by_deadline_result['items_p85']
+    items_possible_p85 = work_by_deadline_result['items_p85']
+
+    # Projected work is LIMITED by the backlog (can't deliver more than what exists)
+    projected_work_p85 = min(items_possible_p85, backlog)
 
     # Calculate percentages - DON'T limit to 100% to show real values
-    scope_completion_pct_raw = (weeks_to_deadline / projected_weeks_p85 * 100) if projected_weeks_p85 > 0 else 100
+    # scope_completion_pct = how much of the BACKLOG will be completed by the deadline
+    scope_completion_pct_raw = (projected_work_p85 / backlog * 100) if backlog > 0 else 100
+    # deadline_completion_pct = how much of the DEADLINE TIME will be used
     deadline_completion_pct_raw = (projected_weeks_p85 / weeks_to_deadline * 100) if weeks_to_deadline > 0 else 100
 
     return {
