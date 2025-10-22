@@ -1187,6 +1187,73 @@ def api_cost_analysis():
 # Print registered routes for debugging
 print("="*60, flush=True)
 print(f"Total routes registered: {len(list(app.url_map.iter_rules()))}", flush=True)
+@app.route('/api/dependency-analysis', methods=['POST'])
+def dependency_analysis():
+    """
+    Analyze dependencies and their impact on project delivery.
+
+    Expected JSON payload:
+    {
+        "dependencies": [
+            {
+                "id": "DEP-001",
+                "name": "API Service",
+                "source_project": "Mobile App",
+                "target_project": "Backend Team",
+                "on_time_probability": 0.7,
+                "delay_impact_days": 10,
+                "criticality": "HIGH"
+            }
+        ],
+        "num_simulations": 10000 (optional)
+    }
+
+    Returns:
+        JSON with dependency analysis results
+    """
+    try:
+        from dependency_analyzer import DependencyAnalyzer, create_dependencies_from_dict
+
+        data = request.json
+        dependencies_data = data.get('dependencies', [])
+
+        if not dependencies_data:
+            return jsonify({
+                'error': 'No dependencies provided'
+            }), 400
+
+        # Validate dependency structure
+        for dep in dependencies_data:
+            required_fields = ['id', 'name', 'source_project', 'target_project']
+            for field in required_fields:
+                if field not in dep:
+                    return jsonify({
+                        'error': f'Dependency missing required field: {field}'
+                    }), 400
+
+        # Create dependency objects
+        dependencies = create_dependencies_from_dict(dependencies_data)
+
+        # Create analyzer
+        analyzer = DependencyAnalyzer(dependencies)
+
+        # Run analysis
+        num_simulations = data.get('num_simulations', 10000)
+        result = analyzer.analyze(num_simulations=num_simulations)
+
+        # Convert to JSON-serializable format
+        return jsonify(convert_to_native_types(result.to_dict()))
+
+    except ImportError:
+        return jsonify({
+            'error': 'Dependency analysis module not available'
+        }), 500
+    except Exception as e:
+        return jsonify({
+            'error': f'Error analyzing dependencies: {str(e)}'
+        }), 500
+
+
 for rule in app.url_map.iter_rules():
     print(f"  {rule.endpoint:30s} {rule.rule}", flush=True)
 print("="*60, flush=True)

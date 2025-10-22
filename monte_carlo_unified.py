@@ -14,6 +14,14 @@ from scipy.special import gammaln
 from typing import List, Dict, Any, Optional, Tuple
 from dataclasses import dataclass
 
+# Import dependency analyzer
+try:
+    from dependency_analyzer import DependencyAnalyzer, Dependency, create_dependencies_from_dict
+    DEPENDENCY_ANALYSIS_AVAILABLE = True
+except ImportError:
+    DEPENDENCY_ANALYSIS_AVAILABLE = False
+    print("Warning: dependency_analyzer not available. Dependency analysis will be disabled.")
+
 
 # ============================================================================
 # UTILITY FUNCTIONS (from monte_carlo.js)
@@ -400,6 +408,16 @@ def simulate_burn_down(simulation_data: Dict[str, Any]) -> Dict[str, Any]:
     burn_down = []
     remaining_tasks = total_tasks
 
+    # Get dependency delays from simulation data (if provided)
+    dependency_delays = simulation_data.get('dependency_delays', [])
+    total_dependency_delay = 0
+
+    # Check if this simulation should include dependency delays
+    # (delays are sampled once per simulation, not per week)
+    if dependency_delays and len(dependency_delays) > 0:
+        # Use pre-calculated delay from dependency analyzer
+        total_dependency_delay = random.choice(dependency_delays)
+
     # Run the simulation
     while remaining_tasks > 0:
         burn_down.append(math.ceil(remaining_tasks))
@@ -429,6 +447,11 @@ def simulate_burn_down(simulation_data: Dict[str, Any]) -> Dict[str, Any]:
         week_number += 1
         effort_weeks += contributors_this_week
 
+    # Add dependency delays (converted from days to weeks)
+    if total_dependency_delay > 0:
+        dependency_delay_weeks = math.ceil(total_dependency_delay / 7)
+        duration_in_calendar_weeks += dependency_delay_weeks
+
     burn_down.append(0)
 
     return {
@@ -457,6 +480,7 @@ def run_monte_carlo_simulation(simulation_data: Dict[str, Any]) -> Dict[str, Any
             - minContributors: Minimum active contributors
             - maxContributors: Maximum active contributors
             - sCurveSize: S-curve size percentage (0-50)
+            - dependencies: List of dependency dictionaries (optional)
 
     Returns:
         Result of the simulation with:
@@ -467,6 +491,7 @@ def run_monte_carlo_simulation(simulation_data: Dict[str, Any]) -> Dict[str, Any
         - tpErrorRate: Throughput error rate
         - ltErrorRate: Lead-time error rate
         - resultsTable: Full probability table
+        - dependency_analysis: Dependency analysis results (if dependencies provided)
     """
     # Create a copy to avoid modifying the original
     simulation_data = simulation_data.copy()
@@ -482,6 +507,31 @@ def run_monte_carlo_simulation(simulation_data: Dict[str, Any]) -> Dict[str, Any
     # Pre-create Weibull fitter (once for all simulations) - PERFORMANCE OPTIMIZATION
     tp_samples = simulation_data['tpSamples']
     simulation_data['weibull_fitter'] = WeibullFitter(np.array(tp_samples))
+
+    # Process dependencies if provided
+    dependency_analysis_result = None
+    if DEPENDENCY_ANALYSIS_AVAILABLE and 'dependencies' in simulation_data and len(simulation_data['dependencies']) > 0:
+        try:
+            # Create dependency objects from dict
+            dependencies = create_dependencies_from_dict(simulation_data['dependencies'])
+
+            # Create analyzer
+            analyzer = DependencyAnalyzer(dependencies)
+
+            # Run dependency analysis
+            dependency_analysis_result = analyzer.analyze(
+                num_simulations=simulation_data['numberOfSimulations']
+            )
+
+            # Get simulated delays and add to simulation_data
+            sim_results = analyzer.simulate_dependency_delays(simulation_data['numberOfSimulations'])
+            simulation_data['dependency_delays'] = sim_results['simulated_delays'].tolist()
+
+        except Exception as e:
+            print(f"Warning: Error processing dependencies: {e}")
+            simulation_data['dependency_delays'] = []
+    else:
+        simulation_data['dependency_delays'] = []
 
     number_of_simulations = simulation_data['numberOfSimulations']
     burn_downs = []
@@ -537,7 +587,7 @@ def run_monte_carlo_simulation(simulation_data: Dict[str, Any]) -> Dict[str, Any
     throughput_stats = describe_throughput_samples(simulation_data.get('tpSamples', []))
     lead_time_stats = describe_lead_time_samples(simulation_data.get('ltSamples', []))
 
-    return {
+    result = {
         'simulations': simulations,
         'burnDowns': burn_downs,
         'completion_times': completion_times,
@@ -550,6 +600,12 @@ def run_monte_carlo_simulation(simulation_data: Dict[str, Any]) -> Dict[str, Any
             'lead_time': lead_time_stats
         }
     }
+
+    # Add dependency analysis results if available
+    if dependency_analysis_result is not None:
+        result['dependency_analysis'] = dependency_analysis_result.to_dict()
+
+    return result
 
 
 # ============================================================================

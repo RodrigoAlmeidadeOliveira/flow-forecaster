@@ -27,13 +27,20 @@ except ImportError:
     XGBOOST_AVAILABLE = False
     warnings.warn("XGBoost not available. Install with: pip install xgboost")
 
+# Import dependency analyzer
+try:
+    from dependency_analyzer import DependencyAnalyzer, create_dependencies_from_dict
+    DEPENDENCY_ANALYSIS_AVAILABLE = True
+except ImportError:
+    DEPENDENCY_ANALYSIS_AVAILABLE = False
+
 warnings.filterwarnings('ignore')
 
 
 class MLForecaster:
     """Machine Learning forecasting for throughput prediction"""
 
-    def __init__(self, max_lag: int = 4, n_splits: int = 5, validation_size: float = 0.2):
+    def __init__(self, max_lag: int = 4, n_splits: int = 5, validation_size: float = 0.2, dependencies: Optional[List[Dict]] = None):
         """
         Initialize ML Forecaster.
 
@@ -41,14 +48,21 @@ class MLForecaster:
             max_lag: Number of lag features to use
             n_splits: Number of K-folds for cross-validation (default: 5)
             validation_size: Proportion of data for validation set (default: 0.2 = 20%)
+            dependencies: Optional list of dependency dictionaries for impact analysis
         """
         self.max_lag = max_lag
         self.n_splits = n_splits
         self.validation_size = validation_size
+        self.dependencies = dependencies
+        self.dependency_impact = 0.0  # Expected delay impact from dependencies
         self.models = {}
         self.results = {}
         self.cv_scores = {}
         self.trained = False
+
+        # Analyze dependencies if provided
+        if DEPENDENCY_ANALYSIS_AVAILABLE and dependencies:
+            self._analyze_dependencies()
 
     def prepare_features(self, data: np.ndarray) -> Tuple[pd.DataFrame, pd.Series]:
         """
@@ -84,6 +98,32 @@ class MLForecaster:
         y = df_clean['y']
 
         return X, y
+
+    def _analyze_dependencies(self):
+        """
+        Analyze dependencies and calculate expected delay impact.
+        This impact is used to adjust forecasts.
+        """
+        try:
+            deps = create_dependencies_from_dict(self.dependencies)
+            analyzer = DependencyAnalyzer(deps)
+
+            # Quick analysis to get expected delay
+            result = analyzer.analyze(num_simulations=1000)
+
+            # Store expected delay in weeks
+            self.dependency_impact = result.expected_delay_days / 7.0
+            self.dependency_analysis = result
+
+            print(f"Dependency Analysis:")
+            print(f"  - Total dependencies: {result.total_dependencies}")
+            print(f"  - On-time probability: {result.on_time_probability*100:.1f}%")
+            print(f"  - Expected delay: {result.expected_delay_days:.1f} days ({self.dependency_impact:.1f} weeks)")
+            print(f"  - Risk level: {result.risk_level}")
+
+        except Exception as e:
+            print(f"Warning: Could not analyze dependencies: {e}")
+            self.dependency_impact = 0.0
 
     def train_models(self, data: np.ndarray, use_kfold_cv: bool = True):
         """
@@ -527,19 +567,20 @@ class MLForecaster:
 
         return np.array(predictions, dtype=float)
 
-    def get_ensemble_forecast(self, forecasts: Dict[str, np.ndarray]) -> Dict[str, np.ndarray]:
+    def get_ensemble_forecast(self, forecasts: Dict[str, np.ndarray], apply_dependency_impact: bool = True) -> Dict[str, np.ndarray]:
         """
         Calculate ensemble statistics from multiple model forecasts.
 
         Args:
             forecasts: Dictionary of forecasts from different models
+            apply_dependency_impact: If True, adjusts forecasts with dependency delays
 
         Returns:
-            Dictionary with ensemble statistics
+            Dictionary with ensemble statistics (optionally adjusted for dependencies)
         """
         all_forecasts = np.array(list(forecasts.values()))
 
-        return {
+        ensemble = {
             'mean': np.mean(all_forecasts, axis=0),
             'median': np.median(all_forecasts, axis=0),
             'p10': np.percentile(all_forecasts, 10, axis=0),
@@ -548,6 +589,47 @@ class MLForecaster:
             'p90': np.percentile(all_forecasts, 90, axis=0),
             'std': np.std(all_forecasts, axis=0)
         }
+
+        # Apply dependency impact if requested
+        if apply_dependency_impact and self.dependency_impact > 0:
+            ensemble = self._adjust_forecast_for_dependencies(ensemble)
+
+        return ensemble
+
+    def _adjust_forecast_for_dependencies(self, forecast: Dict[str, np.ndarray]) -> Dict[str, np.ndarray]:
+        """
+        Adjust forecast to account for dependency delays.
+
+        The adjustment converts the expected dependency delay (in weeks) into
+        an adjustment factor that extends the timeline of the forecast.
+
+        Args:
+            forecast: Dictionary with forecast statistics
+
+        Returns:
+            Adjusted forecast dictionary with dependency impact included
+        """
+        adjusted = {}
+
+        # For each statistic, adjust by dependency impact
+        # Since dependency delays extend the timeline, we adjust percentiles upward
+        # The adjustment is based on the expected delay in weeks
+        delay_factor = 1.0 + (self.dependency_impact / max(1, len(forecast.get('mean', [1]))))
+
+        for key, values in forecast.items():
+            if key == 'std':
+                # Standard deviation also increases with uncertainty from dependencies
+                adjusted[key] = values * delay_factor
+            else:
+                # Other statistics: apply multiplicative adjustment
+                # This effectively extends the forecast timeline
+                adjusted[key] = values * delay_factor
+
+        # Store original forecast for comparison
+        adjusted['original'] = forecast
+        adjusted['dependency_impact_weeks'] = self.dependency_impact
+
+        return adjusted
 
     def get_results_summary(self) -> List[Dict]:
         """Get summary of model training results with K-Fold CV metrics."""
