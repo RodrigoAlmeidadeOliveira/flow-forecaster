@@ -510,9 +510,9 @@ def run_monte_carlo_simulation(simulation_data: Dict[str, Any]) -> Dict[str, Any
 
     # Process dependencies if provided
     dependency_analysis_result = None
-    print(f"[INFO monte_carlo] DEPENDENCY_ANALYSIS_AVAILABLE: {DEPENDENCY_ANALYSIS_AVAILABLE}", flush=True)
-    print(f"[INFO monte_carlo] 'dependencies' in simulation_data: {'dependencies' in simulation_data}", flush=True)
-    print(f"[INFO monte_carlo] len(dependencies): {len(simulation_data.get('dependencies', []))}", flush=True)
+    print(f"[INFO monte_carlo v2.0] DEPENDENCY_ANALYSIS_AVAILABLE: {DEPENDENCY_ANALYSIS_AVAILABLE}", flush=True)
+    print(f"[INFO monte_carlo v2.0] 'dependencies' in simulation_data: {'dependencies' in simulation_data}", flush=True)
+    print(f"[INFO monte_carlo v2.0] len(dependencies): {len(simulation_data.get('dependencies', []))}", flush=True)
 
     if DEPENDENCY_ANALYSIS_AVAILABLE and 'dependencies' in simulation_data and len(simulation_data['dependencies']) > 0:
         print(f"[INFO monte_carlo] Starting dependency analysis for {len(simulation_data['dependencies'])} dependencies", flush=True)
