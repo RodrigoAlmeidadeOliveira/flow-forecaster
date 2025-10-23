@@ -1122,14 +1122,18 @@ $(window).on("load", function () {
 
     function displayDependencyTab(depAnalysis, simulationData) {
         // Populate the dependency analysis tab
+        console.log('displayDependencyTab called', depAnalysis, simulationData);
         const $tabResults = $('#dependencyTabResults');
         const $tabEmpty = $('#dependencyTabEmpty');
 
         if (!depAnalysis || depAnalysis.total_dependencies === 0) {
+            console.log('No dependencies or total = 0, showing empty state');
             $tabResults.hide();
             $tabEmpty.show();
             return;
         }
+
+        console.log('Showing dependency results in tab');
 
         $tabEmpty.hide();
         $tabResults.show();
