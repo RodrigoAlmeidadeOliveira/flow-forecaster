@@ -1116,6 +1116,90 @@ $(window).on("load", function () {
         // Display dependency analysis if available
         if (result.dependency_analysis) {
             displayDependencyResults(result.dependency_analysis);
+            displayDependencyTab(result.dependency_analysis, simulationData);
+        }
+    }
+
+    function displayDependencyTab(depAnalysis, simulationData) {
+        // Populate the dependency analysis tab
+        const $tabResults = $('#dependencyTabResults');
+        const $tabEmpty = $('#dependencyTabEmpty');
+
+        if (!depAnalysis || depAnalysis.total_dependencies === 0) {
+            $tabResults.hide();
+            $tabEmpty.show();
+            return;
+        }
+
+        $tabEmpty.hide();
+        $tabResults.show();
+
+        // Populate metrics (same as main results)
+        const onTimeProb = (depAnalysis.on_time_probability * 100).toFixed(1);
+        $('#dep-tab-on-time-prob').text(onTimeProb + '%');
+        $('#dep-tab-odds-ratio').text(depAnalysis.odds_ratio || '');
+
+        const expectedDelay = depAnalysis.expected_delay_days.toFixed(1);
+        $('#dep-tab-expected-delay').text(expectedDelay + ' dias');
+
+        // Set risk level color
+        const riskLevel = depAnalysis.risk_level;
+        const riskColors = {
+            'LOW': '#28a745',
+            'MEDIUM': '#ffc107',
+            'HIGH': '#fd7e14',
+            'CRITICAL': '#dc3545'
+        };
+        const riskColor = riskColors[riskLevel] || '#6c757d';
+        $('#dep-tab-risk-level').text(riskLevel).css('color', riskColor);
+        $('#dep-tab-risk-score').text(`Score: ${depAnalysis.risk_score.toFixed(0)}/100`);
+
+        $('#dep-tab-total').text(depAnalysis.total_dependencies);
+
+        // Critical path
+        const $criticalPath = $('#dep-tab-critical-path');
+        $criticalPath.empty();
+        if (depAnalysis.critical_path && depAnalysis.critical_path.length > 0) {
+            depAnalysis.critical_path.forEach(dep => {
+                $criticalPath.append(`<li class="list-group-item">${dep}</li>`);
+            });
+        } else {
+            $criticalPath.append('<li class="list-group-item text-muted">Nenhuma dependência crítica</li>');
+        }
+
+        // Recommendations
+        const $recommendations = $('#dep-tab-recommendations');
+        $recommendations.empty();
+        if (depAnalysis.recommendations && depAnalysis.recommendations.length > 0) {
+            depAnalysis.recommendations.slice(0, 5).forEach(rec => {
+                $recommendations.append(`<li class="list-group-item">${rec}</li>`);
+            });
+        } else {
+            $recommendations.append('<li class="list-group-item text-muted">Sem recomendações</li>');
+        }
+
+        // Request visualization from backend
+        if (simulationData.dependencies && simulationData.dependencies.length > 0) {
+            $.ajax({
+                url: '/api/visualize-dependencies',
+                method: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({
+                    dependency_analysis: depAnalysis,
+                    dependencies: simulationData.dependencies
+                }),
+                success: function(response) {
+                    if (response.image) {
+                        $('#dep-tab-visualization-image').attr('src', 'data:image/png;base64,' + response.image);
+                    }
+                },
+                error: function(xhr) {
+                    console.error('Error generating visualization:', xhr);
+                    $('#dep-tab-visualization-container').html(
+                        '<div class="alert alert-warning">Não foi possível gerar a visualização</div>'
+                    );
+                }
+            });
         }
     }
 

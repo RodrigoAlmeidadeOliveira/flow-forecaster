@@ -219,6 +219,9 @@
 <li class="nav-item">
 <a aria-controls="cost-analysis" aria-selected="false" class="nav-link" data-toggle="tab" href="#cost-analysis" id="tab-cost-link" role="tab" data-i18n="tab_cost">Análise de Custos</a>
 </li>
+<li class="nav-item">
+<a aria-controls="dependency-analysis-tab" aria-selected="false" class="nav-link" data-toggle="tab" href="#dependency-analysis-tab" id="tab-dependency-link" role="tab" data-i18n="tab_dependency">Análise de Dependências</a>
+</li>
 </ul>
 <div class="tab-content" id="forecastTabsContent">
 <div aria-labelledby="tab-mc-link" class="tab-pane fade show active" id="mc-forecast" role="tabpanel">
@@ -1619,6 +1622,120 @@ Histograma mostrando a distribuição de probabilidade do esforço estimado usan
 </div>
 </div>
 </div>
+</div>
+</div>
+</div>
+</div>
+<div aria-labelledby="tab-dependency-link" class="tab-pane fade" id="dependency-analysis-tab" role="tabpanel">
+<div class="pt-4 pb-5">
+<div class="container text-center">
+<h2>📊 Análise de Impacto de Dependências</h2>
+<p class="mb-4 text-muted">
+Visualização completa do impacto de dependências no projeto.
+Adicione dependências no formulário principal e execute a simulação para ver os resultados aqui.
+</p>
+</div>
+
+<!-- Key Insight -->
+<div class="container-fluid bg-6 text-center mb-4">
+<div class="alert alert-info">
+<h4><i class="fas fa-lightbulb"></i> Insight Chave: O Problema 2^n</h4>
+<p class="mb-2">
+Para cada dependência, existe uma chance de atraso. Com <strong>n dependências</strong>,
+a probabilidade de todas serem entregues no prazo é de <strong>1 em 2^n</strong>.
+</p>
+<p class="mb-3">
+<strong><i class="fas fa-exclamation-triangle"></i> Cada dependência removida DOBRA suas chances de sucesso!</strong>
+</p>
+<div class="row text-center">
+<div class="col-md-4">
+<strong>1 dependência</strong><br>50% chance (1/2)
+</div>
+<div class="col-md-4">
+<strong>3 dependências</strong><br>12.5% chance (1/8)
+</div>
+<div class="col-md-4">
+<strong>7 dependências</strong><br>0.78% chance (1/128)
+</div>
+</div>
+</div>
+</div>
+
+<!-- Results Section -->
+<div id="dependencyTabResults" style="display: none;">
+<!-- Key Metrics -->
+<div class="container-fluid bg-6 text-center mb-4">
+<h3 class="mb-4">Métricas Principais</h3>
+<div class="row">
+<div class="col-md-3">
+<div class="card text-center mb-3">
+<div class="card-body">
+<h6 class="card-subtitle mb-2 text-muted">Prob. On-Time</h6>
+<h3 class="card-title" id="dep-tab-on-time-prob" style="color: #dc3545;">-</h3>
+<p class="small text-muted" id="dep-tab-odds-ratio">-</p>
+</div>
+</div>
+</div>
+<div class="col-md-3">
+<div class="card text-center mb-3">
+<div class="card-body">
+<h6 class="card-subtitle mb-2 text-muted">Atraso Esperado</h6>
+<h3 class="card-title" id="dep-tab-expected-delay" style="color: #ffc107;">-</h3>
+<p class="small text-muted">Média dos cenários</p>
+</div>
+</div>
+</div>
+<div class="col-md-3">
+<div class="card text-center mb-3">
+<div class="card-body">
+<h6 class="card-subtitle mb-2 text-muted">Nível de Risco</h6>
+<h3 class="card-title" id="dep-tab-risk-level" style="color: #6c757d;">-</h3>
+<p class="small text-muted" id="dep-tab-risk-score">-</p>
+</div>
+</div>
+</div>
+<div class="col-md-3">
+<div class="card text-center mb-3">
+<div class="card-body">
+<h6 class="card-subtitle mb-2 text-muted">Total Dependências</h6>
+<h3 class="card-title" id="dep-tab-total" style="color: #17a2b8;">-</h3>
+<p class="small text-muted">Removendo 1 dobra a chance!</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+<!-- Visualization -->
+<div class="container-fluid bg-6 text-center mb-4">
+<h3 class="mb-4">Visualização Completa</h3>
+<div id="dep-tab-visualization-container" class="bg-white p-4 rounded">
+<img id="dep-tab-visualization-image" src="" alt="Análise de Dependências" class="img-fluid rounded" style="max-width: 100%; height: auto;">
+</div>
+</div>
+
+<!-- Critical Path and Recommendations -->
+<div class="container-fluid bg-6 text-center mb-4">
+<div class="row">
+<div class="col-md-6">
+<h4><i class="fas fa-exclamation-triangle"></i> Caminho Crítico</h4>
+<ul id="dep-tab-critical-path" class="list-group text-left">
+</ul>
+</div>
+<div class="col-md-6">
+<h4><i class="fas fa-lightbulb"></i> Recomendações</h4>
+<ul id="dep-tab-recommendations" class="list-group text-left">
+</ul>
+</div>
+</div>
+</div>
+</div>
+
+<!-- Empty State -->
+<div id="dependencyTabEmpty" class="container-fluid bg-6 text-center">
+<div class="alert alert-warning">
+<h4><i class="fas fa-info-circle"></i> Nenhuma dependência configurada</h4>
+<p>Adicione dependências no formulário principal (aba Monte Carlo) e execute a simulação para ver os resultados aqui.</p>
 </div>
 </div>
 </div>
