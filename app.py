@@ -765,6 +765,11 @@ def api_deadline_analysis():
         ml_result = None
         if len(tp_samples) >= 8:
             try:
+                # Extract dependencies from simulation_data if available
+                dependencies = None
+                if simulation_data:
+                    dependencies = simulation_data.get('dependencies')
+
                 ml_result = ml_analyze_deadline(
                     tp_samples=tp_samples,
                     backlog=backlog,
@@ -776,7 +781,8 @@ def api_deadline_analysis():
                     s_curve_size=s_curve_size,
                     lt_samples=lt_samples,
                     split_rate_samples=split_rate_samples,
-                    n_simulations=min(n_simulations, 1000)
+                    n_simulations=min(n_simulations, 1000),
+                    dependencies=dependencies
                 )
             except Exception as e:
                 ml_result = {'error': str(e)}

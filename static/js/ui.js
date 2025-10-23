@@ -1507,6 +1507,10 @@ $(window).on("load", function () {
         // Machine Learning comparison (se disponível)
         let mlComparisonHtml = '';
         if (ml && !ml.error) {
+            const mlDependencyHtml = ml.dependency_impact_days > 0
+                ? `<p class="mb-1 text-muted small"><em>Includes dependency impact: +${ml.dependency_impact_days} days</em></p>`
+                : '';
+
             mlComparisonHtml = `
                 <div class="col-lg-12 mt-3">
                     <div class="card">
@@ -1529,6 +1533,7 @@ $(window).on("load", function () {
                                     <p class="mb-1"><strong>P50 completion:</strong> ${formatWeeks(mlWeeks.p50)} weeks</p>
                                     <p class="mb-1"><strong>Projected work (P85):</strong> ${ml.projected_work_p85 ?? '—'} tasks</p>
                                     <p class="mb-1"><strong>Projected effort (P85):</strong> ${ml.projected_effort_p85 ?? '—'} person-weeks</p>
+                                    ${mlDependencyHtml}
                                     <div class="mt-2">${verdictBadge(ml.can_meet_deadline)}</div>
                                 </div>
                             </div>

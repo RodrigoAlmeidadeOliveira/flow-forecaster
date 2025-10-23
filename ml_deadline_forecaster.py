@@ -31,7 +31,8 @@ class MLDeadlineForecaster:
                  max_contributors: Optional[int] = None,
                  s_curve_size: int = 0,
                  lt_samples: Optional[List[float]] = None,
-                 split_rate_samples: Optional[List[float]] = None):
+                 split_rate_samples: Optional[List[float]] = None,
+                 dependencies: Optional[List[Dict]] = None):
         """
         Initialize ML Deadline Forecaster with project parameters.
 
@@ -43,6 +44,7 @@ class MLDeadlineForecaster:
             s_curve_size: S-curve percentage (0-50)
             lt_samples: Lead time samples in days
             split_rate_samples: Split rate samples
+            dependencies: List of dependency dictionaries (optional)
         """
         self.tp_samples = tp_samples
         self.team_size = team_size if team_size is not None else 1
@@ -51,9 +53,10 @@ class MLDeadlineForecaster:
         self.s_curve_size = s_curve_size if s_curve_size is not None else 0
         self.lt_samples = lt_samples or []
         self.split_rate_samples = split_rate_samples or []
+        self.dependencies = dependencies
 
-        # Initialize ML forecaster with K-Fold CV protocol
-        self.ml_forecaster = MLForecaster(max_lag=4, n_splits=5, validation_size=0.2)
+        # Initialize ML forecaster with K-Fold CV protocol and dependencies
+        self.ml_forecaster = MLForecaster(max_lag=4, n_splits=5, validation_size=0.2, dependencies=dependencies)
 
         # Cache for trained models to avoid retraining
         self._models_trained = False
@@ -264,7 +267,8 @@ def ml_analyze_deadline(
     lt_samples: Optional[List[float]] = None,
     split_rate_samples: Optional[List[float]] = None,
     forecast_weeks: int = 20,
-    n_simulations: int = 1000
+    n_simulations: int = 1000,
+    dependencies: Optional[List[Dict]] = None
 ) -> Dict[str, Any]:
     """
     ML-based deadline analysis with team dynamics.
@@ -282,6 +286,7 @@ def ml_analyze_deadline(
         split_rate_samples: Split rate samples
         forecast_weeks: Number of weeks to forecast
         n_simulations: Number of simulations
+        dependencies: List of dependency dictionaries (optional)
 
     Returns:
         Deadline analysis with ML forecasts
@@ -315,7 +320,8 @@ def ml_analyze_deadline(
         max_contributors=max_contributors,
         s_curve_size=s_curve_size,
         lt_samples=lt_samples,
-        split_rate_samples=split_rate_samples
+        split_rate_samples=split_rate_samples,
+        dependencies=dependencies
     )
 
     # Run ML simulation (this will train models once)
@@ -351,7 +357,7 @@ def ml_analyze_deadline(
     scope_completion_pct_raw = (weeks_to_deadline / projected_weeks_p85 * 100) if projected_weeks_p85 > 0 else 100
     deadline_completion_pct_raw = (projected_weeks_p85 / weeks_to_deadline * 100) if weeks_to_deadline > 0 else 100
 
-    return {
+    ml_result = {
         'deadline_date': deadline.strftime('%d/%m/%Y'),
         'start_date': start.strftime('%d/%m/%Y'),
         'weeks_to_deadline': round(weeks_to_deadline, 1),
@@ -369,6 +375,13 @@ def ml_analyze_deadline(
         'ml_models': result['ml_results'],
         'forecast_method': 'Machine Learning + Team Dynamics'
     }
+
+    # Add dependency impact information if available
+    if forecaster.dependencies and forecaster.ml_forecaster.dependency_impact > 0:
+        ml_result['dependency_impact_weeks'] = round(forecaster.ml_forecaster.dependency_impact, 2)
+        ml_result['dependency_impact_days'] = round(forecaster.ml_forecaster.dependency_impact * 7, 1)
+
+    return ml_result
 
 
 def ml_forecast_how_many(
