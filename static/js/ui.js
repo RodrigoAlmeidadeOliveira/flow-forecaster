@@ -1114,9 +1114,18 @@ $(window).on("load", function () {
         }
 
         // Display dependency analysis if available
+        console.log('Checking for dependency_analysis in result:', result.dependency_analysis);
+        console.log('simulationData.dependencies:', simulationData.dependencies);
+
         if (result.dependency_analysis) {
+            console.log('dependency_analysis found, displaying results');
             displayDependencyResults(result.dependency_analysis);
             displayDependencyTab(result.dependency_analysis, simulationData);
+        } else {
+            console.log('No dependency_analysis in result');
+            // Show empty state in tab
+            $('#dependencyTabResults').hide();
+            $('#dependencyTabEmpty').show();
         }
     }
 
