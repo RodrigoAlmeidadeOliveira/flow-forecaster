@@ -914,6 +914,10 @@ $(window).on("load", function () {
         const simulationData = readSimulationData();
         if (!simulationData) return;
 
+        // DEBUG: Log what we're sending to backend
+        console.log('[DEBUG] simulationData being sent:', simulationData);
+        console.log('[DEBUG] simulationData.dependencies:', simulationData.dependencies);
+
         if (window.renderInputStats) {
             window.renderInputStats('#input-stats', null);
         }
