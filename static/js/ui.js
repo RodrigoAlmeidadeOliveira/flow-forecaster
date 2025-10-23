@@ -1114,10 +1114,16 @@ $(window).on("load", function () {
         }
 
         // Display dependency analysis if available
+        console.log('[DEBUG] Checking for dependency_analysis in result:', result.dependency_analysis);
+        console.log('[DEBUG] simulationData.dependencies:', simulationData.dependencies);
+        console.log('[DEBUG] result keys:', Object.keys(result));
+
         if (result.dependency_analysis) {
+            console.log('[DEBUG] dependency_analysis found, displaying results');
             displayDependencyResults(result.dependency_analysis);
             displayDependencyTab(result.dependency_analysis, simulationData);
         } else {
+            console.log('[DEBUG] No dependency_analysis in result');
             // Show empty state in tab
             $('#dependencyTabResults').hide();
             $('#dependencyTabEmpty').show();

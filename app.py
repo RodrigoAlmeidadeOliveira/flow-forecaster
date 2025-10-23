@@ -191,9 +191,21 @@ def simulate():
         simulation_data['ltSamples'] = simulation_data.get('ltSamples', [])
         simulation_data['splitRateSamples'] = split_rate_samples
         simulation_data['risks'] = simulation_data.get('risks', [])
+        simulation_data['dependencies'] = simulation_data.get('dependencies', [])
+
+        # Debug: log dependencies
+        print(f"[INFO] Received {len(simulation_data['dependencies'])} dependencies", flush=True)
+        if simulation_data['dependencies']:
+            print(f"[INFO] First dependency: {simulation_data['dependencies'][0]}", flush=True)
 
         # Run the simulation
         result = run_monte_carlo_simulation(simulation_data)
+
+        # Debug: check if dependency_analysis is in result
+        if 'dependency_analysis' in result:
+            print(f"[INFO] dependency_analysis is in result with {result['dependency_analysis']['total_dependencies']} deps", flush=True)
+        else:
+            print(f"[WARNING] dependency_analysis NOT in result. Result keys: {list(result.keys())}", flush=True)
 
         # Compute 30-day probability table for quick planning
         items_forecast_30_days = None

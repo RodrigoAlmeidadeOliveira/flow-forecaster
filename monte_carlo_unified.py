@@ -510,10 +510,16 @@ def run_monte_carlo_simulation(simulation_data: Dict[str, Any]) -> Dict[str, Any
 
     # Process dependencies if provided
     dependency_analysis_result = None
+    print(f"[INFO monte_carlo] DEPENDENCY_ANALYSIS_AVAILABLE: {DEPENDENCY_ANALYSIS_AVAILABLE}", flush=True)
+    print(f"[INFO monte_carlo] 'dependencies' in simulation_data: {'dependencies' in simulation_data}", flush=True)
+    print(f"[INFO monte_carlo] len(dependencies): {len(simulation_data.get('dependencies', []))}", flush=True)
+
     if DEPENDENCY_ANALYSIS_AVAILABLE and 'dependencies' in simulation_data and len(simulation_data['dependencies']) > 0:
+        print(f"[INFO monte_carlo] Starting dependency analysis for {len(simulation_data['dependencies'])} dependencies", flush=True)
         try:
             # Create dependency objects from dict
             dependencies = create_dependencies_from_dict(simulation_data['dependencies'])
+            print(f"[INFO monte_carlo] Created {len(dependencies)} dependency objects", flush=True)
 
             # Create analyzer
             analyzer = DependencyAnalyzer(dependencies)
@@ -522,17 +528,19 @@ def run_monte_carlo_simulation(simulation_data: Dict[str, Any]) -> Dict[str, Any
             dependency_analysis_result = analyzer.analyze(
                 num_simulations=simulation_data['numberOfSimulations']
             )
+            print(f"[INFO monte_carlo] Analysis completed! On-time probability: {dependency_analysis_result.on_time_probability:.2%}", flush=True)
 
             # Get simulated delays and add to simulation_data
             sim_results = analyzer.simulate_dependency_delays(simulation_data['numberOfSimulations'])
             simulation_data['dependency_delays'] = sim_results['simulated_delays'].tolist()
 
         except Exception as e:
-            print(f"Warning: Error processing dependencies: {e}")
+            print(f"[ERROR] Error processing dependencies: {e}", flush=True)
             import traceback
             traceback.print_exc()
             simulation_data['dependency_delays'] = []
     else:
+        print(f"[INFO monte_carlo] Skipping dependency analysis", flush=True)
         simulation_data['dependency_delays'] = []
 
     number_of_simulations = simulation_data['numberOfSimulations']
@@ -605,7 +613,11 @@ def run_monte_carlo_simulation(simulation_data: Dict[str, Any]) -> Dict[str, Any
 
     # Add dependency analysis results if available
     if dependency_analysis_result is not None:
+        print(f"[INFO monte_carlo] Adding dependency_analysis to result", flush=True)
         result['dependency_analysis'] = dependency_analysis_result.to_dict()
+        print(f"[INFO monte_carlo] dependency_analysis added successfully", flush=True)
+    else:
+        print(f"[WARNING monte_carlo] No dependency_analysis_result to add", flush=True)
 
     return result
 
