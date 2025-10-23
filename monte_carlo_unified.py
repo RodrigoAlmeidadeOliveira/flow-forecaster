@@ -510,15 +510,10 @@ def run_monte_carlo_simulation(simulation_data: Dict[str, Any]) -> Dict[str, Any
 
     # Process dependencies if provided
     dependency_analysis_result = None
-    print(f"[DEBUG monte_carlo] DEPENDENCY_ANALYSIS_AVAILABLE: {DEPENDENCY_ANALYSIS_AVAILABLE}")
-    print(f"[DEBUG monte_carlo] 'dependencies' in simulation_data: {'dependencies' in simulation_data}")
-    print(f"[DEBUG monte_carlo] Dependencies data: {simulation_data.get('dependencies', [])}")
     if DEPENDENCY_ANALYSIS_AVAILABLE and 'dependencies' in simulation_data and len(simulation_data['dependencies']) > 0:
-        print(f"[DEBUG monte_carlo] Processing {len(simulation_data['dependencies'])} dependencies...")
         try:
             # Create dependency objects from dict
             dependencies = create_dependencies_from_dict(simulation_data['dependencies'])
-            print(f"[DEBUG monte_carlo] Created {len(dependencies)} dependency objects")
 
             # Create analyzer
             analyzer = DependencyAnalyzer(dependencies)
@@ -527,12 +522,10 @@ def run_monte_carlo_simulation(simulation_data: Dict[str, Any]) -> Dict[str, Any
             dependency_analysis_result = analyzer.analyze(
                 num_simulations=simulation_data['numberOfSimulations']
             )
-            print(f"[DEBUG monte_carlo] Analysis completed: {dependency_analysis_result}")
 
             # Get simulated delays and add to simulation_data
             sim_results = analyzer.simulate_dependency_delays(simulation_data['numberOfSimulations'])
             simulation_data['dependency_delays'] = sim_results['simulated_delays'].tolist()
-            print(f"[DEBUG monte_carlo] Dependency analysis completed successfully")
 
         except Exception as e:
             print(f"Warning: Error processing dependencies: {e}")
@@ -540,7 +533,6 @@ def run_monte_carlo_simulation(simulation_data: Dict[str, Any]) -> Dict[str, Any
             traceback.print_exc()
             simulation_data['dependency_delays'] = []
     else:
-        print(f"[DEBUG monte_carlo] Skipping dependency analysis")
         simulation_data['dependency_delays'] = []
 
     number_of_simulations = simulation_data['numberOfSimulations']
@@ -613,10 +605,7 @@ def run_monte_carlo_simulation(simulation_data: Dict[str, Any]) -> Dict[str, Any
 
     # Add dependency analysis results if available
     if dependency_analysis_result is not None:
-        print(f"[DEBUG monte_carlo] Adding dependency_analysis to result")
         result['dependency_analysis'] = dependency_analysis_result.to_dict()
-    else:
-        print(f"[DEBUG monte_carlo] No dependency_analysis_result to add")
 
     return result
 

@@ -609,21 +609,24 @@
     Nome da Dependência
 </th>
 <th class="col-2" scope="col" data-i18n="dep_source">
-    Projeto Fonte
-</th>
+    Projeto Fonte (bloqueado)
+<a class="doc-hint-icon" href="#" data-toggle="tooltip" title="Projeto que está aguardando"><i class="fas fa-circle-question"></i></a></th>
 <th class="col-2" scope="col" data-i18n="dep_target">
-    Projeto Alvo
-</th>
+    Projeto Alvo (bloqueador)
+<a class="doc-hint-icon" href="#" data-toggle="tooltip" title="Projeto que precisa entregar primeiro"><i class="fas fa-circle-question"></i></a></th>
 <th class="col-2" scope="col"
     data-doc-tooltip="Probabilidade histórica de entrega no prazo (0-100%). Ex: se 7 de 10 entregas foram no prazo, use 70%">
     Prob. On-Time (%)
-<a class="doc-hint-icon" href="#" data-toggle="tooltip" title="Probabilidade histórica de entrega no prazo (0-100%)"><i class="fas fa-circle-question"></i></a></th>
+<a class="doc-hint-icon" href="#" data-toggle="tooltip" title="Ex: se 7 de 10 entregas foram no prazo, use 70"><i class="fas fa-circle-question"></i></a></th>
 <th class="col-2" scope="col"
     data-doc-tooltip="Impacto em dias se a dependência atrasar">
     Atraso (dias)
-<a class="doc-hint-icon" href="#" data-toggle="tooltip" title="Impacto em dias se a dependência atrasar"><i class="fas fa-circle-question"></i></a></th>
+<a class="doc-hint-icon" href="#" data-toggle="tooltip" title="Dias de atraso se falhar"><i class="fas fa-circle-question"></i></a></th>
 <th class="col-2" scope="col" data-i18n="dep_criticality">
     Criticidade
+</th>
+<th class="col-1" scope="col">
+    Ações
 </th>
 </tr>
 </thead>
@@ -633,24 +636,29 @@
 <input class="form-control form-control-sm" name="dep_name" placeholder="Ex: API Service" type="text"/>
 </td>
 <td class="col-2">
-<input class="form-control form-control-sm" name="dep_source" placeholder="Ex: Mobile App" type="text"/>
+<input class="form-control form-control-sm" name="dep_source" placeholder="Ex: Mobile App" type="text" title="Projeto que depende (bloqueado)"/>
 </td>
 <td class="col-2">
-<input class="form-control form-control-sm" name="dep_target" placeholder="Ex: Backend Team" type="text"/>
+<input class="form-control form-control-sm" name="dep_target" placeholder="Ex: Backend Team" type="text" title="Projeto do qual depende (bloqueador)"/>
 </td>
 <td class="col-2">
-<input class="form-control form-control-sm" name="dep_probability" placeholder="50" type="number" min="0" max="100" value="50"/>
+<input class="form-control form-control-sm" name="dep_probability" placeholder="50" type="number" min="0" max="100" value="50" title="Se 7 de 10 entregas foram no prazo, use 70"/>
 </td>
 <td class="col-2">
-<input class="form-control form-control-sm" name="dep_delay" placeholder="10" type="number" min="0" value="10"/>
+<input class="form-control form-control-sm" name="dep_delay" placeholder="10" type="number" min="0" value="10" title="Dias de atraso se falhar"/>
 </td>
 <td class="col-2">
-<select class="form-control form-control-sm" name="dep_criticality">
+<select class="form-control form-control-sm" name="dep_criticality" title="Nível de impacto no projeto">
 <option value="LOW">Baixa</option>
 <option value="MEDIUM" selected>Média</option>
 <option value="HIGH">Alta</option>
 <option value="CRITICAL">Crítica</option>
 </select>
+</td>
+<td class="col-1">
+<button class="btn btn-danger btn-sm remove-dependency" type="button" title="Remover esta dependência" onclick="$(this).closest('.dependency-row').remove();">
+<i class="fas fa-trash-alt"></i>
+</button>
 </td>
 </tr>
 <tr class="d-flex" id="add-dependency-row">
@@ -659,8 +667,11 @@
 <td class="col-2"></td>
 <td class="col-2"></td>
 <td class="col-2"></td>
-<td class="col-2">
-<button class="btn btn-secondary btn-sm" id="addDependency" type="button">Adicionar linha</button>
+<td class="col-2"></td>
+<td class="col-1">
+<button class="btn btn-success btn-sm" id="addDependency" type="button" title="Adicionar nova dependência">
+<i class="fas fa-plus"></i> Adicionar
+</button>
 </td>
 </tr>
 </tbody>
@@ -1665,41 +1676,41 @@ a probabilidade de todas serem entregues no prazo é de <strong>1 em 2^n</strong
 <div id="dependencyTabResults" style="display: none;">
 <!-- Key Metrics -->
 <div class="container-fluid bg-6 text-center mb-4">
-<h3 class="mb-4">Métricas Principais</h3>
+<h3 class="mb-4"><i class="fas fa-chart-line"></i> Métricas Principais</h3>
 <div class="row">
 <div class="col-md-3">
-<div class="card text-center mb-3">
+<div class="card text-center mb-3 border-danger">
 <div class="card-body">
-<h6 class="card-subtitle mb-2 text-muted">Prob. On-Time</h6>
+<h6 class="card-subtitle mb-2 text-muted"><i class="fas fa-clock"></i> Prob. On-Time</h6>
 <h3 class="card-title" id="dep-tab-on-time-prob" style="color: #dc3545;">-</h3>
 <p class="small text-muted" id="dep-tab-odds-ratio">-</p>
 </div>
 </div>
 </div>
 <div class="col-md-3">
-<div class="card text-center mb-3">
+<div class="card text-center mb-3 border-warning">
 <div class="card-body">
-<h6 class="card-subtitle mb-2 text-muted">Atraso Esperado</h6>
+<h6 class="card-subtitle mb-2 text-muted"><i class="fas fa-hourglass-half"></i> Atraso Esperado</h6>
 <h3 class="card-title" id="dep-tab-expected-delay" style="color: #ffc107;">-</h3>
 <p class="small text-muted">Média dos cenários</p>
 </div>
 </div>
 </div>
 <div class="col-md-3">
-<div class="card text-center mb-3">
+<div class="card text-center mb-3 border-secondary">
 <div class="card-body">
-<h6 class="card-subtitle mb-2 text-muted">Nível de Risco</h6>
+<h6 class="card-subtitle mb-2 text-muted"><i class="fas fa-shield-alt"></i> Nível de Risco</h6>
 <h3 class="card-title" id="dep-tab-risk-level" style="color: #6c757d;">-</h3>
 <p class="small text-muted" id="dep-tab-risk-score">-</p>
 </div>
 </div>
 </div>
 <div class="col-md-3">
-<div class="card text-center mb-3">
+<div class="card text-center mb-3 border-info">
 <div class="card-body">
-<h6 class="card-subtitle mb-2 text-muted">Total Dependências</h6>
+<h6 class="card-subtitle mb-2 text-muted"><i class="fas fa-link"></i> Total Dependências</h6>
 <h3 class="card-title" id="dep-tab-total" style="color: #17a2b8;">-</h3>
-<p class="small text-muted">Removendo 1 dobra a chance!</p>
+<p class="small text-muted"><i class="fas fa-info-circle"></i> Removendo 1 dobra a chance!</p>
 </div>
 </div>
 </div>

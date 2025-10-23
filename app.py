@@ -171,10 +171,6 @@ def simulate():
     try:
         simulation_data = request.json
 
-        # DEBUG: Log dependencies received
-        print(f"[DEBUG] Dependencies received: {simulation_data.get('dependencies', [])}")
-        print(f"[DEBUG] Number of dependencies: {len(simulation_data.get('dependencies', []))}")
-
         # Validation
         if not simulation_data.get('tpSamples') or not any(n >= 1 for n in simulation_data['tpSamples']):
             return jsonify({

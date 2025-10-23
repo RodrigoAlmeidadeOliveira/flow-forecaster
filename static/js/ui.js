@@ -914,10 +914,6 @@ $(window).on("load", function () {
         const simulationData = readSimulationData();
         if (!simulationData) return;
 
-        // DEBUG: Log what we're sending to backend
-        console.log('[DEBUG] simulationData being sent:', simulationData);
-        console.log('[DEBUG] simulationData.dependencies:', simulationData.dependencies);
-
         if (window.renderInputStats) {
             window.renderInputStats('#input-stats', null);
         }
@@ -1118,15 +1114,10 @@ $(window).on("load", function () {
         }
 
         // Display dependency analysis if available
-        console.log('Checking for dependency_analysis in result:', result.dependency_analysis);
-        console.log('simulationData.dependencies:', simulationData.dependencies);
-
         if (result.dependency_analysis) {
-            console.log('dependency_analysis found, displaying results');
             displayDependencyResults(result.dependency_analysis);
             displayDependencyTab(result.dependency_analysis, simulationData);
         } else {
-            console.log('No dependency_analysis in result');
             // Show empty state in tab
             $('#dependencyTabResults').hide();
             $('#dependencyTabEmpty').show();
@@ -1135,18 +1126,14 @@ $(window).on("load", function () {
 
     function displayDependencyTab(depAnalysis, simulationData) {
         // Populate the dependency analysis tab
-        console.log('displayDependencyTab called', depAnalysis, simulationData);
         const $tabResults = $('#dependencyTabResults');
         const $tabEmpty = $('#dependencyTabEmpty');
 
         if (!depAnalysis || depAnalysis.total_dependencies === 0) {
-            console.log('No dependencies or total = 0, showing empty state');
             $tabResults.hide();
             $tabEmpty.show();
             return;
         }
-
-        console.log('Showing dependency results in tab');
 
         $tabEmpty.hide();
         $tabResults.show();
