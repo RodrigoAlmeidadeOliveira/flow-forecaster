@@ -220,7 +220,7 @@
 <a aria-controls="cost-analysis" aria-selected="false" class="nav-link" data-toggle="tab" href="#cost-analysis" id="tab-cost-link" role="tab" data-i18n="tab_cost">Análise de Custos</a>
 </li>
 <li class="nav-item">
-<a aria-controls="dependency-analysis-tab" aria-selected="false" class="nav-link" data-toggle="tab" href="#dependency-analysis-tab" id="tab-dependency-link" role="tab" data-i18n="tab_dependency">Análise de Dependências</a>
+                        <a aria-controls="dependency-analysis-tab" aria-selected="false" class="nav-link" data-toggle="tab" href="#dependency-analysis-tab" id="dependency-tab-link" role="tab" data-i18n="dependency_analysis_tab">Análise de Dependências</a>
 </li>
 </ul>
 <div class="tab-content" id="forecastTabsContent">
@@ -592,7 +592,7 @@
 
 <!-- Dependencies Section -->
 <div class="container-fluid bg-12 text-center">
-<h2 data-i18n="dependencies_optional"
+            <h2 data-i18n="dependency_section_heading"
     data-doc-tooltip="Modele dependências entre projetos para entender o impacto no prazo de entrega."
     data-doc-anchor="planejamento">
     Dependências entre Projetos (opcional)
@@ -605,15 +605,15 @@
 <table class="table table-sm" id="dependencies">
 <thead>
 <tr class="d-flex">
-<th class="col-2" scope="col" data-i18n="dep_name">
-    Nome da Dependência
-</th>
-<th class="col-2" scope="col" data-i18n="dep_source">
-    Projeto Fonte (bloqueado)
-<a class="doc-hint-icon" href="#" data-toggle="tooltip" title="Projeto que está aguardando"><i class="fas fa-circle-question"></i></a></th>
-<th class="col-2" scope="col" data-i18n="dep_target">
-    Projeto Alvo (bloqueador)
-<a class="doc-hint-icon" href="#" data-toggle="tooltip" title="Projeto que precisa entregar primeiro"><i class="fas fa-circle-question"></i></a></th>
+                    <th class="col-2" scope="col" data-i18n="dependency_name_label">
+                        Nome da Dependência
+                    </th>
+                    <th class="col-2" scope="col" data-i18n="dependency_source_label">
+                        Projeto Fonte (bloqueado)
+                        <a class="doc-hint-icon" href="#" data-toggle="tooltip" title="Projeto que está aguardando"><i class="fas fa-circle-question"></i></a></th>
+                    <th class="col-2" scope="col" data-i18n="dependency_target_label">
+                        Projeto Alvo (bloqueador)
+                        <a class="doc-hint-icon" href="#" data-toggle="tooltip" title="Projeto que precisa entregar primeiro"><i class="fas fa-circle-question"></i></a></th>
 <th class="col-2" scope="col"
     data-doc-tooltip="Probabilidade histórica de entrega no prazo (0-100%). Ex: se 7 de 10 entregas foram no prazo, use 70%">
     Prob. On-Time (%)
@@ -622,9 +622,9 @@
     data-doc-tooltip="Impacto em dias se a dependência atrasar">
     Atraso (dias)
 <a class="doc-hint-icon" href="#" data-toggle="tooltip" title="Dias de atraso se falhar"><i class="fas fa-circle-question"></i></a></th>
-<th class="col-2" scope="col" data-i18n="dep_criticality">
-    Criticidade
-</th>
+                    <th class="col-2" scope="col" data-i18n="dependency_criticality_label">
+                        Criticidade
+                    </th>
 <th class="col-1" scope="col">
     Ações
 </th>
@@ -633,14 +633,14 @@
 <tbody>
 <tr class="d-flex dependency-row" id="dependency-row-template">
 <td class="col-2">
-<input class="form-control form-control-sm" name="dep_name" placeholder="Ex: API Service" type="text"/>
-</td>
-<td class="col-2">
-<input class="form-control form-control-sm" name="dep_source" placeholder="Ex: Mobile App" type="text" title="Projeto que depende (bloqueado)"/>
-</td>
-<td class="col-2">
-<input class="form-control form-control-sm" name="dep_target" placeholder="Ex: Backend Team" type="text" title="Projeto do qual depende (bloqueador)"/>
-</td>
+                    <input class="form-control form-control-sm" name="dependency_name" placeholder="Ex: API Service" type="text"/>
+                </td>
+                <td class="col-2">
+                    <input class="form-control form-control-sm" name="dependency_source_project" placeholder="Ex: Mobile App" type="text" title="Projeto que depende (bloqueado)"/>
+                </td>
+                <td class="col-2">
+                    <input class="form-control form-control-sm" name="dependency_target_project" placeholder="Ex: Backend Team" type="text" title="Projeto do qual depende (bloqueador)"/>
+                </td>
 <td class="col-2">
 <input class="form-control form-control-sm" name="dep_probability" placeholder="50" type="number" min="0" max="100" value="50" title="Se 7 de 10 entregas foram no prazo, use 70"/>
 </td>
@@ -648,7 +648,7 @@
 <input class="form-control form-control-sm" name="dep_delay" placeholder="10" type="number" min="0" value="10" title="Dias de atraso se falhar"/>
 </td>
 <td class="col-2">
-<select class="form-control form-control-sm" name="dep_criticality" title="Nível de impacto no projeto">
+                    <select class="form-control form-control-sm" name="dependency_criticality" title="Nível de impacto no projeto">
 <option value="LOW">Baixa</option>
 <option value="MEDIUM" selected>Média</option>
 <option value="HIGH">Alta</option>
@@ -1637,7 +1637,7 @@ Histograma mostrando a distribuição de probabilidade do esforço estimado usan
 </div>
 </div>
 </div>
-<div aria-labelledby="tab-dependency-link" class="tab-pane fade" id="dependency-analysis-tab" role="tabpanel">
+                <div aria-labelledby="dependency-tab-link" class="tab-pane fade" id="dependency-analysis-tab" role="tabpanel">
 <div class="pt-4 pb-5">
 <div class="container text-center">
 <h2>📊 Análise de Impacto de Dependências</h2>

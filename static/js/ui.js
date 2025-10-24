@@ -804,12 +804,12 @@ $(window).on("load", function () {
             const $el = $(el);
             const dep = {
                 id: `DEP-${_index + 1}`,
-                name: $el.find("input[name='dep_name']").val(),
-                source_project: $el.find("input[name='dep_source']").val(),
-                target_project: $el.find("input[name='dep_target']").val(),
+                name: $el.find("input[name='dependency_name']").val(),
+                source_project: $el.find("input[name='dependency_source_project']").val(),
+                target_project: $el.find("input[name='dependency_target_project']").val(),
                 on_time_probability: parseFloat($el.find("input[name='dep_probability']").val()) / 100 || 0.5,
                 delay_impact_days: parseFloat($el.find("input[name='dep_delay']").val()) || 0,
-                criticality: $el.find("select[name='dep_criticality']").val() || 'MEDIUM'
+                criticality: $el.find("select[name='dependency_criticality']").val() || 'MEDIUM'
             };
             // Only add if name, source and target are filled
             if (dep.name && dep.source_project && dep.target_project) {
@@ -827,12 +827,12 @@ $(window).on("load", function () {
     }
 
     function fillDependency(dep, $row) {
-        $row.find("input[name='dep_name']").val(dep.name);
-        $row.find("input[name='dep_source']").val(dep.source_project);
-        $row.find("input[name='dep_target']").val(dep.target_project);
+        $row.find("input[name='dependency_name']").val(dep.name);
+        $row.find("input[name='dependency_source_project']").val(dep.source_project);
+        $row.find("input[name='dependency_target_project']").val(dep.target_project);
         $row.find("input[name='dep_probability']").val((dep.on_time_probability * 100) || 50);
         $row.find("input[name='dep_delay']").val(dep.delay_impact_days || 10);
-        $row.find("select[name='dep_criticality']").val(dep.criticality || 'MEDIUM');
+        $row.find("select[name='dependency_criticality']").val(dep.criticality || 'MEDIUM');
     }
 
     const $probabilitiesRowTemplate = $('#probabilities').find('.probabilities-row').clone();

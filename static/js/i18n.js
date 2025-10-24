@@ -19,6 +19,14 @@
             tab_deadline: 'Análise de Prazo',
             tab_historical: 'Gráficos Históricos',
             tab_cost: 'Análise de Custos',
+            dependency_analysis_tab: 'Análise de Dependências',
+
+            // Dependências
+            dependency_section_heading: 'Dependências entre Projetos (opcional)',
+            dependency_name_label: 'Nome da Dependência',
+            dependency_source_label: 'Projeto Fonte (bloqueado)',
+            dependency_target_label: 'Projeto Alvo (bloqueador)',
+            dependency_criticality_label: 'Criticidade',
 
             // Dados de throughput compartilhados
             shared_throughput_title: 'Dados de Throughput Compartilhados',
@@ -276,6 +284,14 @@
             tab_deadline: 'Deadline Analysis',
             tab_historical: 'Historical Charts',
             tab_cost: 'Cost Analysis',
+            dependency_analysis_tab: 'Dependency Analysis',
+
+            // Dependencies
+            dependency_section_heading: 'Project Dependencies (optional)',
+            dependency_name_label: 'Dependency Name',
+            dependency_source_label: 'Source Project (blocked)',
+            dependency_target_label: 'Target Project (blocking)',
+            dependency_criticality_label: 'Criticality',
 
             // Shared throughput data
             shared_throughput_title: 'Shared Throughput Data',
@@ -526,6 +542,14 @@
             tab_deadline: 'Análisis de Plazo',
             tab_historical: 'Gráficos Históricos',
             tab_cost: 'Análisis de Costos',
+            dependency_analysis_tab: 'Análisis de Dependencias',
+
+            // Dependencias
+            dependency_section_heading: 'Dependencias entre Proyectos (opcional)',
+            dependency_name_label: 'Nombre de la Dependencia',
+            dependency_source_label: 'Proyecto Fuente (bloqueado)',
+            dependency_target_label: 'Proyecto Objetivo (bloqueador)',
+            dependency_criticality_label: 'Criticidad',
 
             // Datos de rendimiento compartidos
             shared_throughput_title: 'Datos de Rendimiento Compartidos',
