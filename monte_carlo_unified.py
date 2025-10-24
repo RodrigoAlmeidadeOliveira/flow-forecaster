@@ -373,6 +373,8 @@ def simulate_burn_down(simulation_data: Dict[str, Any]) -> Dict[str, Any]:
     lt_samples = simulation_data['ltSamples']
     split_rate_samples = simulation_data['splitRateSamples']
     risks = simulation_data['risks']
+    focus_factor = float(simulation_data.get('teamFocus', 1.0) or 1.0)
+    focus_factor = max(0.0, focus_factor)
     base_backlog = simulation_data['numberOfTasks']
     backlog_min = simulation_data.get('backlogAdjustedMin')
     backlog_max = simulation_data.get('backlogAdjustedMax')
@@ -453,7 +455,7 @@ def simulate_burn_down(simulation_data: Dict[str, Any]) -> Dict[str, Any]:
         # Scale throughput: if historical data is from 1 person doing X items/week,
         # and we now have N contributors active, they should do N * X items/week
         throughput_per_contributor = random_tp / baseline_team_size
-        adjusted_tp = throughput_per_contributor * contributors_this_week
+        adjusted_tp = throughput_per_contributor * contributors_this_week * focus_factor
 
         remaining_tasks -= adjusted_tp
         duration_in_calendar_weeks += 1
@@ -508,6 +510,9 @@ def run_monte_carlo_simulation(simulation_data: Dict[str, Any]) -> Dict[str, Any
     """
     # Create a copy to avoid modifying the original
     simulation_data = simulation_data.copy()
+
+    focus_factor = float(simulation_data.get('teamFocus', 1.0) or 1.0)
+    simulation_data['teamFocus'] = max(0.0, focus_factor)
 
     # Convert likelihood percentages to decimals
     for risk in simulation_data.get('risks', []):
@@ -640,7 +645,8 @@ def run_monte_carlo_simulation(simulation_data: Dict[str, Any]) -> Dict[str, Any
         'raw_max': simulation_data.get('backlogMax') or simulation_data.get('backlogOriginalMax'),
         'low_multiplier': simulation_data.get('backlogLowMultiplier'),
         'high_multiplier': simulation_data.get('backlogHighMultiplier'),
-        'complexity': simulation_data.get('backlogComplexity')
+        'complexity': simulation_data.get('backlogComplexity'),
+        'focus_factor': simulation_data.get('teamFocus')
     }
 
     return result
@@ -652,7 +658,8 @@ def run_monte_carlo_simulation(simulation_data: Dict[str, Any]) -> Dict[str, Any
 
 def simulate_throughput_forecast(tp_samples: List[float],
                                  backlog: int,
-                                 n_simulations: int = 10000) -> Dict[str, Any]:
+                                 n_simulations: int = 10000,
+                                 focus_factor: float = 1.0) -> Dict[str, Any]:
     """
     SIMPLIFIED Monte Carlo simulation for throughput-based forecasting.
     NOW USES WEIBULL DISTRIBUTION for all random sampling.
@@ -671,6 +678,7 @@ def simulate_throughput_forecast(tp_samples: List[float],
         tp_samples: Historical throughput samples
         backlog: Number of tasks to complete
         n_simulations: Number of Monte Carlo simulations
+        focus_factor: Portion of throughput dedicated to this work (0 to 1)
 
     Returns:
         Dictionary with simulation results
@@ -684,6 +692,8 @@ def simulate_throughput_forecast(tp_samples: List[float],
     if backlog <= 0:
         raise ValueError('Backlog must be greater than zero')
 
+    focus_factor = max(0.0, float(focus_factor))
+
     simulation_data = {
         'projectName': 'Throughput Forecast',
         'numberOfSimulations': n_simulations,
@@ -695,7 +705,8 @@ def simulate_throughput_forecast(tp_samples: List[float],
         'totalContributors': 1,
         'minContributors': 1,
         'maxContributors': 1,
-        'sCurveSize': 0
+        'sCurveSize': 0,
+        'teamFocus': focus_factor
     }
 
     # This now uses Weibull internally via simulate_burn_down
@@ -1026,7 +1037,8 @@ def analyze_deadline(
     backlog: int,
     deadline_date: str,
     start_date: str,
-    n_simulations: int = 10000
+    n_simulations: int = 10000,
+    focus_factor: float = 1.0
 ) -> Dict[str, Any]:
     """
     Analyzes if a deadline can be met and provides detailed metrics.
@@ -1037,6 +1049,7 @@ def analyze_deadline(
         deadline_date: Deadline date (format: 'DD/MM/YY' or 'DD/MM/YYYY')
         start_date: Start date (format: 'DD/MM/YY' or 'DD/MM/YYYY')
         n_simulations: Number of Monte Carlo simulations
+        focus_factor: Portion of throughput dedicated to this work (0 to 1)
 
     Returns:
         Dictionary with deadline analysis including:
@@ -1070,7 +1083,9 @@ def analyze_deadline(
     weeks_to_deadline = days_to_deadline / 7.0
 
     # Run simulation to get projected completion time
-    result = simulate_throughput_forecast(tp_samples, backlog, n_simulations)
+    focus_factor = max(0.0, float(focus_factor))
+
+    result = simulate_throughput_forecast(tp_samples, backlog, n_simulations, focus_factor=focus_factor)
 
     projected_weeks_p85 = result['percentile_stats']['p85']
     projected_weeks_p50 = result['percentile_stats']['p50']
@@ -1080,7 +1095,7 @@ def analyze_deadline(
 
     # Calculate how much work can be done by deadline
     # Run reverse simulation: how much work in N weeks?
-    work_by_deadline_result = forecast_how_many(tp_samples, start_date, deadline_date, n_simulations)
+    work_by_deadline_result = forecast_how_many(tp_samples, start_date, deadline_date, n_simulations, focus_factor=focus_factor)
     items_possible_p85 = work_by_deadline_result['items_p85']
 
     # Projected work is LIMITED by the backlog (can't deliver more than what exists)
@@ -1113,7 +1128,8 @@ def forecast_how_many(
     tp_samples: List[float],
     start_date: str,
     end_date: str,
-    n_simulations: int = 10000
+    n_simulations: int = 10000,
+    focus_factor: float = 1.0
 ) -> Dict[str, Any]:
     """
     Forecasts how many items can be completed in a given time period.
@@ -1124,6 +1140,7 @@ def forecast_how_many(
         start_date: Start date (format: 'DD/MM/YY' or 'DD/MM/YYYY')
         end_date: End date (format: 'DD/MM/YY' or 'DD/MM/YYYY')
         n_simulations: Number of Monte Carlo simulations
+        focus_factor: Portion of throughput dedicated to this work (0 to 1)
 
     Returns:
         Dictionary with forecast including:
@@ -1159,12 +1176,13 @@ def forecast_how_many(
 
     # Run Monte Carlo simulation: simulate throughput for N weeks
     weibull_fitter = WeibullFitter(np.array(tp_samples))
+    focus_factor = max(0.0, float(focus_factor))
 
     items_completed = []
     for _ in range(n_simulations):
         total_items = 0
         for week in range(weeks):
-            weekly_throughput = max(0, round(weibull_fitter.generate_sample()))
+            weekly_throughput = max(0, round(weibull_fitter.generate_sample() * focus_factor))
             total_items += weekly_throughput
         items_completed.append(total_items)
 
@@ -1188,7 +1206,8 @@ def forecast_when(
     tp_samples: List[float],
     backlog: int,
     start_date: str,
-    n_simulations: int = 10000
+    n_simulations: int = 10000,
+    focus_factor: float = 1.0
 ) -> Dict[str, Any]:
     """
     Forecasts when a backlog will be completed.
@@ -1199,6 +1218,7 @@ def forecast_when(
         backlog: Number of items to complete
         start_date: Start date (format: 'DD/MM/YY' or 'DD/MM/YYYY')
         n_simulations: Number of Monte Carlo simulations
+        focus_factor: Portion of throughput dedicated to this work (0 to 1)
 
     Returns:
         Dictionary with forecast including:
@@ -1228,7 +1248,7 @@ def forecast_when(
     start = parse_date(start_date)
 
     # Run simulation to get completion weeks
-    result = simulate_throughput_forecast(tp_samples, backlog, n_simulations)
+    result = simulate_throughput_forecast(tp_samples, backlog, n_simulations, focus_factor=focus_factor)
 
     percentile_stats = result['percentile_stats']
 

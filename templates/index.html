@@ -383,6 +383,32 @@
 <div class="alert alert-light border py-2 px-3 mb-0" id="backlogAdjustedSummary" role="alert" data-i18n="backlog_adjusted_summary_placeholder">Backlog ajustado será exibido aqui.</div>
 <input id="numberOfTasks" name="numberOfTasks" type="hidden" value="1"/>
 </div>
+<div class="form-group w-100">
+<label class="font-weight-bold d-block mb-1"
+       data-doc-tooltip="Ajuste o quanto do throughput disponível será realmente aplicado neste trabalho."
+       data-doc-anchor="focus">
+    <span data-i18n="team_focus_label">Foco do time neste trabalho</span>
+    <a class="doc-hint-icon" href="https://flow-forecaster.fly.dev/documentacao#focus" target="_blank" rel="noopener noreferrer" aria-label="Abrir documentação relacionada em nova aba" data-toggle="tooltip" data-placement="top" data-bs-toggle="tooltip" data-bs-placement="top" title="Ajuste o quanto do throughput disponível será realmente aplicado neste trabalho."><i class="fas fa-circle-question" aria-hidden="true"></i></a>
+</label>
+<div class="d-flex align-items-center mb-2">
+<input class="custom-range flex-grow-1"
+       id="teamFocusPercent"
+       min="25"
+       max="100"
+       step="5"
+       type="range"
+       value="100"/>
+<span class="badge badge-primary ml-3 px-3 py-2" id="teamFocusDisplay">100%</span>
+</div>
+<div class="btn-group btn-group-sm mb-2" role="group" aria-label="Team focus presets">
+<button class="btn btn-outline-secondary team-focus-preset active" data-focus="100" type="button">100%</button>
+<button class="btn btn-outline-secondary team-focus-preset" data-focus="75" type="button">75%</button>
+<button class="btn btn-outline-secondary team-focus-preset" data-focus="50" type="button">50%</button>
+<button class="btn btn-outline-secondary team-focus-preset" data-focus="25" type="button">25%</button>
+</div>
+<small class="form-text text-muted" data-i18n="team_focus_hint">Use quando o time dividir atenção com outras frentes. O throughput será multiplicado por este percentual.</small>
+<input id="teamFocus" name="teamFocus" type="hidden" value="1"/>
+</div>
 <div class="input-group mb-3">
 <div class="input-group-prepend">
 <span class="input-group-text"

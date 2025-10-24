@@ -53,6 +53,8 @@
             complexity_somewhat: 'Parcialmente entendido (1× / 1,5×)',
             complexity_not_really: 'Ainda pouco entendido (1,5× / 2×)',
             complexity_very_unclear: 'Muito incerto (1,75× / 3×)',
+            team_focus_label: 'Foco do time neste trabalho',
+            team_focus_hint: 'Use quando o time dividir atenção com outras frentes. O throughput será multiplicado por este percentual.',
             historical_team_size: 'Tamanho histórico da equipe',
             historical_team_size_tooltip: 'Tamanho da equipe quando os dados históricos de throughput foram coletados',
 
@@ -330,6 +332,8 @@
             complexity_somewhat: 'Somewhat understood (1× / 1.5×)',
             complexity_not_really: 'Not really understood yet (1.5× / 2×)',
             complexity_very_unclear: 'Very unclear (1.75× / 3×)',
+            team_focus_label: 'Team focus on this work',
+            team_focus_hint: 'Use this when the team splits attention across initiatives. Throughput will be multiplied by this percentage.',
             historical_team_size: 'Historical team size',
             historical_team_size_tooltip: 'Team size when historical throughput data was collected',
 
@@ -600,6 +604,8 @@
             complexity_somewhat: 'Parcialmente entendido (1× / 1,5×)',
             complexity_not_really: 'Aún poco entendido (1,5× / 2×)',
             complexity_very_unclear: 'Muy incierto (1,75× / 3×)',
+            team_focus_label: 'Enfoque del equipo en este trabajo',
+            team_focus_hint: 'Úselo cuando el equipo divida la atención con otras frentes. El throughput se multiplicará por este porcentaje.',
             historical_team_size: 'Tamaño histórico del equipo',
             historical_team_size_tooltip: 'Tamaño del equipo cuando se recopilaron los datos históricos de rendimiento',
 

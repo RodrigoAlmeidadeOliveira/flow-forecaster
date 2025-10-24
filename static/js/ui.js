@@ -194,6 +194,33 @@
         return state;
     }
 
+    function clampFocusPercent(value) {
+        const num = parseFloat(value);
+        if (!Number.isFinite(num)) return 100;
+        return Math.min(100, Math.max(0, num));
+    }
+
+    function updateTeamFocusUI(percent) {
+        const clamped = clampFocusPercent(percent);
+        const focusFactor = Math.round((clamped / 100) * 1000) / 1000;
+        $('#teamFocusPercent').val(clamped);
+        $('#teamFocus').val(focusFactor);
+        $('#teamFocusDisplay').text(`${Math.round(clamped)}%`);
+
+        $('.team-focus-preset').each(function() {
+            const preset = parseFloat($(this).data('focus'));
+            if (Math.abs(preset - clamped) < 0.001) {
+                $(this).addClass('active');
+            } else {
+                $(this).removeClass('active');
+            }
+        });
+    }
+
+    function getTeamFocusPercent() {
+        return clampFocusPercent($('#teamFocusPercent').val());
+    }
+
     function buildThroughputStatsHtml(stats) {
         if (!stats) return '';
         const percentiles = stats.percentiles || {};
@@ -1064,6 +1091,10 @@ $(window).on("load", function () {
             }
         }
 
+        const teamFocusPercent = getTeamFocusPercent();
+        const teamFocusFactor = Math.round((teamFocusPercent / 100) * 1000) / 1000;
+        updateTeamFocusUI(teamFocusPercent);
+
         const simulationData = {
             projectName: $('#projectName').val(),
             numberOfSimulations: parseInt($('#numberOfSimulations').val()),
@@ -1080,7 +1111,9 @@ $(window).on("load", function () {
             sCurveSize: parseInt($('#sCurveSize').val()),
             historical_team_size: parseInt($('#historicalTeamSize').val()) || 1,
             startDate: $('#startDate').val() || undefined,
-            deadlineDate: $('#deadlineDate').val() || undefined
+            deadlineDate: $('#deadlineDate').val() || undefined,
+            teamFocus: teamFocusFactor,
+            teamFocusPercent: teamFocusPercent
         };
 
         if (backlogState.elementsPresent) {
@@ -1298,6 +1331,10 @@ $(window).on("load", function () {
             write(` - Backlog sampled between ${backlogSummary.adjusted_min} and ${backlogSummary.adjusted_max} tasks\n`);
         } else if (simulationData.backlogAdjustedMin != null && simulationData.backlogAdjustedMax != null) {
             write(` - Backlog sampled between ${simulationData.backlogAdjustedMin} and ${simulationData.backlogAdjustedMax} tasks\n`);
+        }
+        if (simulationData.teamFocus != null) {
+            const focusDisplay = Math.round(simulationData.teamFocus * 100);
+            write(` - Team focus applied: ${focusDisplay}% of throughput\n`);
         }
         if (simulationData.startDate) {
             write(` - Can be delivered by ${endDate}\n`);
@@ -2181,7 +2218,8 @@ ${generateProgressBar(p50Items, backlog, 'P50 (arriscado)  ', Math.round((p50Ite
                 simulationData: simulationData,
                 deadlineDate: deadlineDate,
                 startDate: simulationData.startDate,
-                nSimulations: simulationData.numberOfSimulations
+                nSimulations: simulationData.numberOfSimulations,
+                teamFocus: simulationData.teamFocus
             }),
             success: function(result) {
                 displayDeadlineAnalysis(result);
@@ -2234,6 +2272,13 @@ ${generateProgressBar(p50Items, backlog, 'P50 (arriscado)  ', Math.round((p50Ite
                             fillRisk(risk, addRisk());
                         }
                     }
+                    if (simulationData.teamFocusPercent != null) {
+                        updateTeamFocusUI(simulationData.teamFocusPercent);
+                    } else if (simulationData.teamFocus != null) {
+                        updateTeamFocusUI(simulationData.teamFocus * 100);
+                    } else {
+                        updateTeamFocusUI($('#teamFocusPercent').val());
+                    }
                     recalculateBacklog();
                     runSimulation();
                     markHistoricalChartsDirty();
@@ -2255,6 +2300,19 @@ ${generateProgressBar(p50Items, backlog, 'P50 (arriscado)  ', Math.round((p50Ite
         recalculateBacklog();
         window.addEventListener('languageChanged', () => {
             updateBacklogSummary(computeBacklogState());
+        });
+    }
+
+    if ($('#teamFocusPercent').length) {
+        $('#teamFocusPercent').on('input change', function() {
+            updateTeamFocusUI($(this).val());
+        });
+        $('.team-focus-preset').on('click', function() {
+            updateTeamFocusUI($(this).data('focus'));
+        });
+        updateTeamFocusUI($('#teamFocusPercent').val());
+        window.addEventListener('languageChanged', () => {
+            updateTeamFocusUI(getTeamFocusPercent());
         });
     }
 

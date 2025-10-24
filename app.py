@@ -199,6 +199,15 @@ def simulate():
         simulation_data['splitRateSamples'] = split_rate_samples
         simulation_data['risks'] = simulation_data.get('risks', [])
         simulation_data['dependencies'] = simulation_data.get('dependencies', [])
+        team_focus_raw = simulation_data.get('teamFocus')
+        try:
+            team_focus_value = float(team_focus_raw) if team_focus_raw is not None else 1.0
+        except (TypeError, ValueError):
+            team_focus_value = 1.0
+        team_focus_value = max(0.0, min(1.0, team_focus_value))
+        simulation_data['teamFocus'] = team_focus_value
+        if 'teamFocusPercent' not in simulation_data:
+            simulation_data['teamFocusPercent'] = round(team_focus_value * 100, 2)
 
         # Debug: log dependencies
         print(f"[INFO] Received {len(simulation_data['dependencies'])} dependencies", flush=True)
@@ -223,11 +232,13 @@ def simulate():
                 start_dt = parse_flexible_date(start_date_raw)
                 horizon_dt = start_dt + timedelta(days=30)
                 horizon_str = horizon_dt.strftime('%d/%m/%Y')
+                focus_factor = simulation_data['teamFocus']
                 forecast_30_days = forecast_how_many(
                     tp_samples=tp_samples,
                     start_date=start_date_raw,
                     end_date=horizon_str,
-                    n_simulations=simulation_data.get('numberOfSimulations', 10000)
+                    n_simulations=simulation_data.get('numberOfSimulations', 10000),
+                    focus_factor=focus_factor
                 )
                 distribution_30 = forecast_30_days.get('distribution') or []
                 probability_rows_30 = []
@@ -655,6 +666,13 @@ def api_deadline_analysis():
         cost_per_person_week = data.get('costPerPersonWeek', 5000)  # Default: R$ 5,000/week
         simulation_payload = data.get('simulationData')
 
+        team_focus_raw = data.get('teamFocus')
+        try:
+            team_focus_value = float(team_focus_raw) if team_focus_raw is not None else 1.0
+        except (TypeError, ValueError):
+            team_focus_value = 1.0
+        team_focus_value = max(0.0, min(1.0, team_focus_value))
+
         simulation_data = None
 
         if simulation_payload:
@@ -683,6 +701,14 @@ def api_deadline_analysis():
                 'sCurveSize': s_curve_size,
                 'numberOfSimulations': n_simulations
             })
+            sim_focus_raw = simulation_data.get('teamFocus', team_focus_value)
+            try:
+                team_focus_value = float(sim_focus_raw)
+            except (TypeError, ValueError):
+                team_focus_value = 1.0
+            team_focus_value = max(0.0, min(1.0, team_focus_value))
+            simulation_data['teamFocus'] = team_focus_value
+            simulation_data.setdefault('teamFocusPercent', round(team_focus_value * 100, 2))
 
         if not tp_samples:
             return jsonify({'error': 'Need throughput samples'}), 400
@@ -713,7 +739,8 @@ def api_deadline_analysis():
                 backlog=backlog,
                 deadline_date=deadline_date,
                 start_date=start_date,
-                n_simulations=n_simulations
+                n_simulations=n_simulations,
+                focus_factor=team_focus_value
             )
             percentile_stats = mc_basic.get('percentile_stats', {})
             projected_weeks_p85 = float(percentile_stats.get('p85', 0))
@@ -725,7 +752,7 @@ def api_deadline_analysis():
 
         # "Quantos?" - How many items can be completed in the deadline period?
         # This answers: "If I have this much time, how many items can I complete?"
-        work_by_deadline = forecast_how_many(tp_samples, start_date, deadline_date, n_simulations)
+        work_by_deadline = forecast_how_many(tp_samples, start_date, deadline_date, n_simulations, focus_factor=team_focus_value)
         items_possible_p95 = work_by_deadline.get('items_p95', 0)
         items_possible_p85 = work_by_deadline.get('items_p85', 0)
         items_possible_p50 = work_by_deadline.get('items_p50', 0)
@@ -739,7 +766,8 @@ def api_deadline_analysis():
                 tp_samples=tp_samples,
                 start_date=start_date,
                 end_date=horizon_30_str,
-                n_simulations=n_simulations
+                n_simulations=n_simulations,
+                focus_factor=team_focus_value
             )
             distribution_30 = forecast_30_days.get('distribution') or []
             probability_rows_30 = []
@@ -780,7 +808,7 @@ def api_deadline_analysis():
         projected_work_p50 = min(items_possible_p50, backlog)
 
         # Get completion dates for each percentile ("Quando?")
-        completion_forecast = forecast_when(tp_samples, backlog, start_date, n_simulations)
+        completion_forecast = forecast_when(tp_samples, backlog, start_date, n_simulations, focus_factor=team_focus_value)
         completion_date_p95 = completion_forecast.get('date_p95', '')
         completion_date_p85 = completion_forecast.get('date_p85', '')
         completion_date_p50 = completion_forecast.get('date_p50', '')
@@ -1103,6 +1131,12 @@ def api_forecast_how_many():
         s_curve_size = data.get('sCurveSize', 0)
         lt_samples = data.get('ltSamples', [])
         n_simulations = data.get('nSimulations', 10000)
+        team_focus_raw = data.get('teamFocus')
+        try:
+            team_focus_value = float(team_focus_raw) if team_focus_raw is not None else 1.0
+        except (TypeError, ValueError):
+            team_focus_value = 1.0
+        team_focus_value = max(0.0, min(1.0, team_focus_value))
 
         if not tp_samples:
             return jsonify({'error': 'Need throughput samples'}), 400
@@ -1114,15 +1148,17 @@ def api_forecast_how_many():
             tp_samples=tp_samples,
             start_date=start_date,
             end_date=end_date,
-            n_simulations=n_simulations
+            n_simulations=n_simulations,
+            focus_factor=team_focus_value
         )
 
         # Machine Learning
         ml_result = None
         if len(tp_samples) >= 8:
             try:
+                scaled_tp_samples = [max(0.0, sample * team_focus_value) for sample in tp_samples]
                 ml_result = ml_forecast_how_many(
-                    tp_samples=tp_samples,
+                    tp_samples=scaled_tp_samples,
                     start_date=start_date,
                     end_date=end_date,
                     team_size=team_size,
@@ -1176,13 +1212,20 @@ def api_forecast_when():
         lt_samples = data.get('ltSamples', [])
         split_rate_samples = data.get('splitRateSamples', [])
         n_simulations = data.get('nSimulations', 10000)
+        team_focus_raw = data.get('teamFocus')
+        try:
+            team_focus_value = float(team_focus_raw) if team_focus_raw is not None else 1.0
+        except (TypeError, ValueError):
+            team_focus_value = 1.0
+        team_focus_value = max(0.0, min(1.0, team_focus_value))
 
         # Monte Carlo
         mc_result = forecast_when(
             tp_samples=tp_samples,
             backlog=backlog,
             start_date=start_date,
-            n_simulations=n_simulations
+            n_simulations=n_simulations,
+            focus_factor=team_focus_value
         )
 
         # Machine Learning
@@ -1190,7 +1233,7 @@ def api_forecast_when():
         if len(tp_samples) >= 8:
             try:
                 ml_result = ml_forecast_when(
-                    tp_samples=tp_samples,
+                    tp_samples=[max(0.0, sample * team_focus_value) for sample in tp_samples],
                     backlog=backlog,
                     start_date=start_date,
                     team_size=team_size,
