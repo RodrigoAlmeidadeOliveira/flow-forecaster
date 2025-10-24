@@ -2,8 +2,8 @@
 <blockquote>
 <p>Guia completo para uso do Flow Forecaster: previsões probabilísticas de projetos com Machine Learning e Monte Carlo</p>
 </blockquote>
-<p><strong>Versão</strong>: 2.0
-<strong>Última atualização</strong>: Outubro 2025
+<p><strong>Versão</strong>: 2.1
+<strong>Última atualização</strong>: Novembro 2025
 <strong>Acesso</strong>: https://flow-forecaster.fly.dev/</p>
 <hr />
 <h2 id="indice">📋 Índice</h2>
@@ -11,7 +11,16 @@
 <li><a href="#introdução">Introdução</a></li>
 <li><a href="#conceitos-fundamentais">Conceitos Fundamentais</a></li>
 <li><a href="#primeiros-passos">Primeiros Passos</a></li>
-<li><a href="#funcionalidades-principais">Funcionalidades Principais</a></li>
+<li><a href="#funcionalidades-principais">Funcionalidades Principais</a>
+<ul>
+<li><a href="#1-simulacao-monte-carlo">Simulação Monte Carlo</a></li>
+<li><a href="#2-machine-learning">Machine Learning</a></li>
+<li><a href="#3-analise-combinada-ml-monte-carlo">Análise Combinada (ML + MC)</a></li>
+<li><a href="#4-previsao-de-demanda">Previsão de Demanda (Inflow)</a></li>
+<li><a href="#5-analise-dependencias">Análise de Dependências</a></li>
+<li><a href="#6-graficos-historicos">Gráficos Históricos</a></li>
+</ul>
+</li>
 <li><a href="#análise-de-custos">Análise de Custos</a></li>
 <li><a href="#análise-de-deadline">Análise de Deadline</a></li>
 <li><a href="#perguntas-frequentes">Perguntas Frequentes</a></li>
@@ -25,9 +34,11 @@
 <p>O Flow Forecaster é uma ferramenta probabilística de previsão de projetos que combina:</p>
 <ul>
 <li><strong>Simulações Monte Carlo</strong>: 10.000+ iterações para análise probabilística robusta</li>
-<li><strong>Machine Learning</strong>: Modelos preditivos avançados (Random Forest, XGBoost, Gradient Boosting)</li>
+<li><strong>Machine Learning de Throughput</strong>: Modelos preditivos avançados (Random Forest, XGBoost, Gradient Boosting)</li>
+<li><strong>Previsão de Demanda</strong>: Conversão automática de timestamps em séries diárias e semanais com bandas de confiança</li>
+<li><strong>Análise de Dependências</strong>: Simulação do impacto de bloqueios externos na entrega</li>
 <li><strong>Análise de Custos</strong>: Estimativas baseadas em esforço e distribuição PERT-Beta</li>
-<li><strong>Análise de Deadline</strong>: Previsões sobre prazos e entregas</li>
+<li><strong>Análise de Deadline</strong>: Verificação de prazos assumindo throughput Monte Carlo e ML</li>
 </ul>
 <h3 id="por-que-usar-previsoes-probabilisticas">Por que usar previsões probabilísticas?</h3>
 <p>Em vez de trabalhar com estimativas únicas ("o projeto termina em 10 semanas"), trabalhamos com <strong>distribuições de probabilidade</strong>:</p>
@@ -80,6 +91,13 @@
 - Conte apenas itens no mesmo nível de granularidade usado no throughput
 - Se throughput é em "stories", backlog também deve ser em "stories"
 - Não misture diferentes tipos de itens (ex: stories com bugs)</p>
+<h3 id="demanda-inflow">Demanda (Inflow)</h3>
+<p><strong>Definição</strong>: Número de itens novos que entram no sistema por período (ex.: semanas). É o “lado de entrada” do fluxo, enquanto o throughput mede a saída.</p>
+<p><strong>Exemplo</strong>: Se 40 solicitações novas foram registradas nas últimas 4 semanas, seu inflow semanal médio é 10.</p>
+<p><strong>Uso no Flow Forecaster</strong>:
+- Sirva como entrada da aba <strong>Previsão de Demanda</strong> (cole as datas de criação)
+- Compare inflow previsto com throughput histórico para detectar crescimento de backlog
+- Converta o total previsto em backlog adicional ou riscos na simulação Monte Carlo</p>
 <h3 id="lead-time-tempo-de-ciclo">Lead Time (Tempo de Ciclo)</h3>
 <p><strong>Definição</strong>: Tempo que cada item leva desde o início até a conclusão.</p>
 <p><strong>Exemplo</strong>: Se 3 itens levaram 2, 3 e 4 dias para serem completados, seu lead time histórico é: <code>[2, 3, 4]</code></p>
@@ -134,12 +152,15 @@ Desvio Padrão = (b - a) / 6
 - 📊 Contribuidores mínimos/máximos
 - 📊 Riscos identificados</p>
 <h3 id="3-estrutura-da-interface">3. Estrutura da Interface</h3>
-<p>A interface possui <strong>4 abas principais</strong>:</p>
+<p>A interface possui <strong>7 abas principais</strong>:</p>
 <ol>
 <li><strong>Simulação Monte Carlo</strong>: Previsões probabilísticas tradicionais</li>
-<li><strong>Machine Learning</strong>: Previsões baseadas em tendências e padrões</li>
+<li><strong>Avançado (ML + MC)</strong>: Execução combinada das duas abordagens</li>
+<li><strong>Previsão de Demanda</strong>: Projeção de entrada (inflow) diária e semanal</li>
+<li><strong>Análise de Prazo</strong>: Checkpoint rápido “deadline vs capacidade”</li>
+<li><strong>Gráficos Históricos</strong>: Histogramas, controle e séries temporais dos dados</li>
 <li><strong>Análise de Custos</strong>: Estimativas de custo baseadas em esforço e demanda</li>
-<li><strong>Análise de Deadline</strong>: Análise combinada de prazos e entregas</li>
+<li><strong>Análise de Dependências</strong>: Impacto probabilístico de bloqueios externos</li>
 </ol>
 <hr />
 <h2 id="funcionalidades-principais">🎲 Funcionalidades Principais</h2>
@@ -354,8 +375,111 @@ Explicação:
 </tbody>
 </table>
 <hr />
+<h3 id="4-previsao-de-demanda">4️⃣ Previsão de Demanda (Inflow)</h3>
+<p><strong>O que faz</strong>: Transforma datas de chegada das demandas em séries diárias e semanais, treina automaticamente modelos de Machine Learning e fornece projeções com bandas de confiança (P10, média, P90).</p>
+<p><strong>Quando usar</strong>:
+- Quer estimar quantos itens novos devem entrar no fluxo nas próximas semanas
+- Precisa dimensionar capacidade antes de compromissos
+- Deseja combinar “inflow” previsto com simulações de throughput/entrega</p>
+<p><strong>Requisitos</strong>:
+- Forneça pelo menos 30 dias de histórico (ideal: 3 meses)
+- Informe cada demanda em uma linha, no formato ISO (<code>YYYY-MM-DD</code>), pt-BR (<code>DD/MM/AAAA</code>) ou carimbo completo (<code>AAAA-MM-DDTHH:MM:SS</code>)</p>
+<p><strong>Como usar</strong>:</p>
+<ol>
+<li>
+<p><strong>Acesse a aba "Previsão de Demanda"</strong></p>
+</li>
+<li>
+<p><strong>Cole as datas de chegada</strong> (uma por linha ou separadas por vírgula)</p>
+</li>
+<li>
+<p><strong>Defina os horizontes</strong>:
+   <code>Dias a prever: 14 (padrão)
+   Semanas a prever: 8 (padrão)</code></p>
+</li>
+<li>
+<p><strong>Opcional</strong>: marque “Ignorar sábados e domingos” para focar apenas em demanda de dias úteis</p>
+</li>
+<li>
+<p><strong>Clique em "Gerar Forecast de Demanda"</strong></p>
+</li>
+</ol>
+<p><strong>Interpretando os Resultados</strong>:</p>
+<ul>
+<li><strong>Risco (diário/semanal)</strong>: classifica a estabilidade da série. Se mostrar <strong>HIGH</strong>, combine com Monte Carlo.</li>
+<li><strong>Gráficos</strong>: exibem histórico real + média/P10/P90 projetados.</li>
+<li><strong>Tabelas</strong>: trazem volumes esperados por data (use-as para planejamento de capacidade).</li>
+<li><strong>Total previsto</strong>: soma acumulada da projeção (use com Monte Carlo e custos).</li>
+</ul>
+<p><strong>Integração com Monte Carlo</strong>:</p>
+<ol>
+<li>
+<p><strong>Ajuste o backlog inicial</strong>:
+   Some o backlog existente ao total previsto. Ex.: backlog atual = 180, demanda prevista (média) = 371 ⇒ informe <strong>551</strong> no campo “Número de tarefas”. Use P90 para um cenário conservador.</p>
+</li>
+<li>
+<p><strong>Modelar como risco</strong>:
+   Na seção de riscos da aba Monte Carlo:
+   <code>Probabilidade: 100%
+   Impacto baixo: 236 (P10)
+   Impacto médio: 371 (Média)
+   Impacto alto: 483 (P90)</code>
+   Isso injeta a chegada da demanda como evento adicional em cada simulação.</p>
+</li>
+<li>
+<p><strong>Rodadas comparativas</strong>:
+   Execute uma simulação apenas com o backlog atual e outra com a demanda prevista. Compare os percentis de término para entender o impacto da nova entrada.</p>
+</li>
+</ol>
+<p><strong>Dica</strong>: guarde screenshots ou exporte o CSV de demanda para justificar premissas de inflow em reuniões.</p>
+<hr />
+<h3 id="5-analise-dependencias">5️⃣ Análise de Dependências</h3>
+<p><strong>O que faz</strong>: Calcula probabilidade de atraso, impacto médio em dias e pontos críticos considerando bloqueios externos (equipes parceiras, fornecedores, aprovações, etc.).</p>
+<p><strong>Como configurar dependências</strong>:</p>
+<ol>
+<li>No formulário da aba Monte Carlo, clique em <strong>"Adicionar Dependência"</strong></li>
+<li>Preencha:
+<ul>
+<li><strong>Nome</strong> e <strong>Descrição</strong></li>
+<li><strong>Probabilidade de atraso</strong> (%)</li>
+<li><strong>Impacto mínimo / provável / máximo</strong> (em dias)</li>
+<li><strong>Categoria</strong> (opcional) para agrupar resultados</li>
+</ul>
+</li>
+<li>Execute a simulação. Os dados alimentam automaticamente a aba “Análise de Dependências”.</li>
+</ol>
+<p><strong>Principais painéis</strong>:</p>
+<ul>
+<li><strong>Probabilidade de entregar no prazo</strong> e nível de risco</li>
+<li><strong>Distribuição de atrasos</strong> (percentis P10–P95)</li>
+<li><strong>Caminho crítico</strong> e dependências com maior impacto esperado</li>
+<li><strong>Recomendações automáticas</strong> (ex.: “remover 1 dependência dobra as chances”)</li>
+</ul>
+<p><strong>Boas práticas</strong>:</p>
+<ul>
+<li>Comece registrando apenas dependências de alta incerteza</li>
+<li>Atualize estimativas sempre que uma dependência mudar de status</li>
+<li>Use os percentis de atraso para negociar janelas de entrega com parceiros</li>
+</ul>
+<hr />
+<h3 id="6-graficos-historicos">6️⃣ Gráficos Históricos</h3>
+<p><strong>O que faz</strong>: Gera histogramas, gráficos de controle e séries temporais do throughput e lead time histórico enviados. Ideal para auditoria de dados e para explicar comportamento passado ao time.</p>
+<p><strong>Como usar</strong>:</p>
+<ol>
+<li>Informe o throughput histórico nos campos compartilhados (seção superior da tela principal)</li>
+<li>Acesse a aba “Gráficos Históricos”</li>
+<li>Revise:
+<ul>
+<li><strong>Histograma</strong>: distribuição dos valores</li>
+<li><strong>Gráfico de controle</strong>: média e limites superior/inferior</li>
+<li><strong>Série temporal</strong>: evolução semana a semana</li>
+</ul>
+</li>
+</ol>
+<p><strong>Dica</strong>: Se notar outliers isolados, considere removê-los ou registrá-los como riscos antes de rodar as simulações.</p>
+<hr />
 <h2 id="analise-de-custos">💰 Análise de Custos</h2>
-<p>A funcionalidade de análise de custos permite estimar o custo total do projeto baseado em esforço ou demanda.</p>
+<p>A funcionalidade de análise de custos permite estimar o custo total do projeto baseado em esforço ou demanda. Combine-a com a <strong>Previsão de Demanda</strong> copiando o total previsto (média ou P90) para dimensionar o volume de itens e converter em valores monetários.</p>
 <h3 id="custo-por-pessoa-semana">💼 Custo por Pessoa-Semana</h3>
 <p><strong>O que faz</strong>: Calcula custos baseados no esforço projetado (pessoa-semanas) multiplicado pelo custo semanal por pessoa.</p>
 <p><strong>Fórmula</strong>:</p>
@@ -915,6 +1039,17 @@ Recomendação:
 </code></pre></div>
 
 <hr />
+<h3 id="p9-como-usar-previsao-de-demanda-com-monte-carlo">P9: Como usar a previsão de demanda junto com Monte Carlo?</h3>
+<p><strong>Resposta</strong>:</p>
+<ol>
+<li>Rode o forecast de demanda e capture o total previsto (média, P90)</li>
+<li>Some esse total ao backlog atual para um cenário direto ou registre como risco com probabilidade 100% (P10/P50/P90 = impactos baixo/médio/alto)</li>
+<li>Execute duas simulações: baseline e com demanda projetada</li>
+<li>Compare os percentis de conclusão/custo — a diferença mostra o esforço necessário para absorver a nova entrada</li>
+</ol>
+<p><strong>Dica</strong>: use o P90 da demanda para negociações mais conservadoras e deixe claro que inflow é incerto.</p>
+
+<hr />
 <h2 id="dicas-e-boas-praticas">💡 Dicas e Boas Práticas</h2>
 <h3 id="coleta-de-dados">📊 Coleta de Dados</h3>
 <p><strong>✅ Faça</strong>:
@@ -965,6 +1100,32 @@ Recomendação:
 - ❌ Poucos dados (&lt;10 semanas)
 - ❌ Grande volatilidade (CV &gt; 40%)
 - ❌ Mudanças recentes (nova equipe, nova tecnologia)</p>
+<hr />
+<h3 id="integracao-demanda-monte-carlo">🔄 Integração Demanda + Monte Carlo</h3>
+<p><strong>Passo a passo recomendado</strong>:</p>
+<ol>
+<li><strong>Rode o forecast de demanda</strong> e anote os totais previstos (Média/P90)</li>
+<li><strong>Cenário direto</strong>: some o total previsto ao backlog atual e rode uma simulação Monte Carlo completa</li>
+<li><strong>Cenário como risco</strong>: adicione um risco com probabilidade 100% e impacto baixo/médio/alto igual aos percentis (P10, Média, P90)</li>
+<li><strong>Compare</strong> os percentis de término entre o cenário baseline e o cenário com demanda injetada</li>
+<li><strong>Comunicação</strong>: destaque para o time a diferença de semanas/custos quando a demanda prevista é considerada</li>
+</ol>
+<p><strong>Dicas</strong>:</p>
+<ul>
+<li>Use a soma em backlog para dimensionar capacidade “se nada mudar”</li>
+<li>Use a modelagem como risco para explorar “e se a demanda não vier inteira?”</li>
+<li>Se o risco retornar em <strong>HIGH</strong>, trate o cenário P90 como obrigatório ao negociar compromissos</li>
+</ul>
+<hr />
+<h3 id="dependencias">🧷 Dependências</h3>
+<p><strong>Boas práticas</strong>:</p>
+<ul>
+<li>Mantenha a lista sempre atualizada (remova dependências concluídas)</li>
+<li>Revise probabilidades e impactos a cada cerimônia de planejamento</li>
+<li>Use as recomendações automáticas para priorizar conversas com outras equipes</li>
+<li>Documente planos de mitigação quando o risco agregado estiver em nível <strong>HIGH</strong></li>
+</ul>
+<p><strong>Tip</strong>: Sempre que remover ou reduzir uma dependência, rode novamente a análise — cada remoção dobra a chance de entregar no prazo.</p>
 <hr />
 <h3 id="analise-de-custos_1">💰 Análise de Custos</h3>
 <p><strong>Defina custo realista por pessoa-semana</strong>:</p>
@@ -1040,6 +1201,21 @@ Total mensal:         R$ 22,000
    - Melhore processo (Kanban, Scrum mais disciplinado)
    - Treine equipe em quebra de items
    - Estabeleça Definition of Ready/Done claras</p>
+<hr />
+<h3 id="problema-3b-previsao-demanda-risk-high">Problema 3b: "Previsão de Demanda mostra Risco HIGH"</h3>
+<p><strong>Sintomas</strong>:
+- Cartões de risco diário/semanal exibem nível <strong>HIGH</strong>
+- Volatilidade (CV) &gt; 0,5 e tendência recente muito diferente da média
+- Mensagem “High uncertainty detected - consider Monte Carlo”</p>
+<p><strong>Causas comuns</strong>:
+1. Poucas datas recentes (menos de 30-40 dias)
+2. Picos concentrados (ex.: lotes de cadastro em uma única semana)
+3. Mudança repentina no processo de intake</p>
+<p><strong>Soluções</strong>:
+1. <strong>Monte Carlo</strong>: trate os percentis da demanda como backlog ou risco adicional
+2. <strong>Suavização</strong>: remova datas claramente atípicas (importações únicas, testes)
+3. <strong>Maior histórico</strong>: colete mais ciclos completos de demanda (pelo menos 3 meses)</p>
+<p><strong>Dica</strong>: mesmo com Risco HIGH, use o intervalo (P10-P90) para discutir cenários com o time e mitigar saturação de fluxo.</p>
 <hr />
 <h3 id="problema-4-simulacao-demora-muito">Problema 4: "Simulação demora muito"</h3>
 <p><strong>Sintomas</strong>:
