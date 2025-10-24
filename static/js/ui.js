@@ -1166,6 +1166,35 @@ $(window).on("load", function () {
 
         $('#dep-tab-total').text(depAnalysis.total_dependencies);
 
+        // Delay distribution table
+        const $delayBody = $('#dep-tab-delay-body');
+        $delayBody.empty();
+        const delayPercentiles = depAnalysis.delay_percentiles || {};
+        const entries = Object.entries(delayPercentiles).map(([key, value]) => {
+            const numericPercentile = parseFloat(key.replace(/[^0-9.]/g, '')) || 0;
+            const label = key.toUpperCase().startsWith('P') ? key.toUpperCase() : `P${numericPercentile}`;
+            const delayValue = typeof value === 'number' ? value : parseFloat(value) || 0;
+            return { order: numericPercentile, label, value: delayValue };
+        }).sort((a, b) => a.order - b.order);
+
+        if (entries.length) {
+            entries.forEach(({ label, value }) => {
+                const formattedValue = `${value.toFixed(1)} dias`;
+                $delayBody.append(`
+                    <tr>
+                        <td class="font-weight-bold">${label}</td>
+                        <td>${formattedValue}</td>
+                    </tr>
+                `);
+            });
+        } else {
+            $delayBody.append(`
+                <tr>
+                    <td colspan="2" class="text-muted">Sem dados de atraso disponíveis</td>
+                </tr>
+            `);
+        }
+
         // Critical path
         const $criticalPath = $('#dep-tab-critical-path');
         $criticalPath.empty();
