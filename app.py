@@ -1312,18 +1312,25 @@ def visualize_dependencies():
         JSON with base64 encoded image
     """
     try:
-        data = request.json
+        data = request.json or {}
+        dep_analysis = data.get('dependency_analysis')
 
-        if not data:
+        if not dep_analysis:
             return jsonify({
-                'error': 'No data provided'
+                'error': 'Missing dependency_analysis data'
             }), 400
 
         # Create visualizer
         visualizer = ForecastVisualizer()
 
         # Generate visualization
-        image_b64 = visualizer.plot_dependency_impact(data)
+        image_data_url = visualizer.plot_dependency_impact(dep_analysis)
+
+        # Strip possible data URL prefix so the frontend can add it consistently
+        if isinstance(image_data_url, str) and image_data_url.startswith('data:image'):
+            _, _, image_b64 = image_data_url.partition(',')
+        else:
+            image_b64 = image_data_url
 
         return jsonify({
             'image': image_b64

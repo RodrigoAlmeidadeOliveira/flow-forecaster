@@ -24,6 +24,28 @@ class ForecastVisualizer:
 
     def __init__(self):
         self.figures = []
+        self._symbol_replacements = {
+            '⚠️': '[ALERTA] ',
+            '⚠': '[ALERTA] ',
+            'ℹ️': '[INFO] ',
+            'ℹ': '[INFO] ',
+            '✓': '[OK] ',
+            '✅': '[OK] ',
+            '❗': '[ALERTA] ',
+            '❗️': '[ALERTA] ',
+            '✔️': '[OK] ',
+            '✔': '[OK] ',
+            '️': '',  # variation selector
+        }
+
+    def _sanitize_text(self, text: str) -> str:
+        """Replace unsupported glyphs (emoji/symbols) with ASCII-friendly markers."""
+        if not isinstance(text, str):
+            return text
+        cleaned = text
+        for symbol, replacement in self._symbol_replacements.items():
+            cleaned = cleaned.replace(symbol, replacement)
+        return cleaned
 
     def plot_ml_forecasts(self, historical_data: np.ndarray,
                          forecasts: Dict[str, np.ndarray],
@@ -526,6 +548,7 @@ class ForecastVisualizer:
 
         KEY INSIGHT: Each dependency removed DOUBLES your chances of on-time delivery!
         """
+        summary_text = self._sanitize_text(summary_text)
 
         ax5.text(0.05, 0.95, summary_text, transform=ax5.transAxes,
                 fontsize=10, verticalalignment='top', fontfamily='monospace',
@@ -534,7 +557,8 @@ class ForecastVisualizer:
         # Add recommendations
         recommendations = dependency_analysis.get('recommendations', [])
         if recommendations:
-            rec_text = "\n\nRECOMMENDATIONS:\n" + "\n".join([f"• {rec}" for rec in recommendations[:3]])
+            sanitized_recs = [self._sanitize_text(rec) for rec in recommendations[:3]]
+            rec_text = "\n\nRECOMMENDATIONS:\n" + "\n".join([f"- {rec}" for rec in sanitized_recs])
             ax5.text(0.05, 0.35, rec_text, transform=ax5.transAxes,
                     fontsize=9, verticalalignment='top',
                     bbox=dict(boxstyle='round', facecolor='lightblue', alpha=0.8))
