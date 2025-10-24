@@ -29,6 +29,142 @@
     window.__PF_formatInteger = formatInteger;
     window.__PF_formatPercent = formatPercent;
 
+    function parseIntegerValue(value) {
+        if (value === null || value === undefined) return null;
+        const parsed = parseInt(value, 10);
+        return Number.isFinite(parsed) ? parsed : null;
+    }
+
+    function computeBacklogState() {
+        const $minInput = $('#backlogMin');
+        const $maxInput = $('#backlogMax');
+        const $complexity = $('#backlogComplexity');
+        const $hiddenBacklog = $('#numberOfTasks');
+
+        if ($minInput.length === 0 || $maxInput.length === 0 || $complexity.length === 0) {
+            const fallback = parseIntegerValue($hiddenBacklog.val());
+            return {
+                rawMin: null,
+                rawMax: null,
+                normalizedMin: null,
+                normalizedMax: null,
+                adjustedMin: fallback,
+                adjustedMax: fallback,
+                average: fallback,
+                swapped: false,
+                lowMultiplier: 1,
+                highMultiplier: 1,
+                complexityKey: null,
+                complexityLabel: '',
+                elementsPresent: false
+            };
+        }
+
+        const rawMin = parseIntegerValue($minInput.val());
+        const rawMax = parseIntegerValue($maxInput.val());
+        const option = $complexity.find('option:selected');
+
+        const lowMultiplier = parseFloat(option.data('lowMultiplier')) || 1;
+        const highMultiplier = parseFloat(option.data('highMultiplier')) || 1;
+        const complexityKey = option.val() || null;
+        const complexityLabel = option.text().trim();
+
+        let normalizedMin = rawMin;
+        let normalizedMax = rawMax;
+        let swapped = false;
+
+        if (normalizedMin !== null && normalizedMax !== null) {
+            if (normalizedMin > normalizedMax) {
+                swapped = true;
+                const tmp = normalizedMin;
+                normalizedMin = normalizedMax;
+                normalizedMax = tmp;
+            }
+        }
+
+        if (normalizedMin !== null) {
+            normalizedMin = Math.max(0, normalizedMin);
+        }
+        if (normalizedMax !== null) {
+            normalizedMax = Math.max(0, normalizedMax);
+        }
+
+        const adjustedMin = normalizedMin !== null ? Math.round(normalizedMin * lowMultiplier) : null;
+        const adjustedMax = normalizedMax !== null ? Math.round(normalizedMax * highMultiplier) : null;
+
+        let average = null;
+        if (adjustedMin !== null && adjustedMax !== null) {
+            average = Math.round((adjustedMin + adjustedMax) / 2);
+        } else if (adjustedMin !== null) {
+            average = adjustedMin;
+        } else if (adjustedMax !== null) {
+            average = adjustedMax;
+        }
+
+        return {
+            rawMin,
+            rawMax,
+            normalizedMin,
+            normalizedMax,
+            adjustedMin,
+            adjustedMax,
+            average,
+            swapped,
+            lowMultiplier,
+            highMultiplier,
+            complexityKey,
+            complexityLabel,
+            elementsPresent: true
+        };
+    }
+
+    function updateBacklogSummary(state) {
+        if (!state.elementsPresent) {
+            return;
+        }
+
+        const $minInput = $('#backlogMin');
+        const $maxInput = $('#backlogMax');
+        const $hiddenBacklog = $('#numberOfTasks');
+        const $warning = $('#backlogRangeWarning');
+        const $summary = $('#backlogAdjustedSummary');
+
+        if (state.swapped) {
+            $warning.text(i18n('backlog_range_swapped_warning'));
+            if (state.normalizedMin !== null) {
+                $minInput.val(state.normalizedMin);
+            }
+            if (state.normalizedMax !== null) {
+                $maxInput.val(state.normalizedMax);
+            }
+        } else {
+            $warning.text('');
+        }
+
+        if (state.average !== null && state.average > 0) {
+            $hiddenBacklog.val(state.average);
+        } else {
+            $hiddenBacklog.val('');
+        }
+
+        if (state.adjustedMin !== null && state.adjustedMax !== null && state.adjustedMin >= 0 && state.adjustedMax >= 0) {
+            $summary.text(i18n('backlog_adjusted_summary', {
+                adjustedMin: state.adjustedMin,
+                adjustedMax: state.adjustedMax,
+                average: state.average ?? '—',
+                label: state.complexityLabel || ''
+            }));
+        } else {
+            $summary.text(i18n('backlog_adjusted_summary_placeholder'));
+        }
+    }
+
+    function recalculateBacklog() {
+        const state = computeBacklogState();
+        updateBacklogSummary(state);
+        return state;
+    }
+
     function buildThroughputStatsHtml(stats) {
         if (!stats) return '';
         const percentiles = stats.percentiles || {};
@@ -872,6 +1008,24 @@ $(window).on("load", function () {
 
     function readSimulationData(options = {}) {
         const { updateHash = true } = options;
+        const backlogState = recalculateBacklog();
+
+        if (backlogState.elementsPresent) {
+            if (backlogState.normalizedMin === null || backlogState.normalizedMax === null) {
+                alert(i18n('backlog_invalid_range'));
+                return false;
+            }
+            if (backlogState.adjustedMin === null || backlogState.adjustedMax === null ||
+                backlogState.adjustedMin <= 0 || backlogState.adjustedMax <= 0) {
+                alert(i18n('backlog_invalid_range'));
+                return false;
+            }
+            if (backlogState.average === null || backlogState.average <= 0) {
+                alert(i18n('backlog_invalid_range'));
+                return false;
+            }
+        }
+
         const simulationData = {
             projectName: $('#projectName').val(),
             numberOfSimulations: parseInt($('#numberOfSimulations').val()),
@@ -881,7 +1035,7 @@ $(window).on("load", function () {
             splitRateSamples: parseSamples('#splitRateSamples'),
             risks: parseRisks('#risks'),
             dependencies: parseDependencies('#dependencies'),
-            numberOfTasks: parseInt($('#numberOfTasks').val()),
+            numberOfTasks: backlogState.average || parseInt($('#numberOfTasks').val()),
             totalContributors: parseInt($('#totalContributors').val()),
             minContributors: parseInt($('#minContributors').val()) || parseInt($('#totalContributors').val()),
             maxContributors: parseInt($('#maxContributors').val()) || parseInt($('#totalContributors').val()),
@@ -890,6 +1044,18 @@ $(window).on("load", function () {
             startDate: $('#startDate').val() || undefined,
             deadlineDate: $('#deadlineDate').val() || undefined
         };
+
+        if (backlogState.elementsPresent) {
+            simulationData.backlogOriginalMin = backlogState.rawMin;
+            simulationData.backlogOriginalMax = backlogState.rawMax;
+            simulationData.backlogMin = backlogState.normalizedMin;
+            simulationData.backlogMax = backlogState.normalizedMax;
+            simulationData.backlogAdjustedMin = backlogState.adjustedMin;
+            simulationData.backlogAdjustedMax = backlogState.adjustedMax;
+            simulationData.backlogLowMultiplier = backlogState.lowMultiplier;
+            simulationData.backlogHighMultiplier = backlogState.highMultiplier;
+            simulationData.backlogComplexity = backlogState.complexityKey;
+        }
 
         if (!simulationData.tpSamples.some(n => n >= 1)) {
             alert("Must have at least one weekly throughput sample greater than zero");
@@ -953,6 +1119,7 @@ $(window).on("load", function () {
 
         const effort = Math.round(percentile(effortValues, reportPercentile));
         const duration = Math.round(percentile(durationValues, reportPercentile));
+        const backlogSummary = result.backlog_summary || {};
 
         console.log('Monte Carlo Simulation Results:', { effort, duration, effortValues, durationValues, confidenceLevel });
 
@@ -1089,6 +1256,11 @@ $(window).on("load", function () {
         write(`Project forecast summary (with ${confidenceLevel}% of confidence):\n`);
         write(` - Up to ${effort} person-weeks of effort\n`);
         write(` - Can be delivered in up to ${duration} calendar weeks\n`);
+        if (isFiniteNumber(backlogSummary.adjusted_min) && isFiniteNumber(backlogSummary.adjusted_max)) {
+            write(` - Backlog sampled between ${backlogSummary.adjusted_min} and ${backlogSummary.adjusted_max} tasks\n`);
+        } else if (simulationData.backlogAdjustedMin != null && simulationData.backlogAdjustedMax != null) {
+            write(` - Backlog sampled between ${simulationData.backlogAdjustedMin} and ${simulationData.backlogAdjustedMax} tasks\n`);
+        }
         if (simulationData.startDate) {
             write(` - Can be delivered by ${endDate}\n`);
         }
@@ -2024,6 +2196,7 @@ ${generateProgressBar(p50Items, backlog, 'P50 (arriscado)  ', Math.round((p50Ite
                             fillRisk(risk, addRisk());
                         }
                     }
+                    recalculateBacklog();
                     runSimulation();
                     markHistoricalChartsDirty();
                 },
@@ -2036,6 +2209,15 @@ ${generateProgressBar(p50Items, backlog, 'P50 (arriscado)  ', Math.round((p50Ite
             console.error(error);
             return false;
         }
+    }
+
+    if ($('#backlogMin').length) {
+        $('#backlogMin, #backlogMax').on('input change', recalculateBacklog);
+        $('#backlogComplexity').on('change', recalculateBacklog);
+        recalculateBacklog();
+        window.addEventListener('languageChanged', () => {
+            updateBacklogSummary(computeBacklogState());
+        });
     }
 
     $('#tpSamples, #ltSamples').on('input change', markHistoricalChartsDirty);

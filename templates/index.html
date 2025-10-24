@@ -302,22 +302,86 @@
        title="Quantidade máxima de contribuidores esperada"
        type="number"/>
 </div>
+<div class="form-group w-100">
+<label class="font-weight-bold d-block"
+       data-doc-tooltip="Informe o total de itens que precisam ser concluídos. Esse valor representa seu backlog alvo."
+       data-doc-anchor="backlog">
+    <span data-i18n="num_tasks">Número de tarefas</span>
+    <a class="doc-hint-icon" href="https://flow-forecaster.fly.dev/documentacao#backlog" target="_blank" rel="noopener noreferrer" aria-label="Abrir documentação relacionada em nova aba" data-toggle="tooltip" data-placement="top" data-bs-toggle="tooltip" data-bs-placement="top" title="Informe o total de itens que precisam ser concluídos. Esse valor representa seu backlog alvo."><i class="fas fa-circle-question" aria-hidden="true"></i></a>
+    <span style="color:red">*</span>
+</label>
+<div class="form-row">
+<div class="col-md-6">
 <div class="input-group mb-3">
 <div class="input-group-prepend">
-<span class="input-group-text"
-      data-doc-tooltip="Informe o total de itens que precisam ser concluídos. Esse valor representa seu backlog alvo."
-      data-doc-anchor="backlog">
-    <span data-i18n="num_tasks">Número de tarefas<a class="doc-hint-icon" href="https://flow-forecaster.fly.dev/documentacao#backlog" target="_blank" rel="noopener noreferrer" aria-label="Abrir documentação relacionada em nova aba" data-toggle="tooltip" data-placement="top" data-bs-toggle="tooltip" data-bs-placement="top" title="Informe o total de itens que precisam ser concluídos. Esse valor representa seu backlog alvo."><i class="fas fa-circle-question" aria-hidden="true"></i></a></span><span style="color:red">*</span>
-</span>
+<span class="input-group-text" data-i18n="backlog_min_label">Mín</span>
 </div>
 <input class="form-control"
-       id="numberOfTasks"
-       max="9999"
+       id="backlogMin"
+       max="999999"
        min="0"
        required="required"
-       title="Quantidade total de itens no backlog analisado"
+       title="Quantidade mínima estimada de itens no backlog"
        type="number"
        value="1"/>
+<div class="input-group-append d-none d-lg-flex">
+<span class="input-group-text" data-i18n="tasks">tarefas</span>
+</div>
+</div>
+</div>
+<div class="col-md-6">
+<div class="input-group mb-3">
+<div class="input-group-prepend">
+<span class="input-group-text" data-i18n="backlog_max_label">Máx</span>
+</div>
+<input class="form-control"
+       id="backlogMax"
+       max="999999"
+       min="0"
+       required="required"
+       title="Quantidade máxima estimada de itens no backlog"
+       type="number"
+       value="1"/>
+<div class="input-group-append d-none d-lg-flex">
+<span class="input-group-text" data-i18n="tasks">tarefas</span>
+</div>
+</div>
+</div>
+</div>
+<div class="form-row">
+<div class="col-md-6">
+<div class="input-group mb-3">
+<div class="input-group-prepend">
+<span class="input-group-text" data-i18n="backlog_complexity_label">Complexidade</span>
+</div>
+<select class="form-control"
+        id="backlogComplexity"
+        title="Multiplicadores aplicados ao backlog com base na complexidade do escopo">
+<option value="clear_understood"
+        data-i18n="complexity_clear"
+        data-low-multiplier="1"
+        data-high-multiplier="1"
+        selected>Escopo claro e entendido (1× / 1×)</option>
+<option value="somewhat_understood"
+        data-i18n="complexity_somewhat"
+        data-low-multiplier="1"
+        data-high-multiplier="1.5">Parcialmente entendido (1× / 1,5×)</option>
+<option value="not_really_understood"
+        data-i18n="complexity_not_really"
+        data-low-multiplier="1.5"
+        data-high-multiplier="2">Ainda pouco entendido (1,5× / 2×)</option>
+<option value="very_unclear"
+        data-i18n="complexity_very_unclear"
+        data-low-multiplier="1.75"
+        data-high-multiplier="3">Muito incerto (1,75× / 3×)</option>
+</select>
+</div>
+</div>
+</div>
+<small class="form-text text-muted" id="backlogRangeHint" data-i18n="backlog_range_hint">Informe valores mínimos e máximos e escolha a complexidade para ajustarmos automaticamente o backlog.</small>
+<small class="form-text text-warning" id="backlogRangeWarning"></small>
+<div class="alert alert-light border py-2 px-3 mb-0" id="backlogAdjustedSummary" role="alert" data-i18n="backlog_adjusted_summary_placeholder">Backlog ajustado será exibido aqui.</div>
+<input id="numberOfTasks" name="numberOfTasks" type="hidden" value="1"/>
 </div>
 <div class="input-group mb-3">
 <div class="input-group-prepend">

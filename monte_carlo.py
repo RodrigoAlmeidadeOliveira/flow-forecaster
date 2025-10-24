@@ -365,7 +365,21 @@ def simulate_burn_down(simulation_data: Dict[str, Any]) -> Dict[str, Any]:
     lt_samples = simulation_data['ltSamples']
     split_rate_samples = simulation_data['splitRateSamples']
     risks = simulation_data['risks']
-    number_of_tasks = simulation_data['numberOfTasks']
+    base_backlog = simulation_data['numberOfTasks']
+
+    backlog_min = simulation_data.get('backlogAdjustedMin')
+    backlog_max = simulation_data.get('backlogAdjustedMax')
+    if backlog_min is not None and backlog_max is not None:
+        try:
+            backlog_low = int(round(backlog_min))
+            backlog_high = int(round(backlog_max))
+        except (TypeError, ValueError):
+            backlog_low = backlog_high = None
+        if backlog_low is not None and backlog_high is not None and backlog_low > 0 and backlog_high > 0:
+            if backlog_low > backlog_high:
+                backlog_low, backlog_high = backlog_high, backlog_low
+            base_backlog = random_integer(backlog_low, backlog_high)
+
     total_contributors = simulation_data['totalContributors']
 
     # Retrieve a random split rate for this round
@@ -379,7 +393,7 @@ def simulate_burn_down(simulation_data: Dict[str, Any]) -> Dict[str, Any]:
             impact_tasks += random_integer(risk['lowImpact'], risk['highImpact'])
 
     # Calculate the number of tasks for this round
-    total_tasks = round((number_of_tasks + impact_tasks) * random_split_rate)
+    total_tasks = round((base_backlog + impact_tasks) * random_split_rate)
 
     # Extend the duration by a random sample average of lead times
     lead_time = (random_sample_average(lt_samples,
@@ -541,6 +555,16 @@ def run_monte_carlo_simulation(simulation_data: Dict[str, Any]) -> Dict[str, Any
         'input_stats': {
             'throughput': throughput_stats,
             'lead_time': lead_time_stats
+        },
+        'backlog_summary': {
+            'average': simulation_data.get('numberOfTasks'),
+            'adjusted_min': simulation_data.get('backlogAdjustedMin'),
+            'adjusted_max': simulation_data.get('backlogAdjustedMax'),
+            'raw_min': simulation_data.get('backlogMin') or simulation_data.get('backlogOriginalMin'),
+            'raw_max': simulation_data.get('backlogMax') or simulation_data.get('backlogOriginalMax'),
+            'low_multiplier': simulation_data.get('backlogLowMultiplier'),
+            'high_multiplier': simulation_data.get('backlogHighMultiplier'),
+            'complexity': simulation_data.get('backlogComplexity')
         }
     }
 
