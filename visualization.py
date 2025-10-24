@@ -9,6 +9,7 @@ import numpy as np
 import matplotlib
 matplotlib.use('Agg')  # Use non-interactive backend
 import matplotlib.pyplot as plt
+from matplotlib.patches import FancyBboxPatch
 import seaborn as sns
 from typing import Dict, List, Optional
 from datetime import datetime, timedelta
@@ -428,150 +429,329 @@ class ForecastVisualizer:
         Returns:
             Base64 encoded image string
         """
-        fig = plt.figure(figsize=(16, 10))
-        gs = fig.add_gridspec(3, 2, hspace=0.3, wspace=0.3)
+        fig = plt.figure(figsize=(14, 9))
+        gs = fig.add_gridspec(
+            3,
+            4,
+            height_ratios=[0.7, 2.2, 2.2],
+            hspace=0.45,
+            wspace=0.35
+        )
 
-        # 1. On-time Probability vs Number of Dependencies
-        ax1 = fig.add_subplot(gs[0, 0])
         n_deps = dependency_analysis['total_dependencies']
         on_time_prob = dependency_analysis['on_time_probability']
+        expected_delay = dependency_analysis.get('expected_delay_days', 0.0)
+        at_least_one_delayed = dependency_analysis.get('at_least_one_delayed_probability', 0.0)
+        risk_score = dependency_analysis['risk_score']
+        risk_level = dependency_analysis['risk_level']
+        percentiles = dependency_analysis.get('delay_percentiles', {})
+
+        risk_palette = {
+            'LOW': '#2ecc71',
+            'MEDIUM': '#f1c40f',
+            'HIGH': '#e67e22',
+            'CRITICAL': '#e74c3c'
+        }
+        risk_color = risk_palette.get(risk_level.upper(), '#6c757d')
+
+        # ------------------------------------------------------------------
+        # Top metrics row
+        # ------------------------------------------------------------------
+        ax_metrics = fig.add_subplot(gs[0, :])
+        ax_metrics.axis('off')
+        card_positions = [0.02, 0.35, 0.68]
+        card_width = 0.29
+        card_height = 0.78
+        metric_cards = [
+            {
+                'title': 'On-time Probability',
+                'value': f"{on_time_prob * 100:.1f}%",
+                'subtitle': self._sanitize_text(
+                    f"Odds: {dependency_analysis['odds_ratio']} | "
+                    f"At least one delayed: {at_least_one_delayed * 100:.1f}%"
+                ),
+                'color': '#2E86AB'
+            },
+            {
+                'title': 'Expected Delay (if delayed)',
+                'value': f"{expected_delay:.1f} days",
+                'subtitle': self._sanitize_text(
+                    f"P50: {percentiles.get('p50', 0):.1f}d | "
+                    f"P90: {percentiles.get('p90', 0):.1f}d"
+                ),
+                'color': '#E67E22'
+            },
+            {
+                'title': 'Risk Level',
+                'value': self._sanitize_text(f"{risk_level}"),
+                'subtitle': self._sanitize_text(
+                    f"Score: {risk_score:.0f}/100 | Dependencies: {n_deps}"
+                ),
+                'color': risk_color
+            }
+        ]
+
+        for idx, card in enumerate(metric_cards):
+            x0 = card_positions[idx]
+            box = FancyBboxPatch(
+                (x0, 0.1),
+                card_width,
+                card_height,
+                boxstyle="round,pad=0.02",
+                linewidth=1.5,
+                facecolor=card['color'],
+                edgecolor=card['color'],
+                alpha=0.18,
+                transform=ax_metrics.transAxes
+            )
+            ax_metrics.add_patch(box)
+            ax_metrics.text(
+                x0 + card_width / 2,
+                0.72,
+                card['title'],
+                fontsize=11,
+                fontweight='bold',
+                ha='center',
+                va='center',
+                color='#1f1f1f'
+            )
+            ax_metrics.text(
+                x0 + card_width / 2,
+                0.46,
+                card['value'],
+                fontsize=20,
+                fontweight='bold',
+                ha='center',
+                va='center',
+                color=card['color']
+            )
+            ax_metrics.text(
+                x0 + card_width / 2,
+                0.22,
+                card['subtitle'],
+                fontsize=9,
+                ha='center',
+                va='center',
+                color='#333333'
+            )
+
+        # ------------------------------------------------------------------
+        # 1. On-time Probability vs Number of Dependencies
+        # ------------------------------------------------------------------
+        ax1 = fig.add_subplot(gs[1, :2])
 
         # Show exponential decay curve
-        x = range(0, max(10, n_deps + 2))
-        # Using simplified model: 0.5^n
+        x = range(0, max(8, n_deps + 3))
         y_simple = [0.5 ** i for i in x]
 
-        ax1.plot(x, [p * 100 for p in y_simple], 'b-', alpha=0.3, linewidth=2, label='Simplified Model (50% each)')
-        ax1.scatter([n_deps], [on_time_prob * 100], s=200, c='red', marker='o', zorder=5, edgecolors='darkred', linewidths=2)
-        ax1.axhline(y=on_time_prob * 100, color='red', linestyle='--', alpha=0.5, label=f'Current: {on_time_prob*100:.1f}%')
+        ax1.plot(
+            x,
+            [p * 100 for p in y_simple],
+            color='#7FDBFF',
+            alpha=0.8,
+            linewidth=2.5,
+            label='Simplified model (50% each)'
+        )
+        ax1.scatter(
+            [n_deps],
+            [on_time_prob * 100],
+            s=180,
+            c=risk_color,
+            marker='o',
+            zorder=5,
+            edgecolors='#2c3e50',
+            linewidths=1.5
+        )
+        ax1.axhline(
+            y=on_time_prob * 100,
+            color=risk_color,
+            linestyle='--',
+            alpha=0.5,
+            label=f'Current probability: {on_time_prob * 100:.1f}%'
+        )
 
-        ax1.set_xlabel('Number of Dependencies', fontsize=11, fontweight='bold')
-        ax1.set_ylabel('On-time Delivery Probability (%)', fontsize=11, fontweight='bold')
-        ax1.set_title('Impact of Dependencies on On-time Probability', fontsize=12, fontweight='bold')
-        ax1.grid(True, alpha=0.3)
-        ax1.legend()
+        ax1.set_xlabel('Number of dependencies', fontsize=11, fontweight='bold')
+        ax1.set_ylabel('On-time delivery probability (%)', fontsize=11, fontweight='bold')
+        ax1.set_title('Impact of dependency count on delivery confidence', fontsize=12, fontweight='bold')
+        ax1.grid(True, alpha=0.25)
+        ax1.set_facecolor('#f8f9fa')
+        for spine in ax1.spines.values():
+            spine.set_color('#dcdcdc')
+        ax1.legend(loc='upper right', fontsize=9, frameon=False)
 
         # Add annotation
-        ax1.annotate(f'{n_deps} dependencies\n{on_time_prob*100:.1f}% probability\n({dependency_analysis["odds_ratio"]})',
-                    xy=(n_deps, on_time_prob * 100),
-                    xytext=(n_deps + 1, on_time_prob * 100 + 10),
-                    arrowprops=dict(arrowstyle='->', color='red', lw=2),
-                    fontsize=10, bbox=dict(boxstyle='round,pad=0.5', facecolor='yellow', alpha=0.7))
+        dep_label = "dependency" if n_deps == 1 else "dependencies"
+        annotation = self._sanitize_text(
+            f"{n_deps} {dep_label}\n{on_time_prob * 100:.1f}% probability\n({dependency_analysis['odds_ratio']})"
+        )
+        ax1.annotate(
+            annotation,
+            xy=(n_deps, on_time_prob * 100),
+            xytext=(n_deps + 0.7, min(100, on_time_prob * 100 + 15)),
+            arrowprops=dict(arrowstyle='->', color=risk_color, lw=2),
+            fontsize=9,
+            bbox=dict(boxstyle='round,pad=0.4', facecolor='white', alpha=0.9)
+        )
 
+        # ------------------------------------------------------------------
         # 2. Delay Distribution (Percentiles)
-        ax2 = fig.add_subplot(gs[0, 1])
-        percentiles = dependency_analysis['delay_percentiles']
+        # ------------------------------------------------------------------
+        ax2 = fig.add_subplot(gs[1, 2:])
         p_labels = list(percentiles.keys())
         p_values = [percentiles[p] for p in p_labels]
 
-        colors = plt.cm.RdYlGn_r(np.linspace(0.3, 0.9, len(p_labels)))
-        bars = ax2.barh(p_labels, p_values, color=colors, edgecolor='black', linewidth=1)
+        colors = plt.cm.YlOrRd(np.linspace(0.4, 0.85, len(p_labels))) if p_labels else []
+        bars = ax2.barh(
+            p_labels,
+            p_values,
+            color=colors,
+            edgecolor='#d35400',
+            linewidth=1.1
+        )
 
-        ax2.set_xlabel('Expected Delay (days)', fontsize=11, fontweight='bold')
+        ax2.set_xlabel('Expected delay (days)', fontsize=11, fontweight='bold')
         ax2.set_ylabel('Percentile', fontsize=11, fontweight='bold')
-        ax2.set_title('Delay Impact Distribution (if delayed)', fontsize=12, fontweight='bold')
-        ax2.grid(True, alpha=0.3, axis='x')
+        ax2.set_title('Delay distribution when dependency slips', fontsize=12, fontweight='bold')
+        ax2.grid(True, alpha=0.25, axis='x')
+        ax2.set_facecolor('#fef9f3')
+        for spine in ax2.spines.values():
+            spine.set_color('#dcdcdc')
 
-        # Add value labels
+        max_delay = max(p_values) if p_values else 0
         for i, (bar, val) in enumerate(zip(bars, p_values)):
-            ax2.text(val + 0.5, i, f'{val:.1f}d', va='center', fontsize=9, fontweight='bold')
+            ax2.text(
+                val + (max_delay * 0.02 if max_delay else 0.5),
+                bar.get_y() + bar.get_height() / 2,
+                f'{val:.1f} d',
+                va='center',
+                fontsize=9,
+                fontweight='bold',
+                color='#6e2c00'
+            )
 
-        # 3. Risk Score Gauge
-        ax3 = fig.add_subplot(gs[1, 0])
-        risk_score = dependency_analysis['risk_score']
-        risk_level = dependency_analysis['risk_level']
+        # ------------------------------------------------------------------
+        # Bottom-left: risk gauge + critical path (sub-gridspec)
+        # ------------------------------------------------------------------
+        sub_gs = gs[2, :2].subgridspec(2, 1, height_ratios=[0.8, 1.4], hspace=0.30)
 
-        # Create gauge chart
-        theta = np.linspace(0, np.pi, 100)
-        r = np.ones_like(theta)
+        ax_risk = fig.add_subplot(sub_gs[0])
+        ax_risk.set_xlim(0, 100)
+        ax_risk.set_ylim(0, 1)
+        ax_risk.axis('off')
+        ax_risk.set_title('Aggregate risk profile', fontsize=11, fontweight='bold', loc='left')
 
-        # Color zones
-        colors_zones = ['green', 'yellow', 'orange', 'red']
-        zone_ranges = [0, 25, 50, 75, 100]
+        risk_zones = [
+            (0, 25, '#d4efdf'),
+            (25, 50, '#fcf3cf'),
+            (50, 75, '#fdebd0'),
+            (75, 100, '#f5b7b1')
+        ]
+        for start, end, color in risk_zones:
+            ax_risk.axvspan(start, end, color=color, alpha=0.8, ymin=0.35, ymax=0.85)
 
-        for i in range(len(colors_zones)):
-            theta_zone = np.linspace(np.pi * (1 - zone_ranges[i+1]/100), np.pi * (1 - zone_ranges[i]/100), 20)
-            ax3.fill_between(theta_zone, 0, 1, color=colors_zones[i], alpha=0.3)
+        ax_risk.barh(
+            0.6,
+            risk_score,
+            height=0.25,
+            color=risk_color,
+            alpha=0.7,
+            edgecolor='#444'
+        )
+        ax_risk.scatter([risk_score], [0.6], color='#2c3e50', s=40, zorder=3)
+        ax_risk.text(
+            risk_score,
+            0.25,
+            self._sanitize_text(f'{risk_score:.0f}/100 - {risk_level}'),
+            ha='center',
+            va='center',
+            fontsize=10,
+            fontweight='bold'
+        )
+        ax_risk.text(0, 0.05, '0', fontsize=9, fontweight='bold')
+        ax_risk.text(50, 0.05, '50', fontsize=9, fontweight='bold', ha='center')
+        ax_risk.text(100, 0.05, '100', fontsize=9, fontweight='bold', ha='right')
 
-        # Needle
-        needle_theta = np.pi * (1 - risk_score / 100)
-        ax3.plot([0, np.cos(needle_theta)], [0, np.sin(needle_theta)], 'k-', linewidth=4)
-        ax3.plot(0, 0, 'ko', markersize=15)
-
-        ax3.set_xlim(-1.1, 1.1)
-        ax3.set_ylim(0, 1.2)
-        ax3.set_aspect('equal')
-        ax3.axis('off')
-        ax3.set_title(f'Risk Score: {risk_score:.0f}/100 - {risk_level}', fontsize=12, fontweight='bold')
-
-        # Add labels
-        ax3.text(-1, 0, '0', ha='right', va='center', fontsize=10, fontweight='bold')
-        ax3.text(0, 1.15, '50', ha='center', va='bottom', fontsize=10, fontweight='bold')
-        ax3.text(1, 0, '100', ha='left', va='center', fontsize=10, fontweight='bold')
-
-        # 4. Critical Path
-        ax4 = fig.add_subplot(gs[1, 1])
-        critical_path = dependency_analysis['critical_path'][:5]  # Top 5
+        ax4 = fig.add_subplot(sub_gs[1])
+        critical_path = dependency_analysis['critical_path'][:5]
 
         if critical_path:
             y_pos = np.arange(len(critical_path))
-            # Shorten names if too long
             labels = [cp[:40] + '...' if len(cp) > 40 else cp for cp in critical_path]
 
-            colors_crit = plt.cm.Reds(np.linspace(0.9, 0.5, len(critical_path)))
-            ax4.barh(y_pos, [len(critical_path) - i for i in range(len(critical_path))], color=colors_crit, edgecolor='black')
+            priorities = list(range(len(critical_path), 0, -1))
+            colors_crit = plt.cm.Reds(np.linspace(0.35, 0.85, len(critical_path)))
+            ax4.barh(
+                y_pos,
+                priorities,
+                color=colors_crit,
+                edgecolor='#922b21',
+                linewidth=1.1
+            )
             ax4.set_yticks(y_pos)
             ax4.set_yticklabels(labels, fontsize=9)
-            ax4.set_xlabel('Criticality Score', fontsize=11, fontweight='bold')
-            ax4.set_title('Top 5 Critical Dependencies', fontsize=12, fontweight='bold')
-            ax4.grid(True, alpha=0.3, axis='x')
+            ax4.set_xlabel('Priority (1 = most critical)', fontsize=10, fontweight='bold')
+            ax4.set_title('Top 5 critical dependencies', fontsize=11, fontweight='bold', loc='left')
+            ax4.set_facecolor('#fdf0ee')
+            ax4.invert_yaxis()
+            for spine in ax4.spines.values():
+                spine.set_visible(False)
+            ax4.grid(True, axis='x', alpha=0.15)
         else:
             ax4.text(0.5, 0.5, 'No critical dependencies identified', ha='center', va='center', fontsize=11)
             ax4.axis('off')
 
-        # 5. Summary Statistics
-        ax5 = fig.add_subplot(gs[2, :])
-        ax5.axis('off')
+        # ------------------------------------------------------------------
+        # 5. Summary & recommendations
+        # ------------------------------------------------------------------
+        ax_summary = fig.add_subplot(gs[2, 2:])
+        ax_summary.axis('off')
 
-        summary_text = f"""
-        DEPENDENCY ANALYSIS SUMMARY
+        summary_lines = [
+            "Dependency analysis snapshot",
+            f"- Total dependencies: {n_deps}",
+            f"- On-time probability: {on_time_prob * 100:.1f}% ({dependency_analysis['odds_ratio']})",
+            f"- At least one delayed: {at_least_one_delayed * 100:.1f}%",
+            f"- Mean delay if slipped: {expected_delay:.1f} days",
+            f"- Median delay (P50): {percentiles.get('p50', 0):.1f} days",
+            f"- 90th percentile delay: {percentiles.get('p90', 0):.1f} days",
+        ]
+        summary_text = self._sanitize_text("\n".join(summary_lines))
 
-        Total Dependencies: {dependency_analysis['total_dependencies']}
-        On-time Probability: {dependency_analysis['on_time_probability_percentage']}% ({dependency_analysis['odds_ratio']})
-        At Least One Delayed: {dependency_analysis['at_least_one_delayed_probability_percentage']}%
+        ax_summary.text(
+            0.02,
+            0.96,
+            summary_text,
+            transform=ax_summary.transAxes,
+            fontsize=10,
+            va='top',
+            ha='left',
+            bbox=dict(boxstyle='round', facecolor='#fdf7e3', edgecolor='#f1c40f', alpha=0.9)
+        )
 
-        Expected Delay (if delayed): {dependency_analysis['expected_delay_days']:.1f} days
-        Median Delay: {percentiles.get('p50', 0):.1f} days
-        90th Percentile Delay: {percentiles.get('p90', 0):.1f} days
-
-        Risk Level: {risk_level} (Score: {risk_score:.0f}/100)
-
-        KEY INSIGHT: Each dependency removed DOUBLES your chances of on-time delivery!
-        """
-        summary_text = self._sanitize_text(summary_text)
-
-        ax5.text(0.05, 0.95, summary_text, transform=ax5.transAxes,
-                fontsize=10, verticalalignment='top', fontfamily='monospace',
-                bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8))
-
-        # Add recommendations
+        # Recommendations block
         recommendations = dependency_analysis.get('recommendations', [])
         if recommendations:
-            sanitized_recs = [self._sanitize_text(rec) for rec in recommendations[:3]]
-            rec_text = "\n\nRECOMMENDATIONS:\n" + "\n".join([f"- {rec}" for rec in sanitized_recs])
-            ax5.text(0.05, 0.35, rec_text, transform=ax5.transAxes,
-                    fontsize=9, verticalalignment='top',
-                    bbox=dict(boxstyle='round', facecolor='lightblue', alpha=0.8))
+            sanitized_recs = [self._sanitize_text(rec) for rec in recommendations[:4]]
+            rec_text = "Priority recommendations:\n" + "\n".join([f"- {rec}" for rec in sanitized_recs])
+            ax_summary.text(
+                0.02,
+                0.38,
+                rec_text,
+                transform=ax_summary.transAxes,
+                fontsize=9.5,
+                va='top',
+                ha='left',
+                bbox=dict(boxstyle='round', facecolor='#e8f4fb', edgecolor='#3498db', alpha=0.9)
+            )
 
-        fig.suptitle('Dependency Impact Analysis for Project Forecasting', fontsize=14, fontweight='bold', y=0.98)
+        fig.suptitle(
+            'Dependency Impact Analysis for Project Forecasting',
+            fontsize=14,
+            fontweight='bold',
+            y=0.98
+        )
 
-        buffer = io.BytesIO()
-        fig.savefig(buffer, format='png', dpi=100, bbox_inches='tight')
-        buffer.seek(0)
-        image_base64 = base64.b64encode(buffer.read()).decode('utf-8')
-        plt.close(fig)
-        buffer.close()
-        return f"data:image/png;base64,{image_base64}"
+        return self._fig_to_base64(fig)
 
 
 # For pandas import if needed
