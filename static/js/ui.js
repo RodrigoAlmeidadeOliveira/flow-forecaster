@@ -29,6 +29,24 @@
     window.__PF_formatInteger = formatInteger;
     window.__PF_formatPercent = formatPercent;
 
+    function translate(key, fallback, params) {
+        if (typeof window.i18n === 'function') {
+            try {
+                return window.i18n(key, params);
+            } catch (error) {
+                console.warn('[i18n] Failed to translate key:', key, error);
+            }
+        }
+        let text = fallback != null ? fallback : key;
+        if (params) {
+            Object.keys(params).forEach(param => {
+                const value = params[param];
+                text = text.replace(new RegExp(`{{${param}}}`, 'g'), value);
+            });
+        }
+        return text;
+    }
+
     function parseIntegerValue(value) {
         if (value === null || value === undefined) return null;
         const parsed = parseInt(value, 10);
@@ -130,7 +148,10 @@
         const $summary = $('#backlogAdjustedSummary');
 
         if (state.swapped) {
-            $warning.text(i18n('backlog_range_swapped_warning'));
+            $warning.text(translate(
+                'backlog_range_swapped_warning',
+                'O valor mínimo era maior que o máximo e foi invertido automaticamente.'
+            ));
             if (state.normalizedMin !== null) {
                 $minInput.val(state.normalizedMin);
             }
@@ -148,14 +169,21 @@
         }
 
         if (state.adjustedMin !== null && state.adjustedMax !== null && state.adjustedMin >= 0 && state.adjustedMax >= 0) {
-            $summary.text(i18n('backlog_adjusted_summary', {
-                adjustedMin: state.adjustedMin,
-                adjustedMax: state.adjustedMax,
-                average: state.average ?? '—',
-                label: state.complexityLabel || ''
-            }));
+            $summary.text(translate(
+                'backlog_adjusted_summary',
+                'Backlog ajustado: {{adjustedMin}} – {{adjustedMax}} tarefas (média {{average}}) • Complexidade: {{label}}',
+                {
+                    adjustedMin: state.adjustedMin,
+                    adjustedMax: state.adjustedMax,
+                    average: state.average ?? '—',
+                    label: state.complexityLabel || ''
+                }
+            ));
         } else {
-            $summary.text(i18n('backlog_adjusted_summary_placeholder'));
+            $summary.text(translate(
+                'backlog_adjusted_summary_placeholder',
+                'Backlog ajustado será exibido aqui.'
+            ));
         }
     }
 
@@ -1011,17 +1039,26 @@ $(window).on("load", function () {
         const backlogState = recalculateBacklog();
 
         if (backlogState.elementsPresent) {
-            if (backlogState.normalizedMin === null || backlogState.normalizedMax === null) {
-                alert(i18n('backlog_invalid_range'));
+            const hasMin = backlogState.normalizedMin !== null && backlogState.normalizedMin > 0;
+            const hasMax = backlogState.normalizedMax !== null && backlogState.normalizedMax > 0;
+            const invalidMessage = translate(
+                'backlog_invalid_range',
+                'Defina valores mínimos e máximos válidos e maiores que zero para o backlog.'
+            );
+
+            if (!hasMin && !hasMax) {
+                alert(invalidMessage);
                 return false;
             }
-            if (backlogState.adjustedMin === null || backlogState.adjustedMax === null ||
-                backlogState.adjustedMin <= 0 || backlogState.adjustedMax <= 0) {
-                alert(i18n('backlog_invalid_range'));
+
+            if ((hasMin && (backlogState.adjustedMin === null || backlogState.adjustedMin <= 0)) ||
+                (hasMax && (backlogState.adjustedMax === null || backlogState.adjustedMax <= 0))) {
+                alert(invalidMessage);
                 return false;
             }
+
             if (backlogState.average === null || backlogState.average <= 0) {
-                alert(i18n('backlog_invalid_range'));
+                alert(invalidMessage);
                 return false;
             }
         }
@@ -2218,6 +2255,7 @@ ${generateProgressBar(p50Items, backlog, 'P50 (arriscado)  ', Math.round((p50Ite
         window.addEventListener('languageChanged', () => {
             updateBacklogSummary(computeBacklogState());
         });
+        $(recalculateBacklog);
     }
 
     $('#tpSamples, #ltSamples').on('input change', markHistoricalChartsDirty);
