@@ -1,4 +1,5 @@
-(function ($) {
+(function (global) {
+    const $ = global.jQuery || global.$;
     function isFiniteNumber(value) {
         return typeof value === 'number' && isFinite(value);
     }
