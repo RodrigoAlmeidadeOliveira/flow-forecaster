@@ -1427,6 +1427,115 @@ Histograma mostrando a distribuição de probabilidade do esforço estimado usan
 
 <hr class="my-5">
 
+<hr class="my-5">
+
+<div class="container-fluid bg-6 text-center" id="demand-forecast-section">
+<h2 class="mb-3">
+    🧠 Previsão de Demanda com ML
+<a class="doc-hint-icon" href="https://flow-forecaster.fly.dev/documentacao#2-machine-learning" target="_blank" rel="noopener noreferrer" aria-label="Abrir documentação relacionada em nova aba" data-toggle="tooltip" data-placement="top" data-bs-toggle="tooltip" data-bs-placement="top" title="Utilize as datas históricas das demandas para treinar modelos de machine learning e projetar o volume futuro."><i class="fas fa-circle-question" aria-hidden="true"></i></a></h2>
+<p class="text-muted mb-4">
+    Cole as datas de criação das demandas (uma por linha) e o Flow Forecaster irá agregar os dados, treinar modelos de machine learning
+    e gerar projeções diárias e semanais com intervalos de confiança.
+</p>
+
+<div class="row">
+<div class="col-md-6 text-left">
+<h3>Entradas</h3>
+<div class="form-group">
+<label for="demandDates">Datas de chegada das demandas</label>
+<textarea class="form-control text-monospace" id="demandDates" rows="8" placeholder="Exemplos:
+2024-01-03
+2024-01-04
+05/01/2024 14:30
+2024-01-06T09:10:00"></textarea>
+<small class="form-text text-muted">
+    Aceita formatos ISO (<code>YYYY-MM-DD</code>) ou datas brasileiras (<code>DD/MM/AAAA</code>). Informe uma data por linha.
+</small>
+</div>
+<div class="form-row">
+<div class="form-group col-md-6">
+<label for="demandForecastDays">Horizonte diário (dias)</label>
+<input class="form-control" id="demandForecastDays" type="number" min="1" max="60" value="14" title="Número de dias futuros para prever"/>
+</div>
+<div class="form-group col-md-6">
+<label for="demandForecastWeeks">Horizonte semanal (semanas)</label>
+<input class="form-control" id="demandForecastWeeks" type="number" min="1" max="20" value="8" title="Número de semanas futuras para prever"/>
+</div>
+</div>
+<div class="form-group form-check">
+<input class="form-check-input" id="demandExcludeWeekends" type="checkbox"/>
+<label class="form-check-label" for="demandExcludeWeekends">Ignorar sábados e domingos</label>
+</div>
+<button class="btn btn-primary btn-lg" id="runDemandForecast" type="button">
+<i class="fas fa-robot"></i> Gerar Forecast de Demanda
+</button>
+<div class="mt-3 alert alert-danger" id="demand-forecast-error" style="display:none" role="alert"></div>
+</div>
+<div class="col-md-6 text-left">
+<h3>Dicas rápidas</h3>
+<ul class="list-unstyled mb-0">
+<li><i class="fas fa-check text-success"></i> Use pelo menos 60 dias de histórico para obter previsões estáveis.</li>
+<li><i class="fas fa-check text-success"></i> Você pode remover finais de semana marcando a opção de exclusão.</li>
+<li><i class="fas fa-check text-success"></i> Combine com Monte Carlo quando o risco for alto.</li>
+</ul>
+</div>
+</div>
+
+<div class="text-center mt-4" id="demand-forecast-loading" style="display:none">
+<div class="spinner-border text-primary" role="status">
+<span class="sr-only">Carregando...</span>
+</div>
+<p class="mt-2 mb-0">Treinando modelos e calculando previsões...</p>
+</div>
+
+<div class="mt-4" id="demand-forecast-results" style="display:none">
+<div class="results-panel">
+<h4>Resumo histórico</h4>
+<div id="demand-history-summary"></div>
+</div>
+
+<div class="row">
+<div class="col-lg-6">
+<div class="results-panel">
+<h4>Risco (diário)</h4>
+<div id="demand-daily-risk"></div>
+</div>
+</div>
+<div class="col-lg-6" id="demand-weekly-panels" style="display:none">
+<div class="results-panel">
+<h4>Risco (semanal)</h4>
+<div id="demand-weekly-risk"></div>
+</div>
+</div>
+</div>
+
+<div class="chart-container" id="demand-daily-chart-container">
+<h4>Série histórica e forecast diário</h4>
+<img alt="Previsão diária de demanda" id="demand-daily-chart" src=""/>
+</div>
+
+<div class="chart-container" id="demand-weekly-chart-container" style="display:none">
+<h4>Forecast semanal</h4>
+<img alt="Previsão semanal de demanda" id="demand-weekly-chart" src=""/>
+</div>
+
+<div class="results-panel">
+<h4>Métricas dos modelos (diário)</h4>
+<div id="demand-model-performance"></div>
+</div>
+
+<div class="results-panel">
+<h4>Forecast diário</h4>
+<div id="demand-daily-table"></div>
+</div>
+
+<div class="results-panel" id="demand-weekly-table-wrapper" style="display:none">
+<h4>Forecast semanal</h4>
+<div id="demand-weekly-table"></div>
+</div>
+</div>
+</div>
+
 <!-- AVERAGE DEMAND COST SECTION -->
 <div class="container-fluid bg-6 text-center">
 <h2 class="mb-3"
@@ -1808,6 +1917,7 @@ a probabilidade de todas serem entregues no prazo é de <strong>1 em 2^n</strong
 <!-- Custom JS -->
 <script src="{{ url_for('static', filename='js/ui.js') }}?v=20241130"></script>
 <script src="{{ url_for('static', filename='js/advanced_forecast.js') }}"></script>
+<script src="{{ url_for('static', filename='js/demand_forecast.js') }}"></script>
 <script src="{{ url_for('static', filename='js/charts.js') }}"></script>
 <script src="{{ url_for('static', filename='js/cost_analysis.js') }}"></script>
 <script>

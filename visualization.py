@@ -11,7 +11,8 @@ matplotlib.use('Agg')  # Use non-interactive backend
 import matplotlib.pyplot as plt
 from matplotlib.patches import FancyBboxPatch
 import seaborn as sns
-from typing import Dict, List, Optional
+import pandas as pd
+from typing import Dict, List, Optional, Sequence
 from datetime import datetime, timedelta
 
 # Set style
@@ -119,6 +120,90 @@ class ForecastVisualizer:
         if use_dates:
             plt.xticks(rotation=45, ha='right')
 
+        plt.tight_layout()
+
+        return self._fig_to_base64(fig)
+
+    def plot_demand_forecast(
+        self,
+        historical_series: pd.Series,
+        forecast_dates: Sequence[datetime],
+        ensemble_stats: Dict[str, Sequence[float]],
+        *,
+        title: str = "Demand Forecast",
+        ylabel: str = "Demand",
+    ) -> str:
+        """
+        Plot demand history alongside ensemble forecast intervals.
+        """
+        if historical_series.empty or not forecast_dates:
+            raise ValueError("Dados insuficientes para gerar o gráfico de demanda.")
+
+        hist_x = historical_series.index
+        hist_y = historical_series.values.astype(float)
+
+        forecast_x = list(forecast_dates)
+        mean = np.asarray(ensemble_stats.get("mean", []), dtype=float)
+        p10 = np.asarray(ensemble_stats.get("p10", []), dtype=float)
+        p90 = np.asarray(ensemble_stats.get("p90", []), dtype=float)
+        p25 = np.asarray(ensemble_stats.get("p25", []), dtype=float)
+        p75 = np.asarray(ensemble_stats.get("p75", []), dtype=float)
+
+        if len(forecast_x) != len(mean):
+            raise ValueError("Tamanho do horizonte previsto não corresponde ao conjunto de datas.")
+
+        fig, ax = plt.subplots(figsize=(14, 6))
+
+        ax.plot(hist_x, hist_y, color="#2E86AB", linewidth=2, label="Histórico", zorder=3)
+        ax.plot(
+            forecast_x,
+            mean,
+            color="#E63946",
+            linewidth=2.2,
+            marker="o",
+            markersize=5,
+            label="Média prevista",
+            zorder=4,
+        )
+
+        if len(p10) and len(p90):
+            ax.fill_between(
+                forecast_x,
+                p10,
+                p90,
+                color="#E63946",
+                alpha=0.15,
+                label="Intervalo P10 - P90",
+            )
+
+        if len(p25) and len(p75):
+            ax.fill_between(
+                forecast_x,
+                p25,
+                p75,
+                color="#E63946",
+                alpha=0.25,
+                label="Intervalo P25 - P75",
+            )
+
+        boundary = forecast_x[0]
+        ax.axvline(boundary, color="#555555", linestyle="--", linewidth=1.2, alpha=0.6)
+        ax.text(
+            boundary,
+            ax.get_ylim()[1],
+            " Início da previsão",
+            fontsize=10,
+            color="#555555",
+            verticalalignment="top",
+            horizontalalignment="left",
+        )
+
+        ax.set_title(title, fontsize=14, fontweight="bold")
+        ax.set_ylabel(ylabel, fontsize=12, fontweight="bold")
+        ax.set_xlabel("Data", fontsize=12, fontweight="bold")
+        ax.legend(loc="best", framealpha=0.9)
+        ax.grid(True, alpha=0.3)
+        plt.xticks(rotation=45, ha="right")
         plt.tight_layout()
 
         return self._fig_to_base64(fig)

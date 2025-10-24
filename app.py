@@ -20,6 +20,7 @@ from monte_carlo_unified import (
 from ml_forecaster import MLForecaster
 from ml_deadline_forecaster import ml_analyze_deadline, ml_forecast_how_many, ml_forecast_when
 from visualization import ForecastVisualizer
+from demand_forecasting import DemandForecastService
 from cost_pert_beta import (
     simulate_pert_beta_cost,
     calculate_risk_metrics,
@@ -379,6 +380,84 @@ def ml_forecast():
     except Exception as e:
         import traceback
         return jsonify({'error': str(e), 'trace': traceback.format_exc()}), 500
+
+
+@app.route('/api/demand/forecast', methods=['POST'])
+def demand_forecast():
+    """
+    Execute demand forecasting based on arrival dates provided by the user.
+
+    Expected JSON payload:
+    {
+        "dates": list[str],               # Demand arrival timestamps
+        "forecastDays": int (default 14), # Horizon for daily forecast
+        "forecastWeeks": int (default 8), # Horizon for weekly forecast
+        "excludeWeekends": bool           # Optional, drop Saturday/Sunday from history
+    }
+    """
+    try:
+        payload = request.json or {}
+        raw_dates = payload.get('dates') or payload.get('demandDates') or []
+        if isinstance(raw_dates, str):
+            raw_dates = [raw_dates]
+
+        forecast_days = int(payload.get('forecastDays', 14))
+        forecast_weeks = int(payload.get('forecastWeeks', 8))
+        exclude_weekends = bool(payload.get('excludeWeekends', False))
+
+        service = DemandForecastService(
+            raw_dates,
+            exclude_weekends=exclude_weekends,
+        )
+
+        results = service.generate(
+            daily_horizon=max(1, forecast_days),
+            weekly_horizon=max(1, forecast_weeks),
+        )
+
+        visualizer = ForecastVisualizer()
+        charts = {}
+
+        if 'daily_forecast' in results:
+            daily = results['daily_forecast']
+            daily_dates = [
+                datetime.strptime(date_str, '%Y-%m-%d')
+                for date_str in daily.get('dates', [])
+            ]
+            charts['daily'] = visualizer.plot_demand_forecast(
+                service.daily_series,
+                daily_dates,
+                daily['ensemble'],
+                title='Previsão diária de demanda',
+                ylabel='Itens por dia'
+            )
+
+        if 'weekly_forecast' in results:
+            weekly = results['weekly_forecast']
+            weekly_dates = [
+                datetime.strptime(date_str, '%Y-%m-%d')
+                for date_str in weekly.get('dates', [])
+            ]
+            charts['weekly'] = visualizer.plot_demand_forecast(
+                service.weekly_series,
+                weekly_dates,
+                weekly['ensemble'],
+                title='Previsão semanal de demanda',
+                ylabel='Itens por semana'
+            )
+
+        results['charts'] = charts
+        return jsonify(results)
+
+    except ValueError as exc:
+        return jsonify({'error': str(exc)}), 400
+    except Exception as exc:
+        import traceback
+        return jsonify({
+            'error': 'Erro ao gerar a previsão de demanda',
+            'details': str(exc),
+            'trace': traceback.format_exc()
+        }), 500
 
 
 @app.route('/api/mc-throughput', methods=['POST'])
