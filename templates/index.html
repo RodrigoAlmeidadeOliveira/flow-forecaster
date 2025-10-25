@@ -202,6 +202,18 @@
                             Forneça amostras de throughput semanais uma vez e reutilize-as em simulações Monte Carlo e Aprendizado de Máquina.
                             <a href="https://flow-forecaster.fly.dev/documentacao#throughput-vazao" target="_blank" rel="noopener noreferrer">Saiba mais na documentação</a>.
                         </small>
+<div class="form-row mt-3">
+    <div class="col-md-6 text-left">
+        <label for="throughputCadence" class="font-weight-bold">Cadência das amostras</label>
+        <select class="form-control" id="throughputCadence">
+            <option value="7" selected>1 semana (7 dias)</option>
+            <option value="14">2 semanas (14 dias)</option>
+            <option value="21">3 semanas (21 dias)</option>
+            <option value="28">4 semanas (28 dias)</option>
+        </select>
+        <small class="form-text text-muted">Normalizamos o throughput para 1 semana antes de simular.</small>
+    </div>
+</div>
 </div>
 </div>
 </div>
@@ -808,6 +820,25 @@
 <input class="form-control" id="res-endDate" readonly="" type="text"/>
 </div>
 </div>
+<div class="card card-body text-left mb-4">
+    <h4 class="mb-3">Horizonte personalizado</h4>
+    <div class="form-row">
+        <div class="col-sm-3">
+            <label for="forecastHorizonValue" class="font-weight-bold">Valor</label>
+            <input class="form-control" id="forecastHorizonValue" type="number" min="1" value="30" />
+        </div>
+        <div class="col-sm-3">
+            <label for="forecastHorizonUnit" class="font-weight-bold">Unidade</label>
+            <select class="form-control" id="forecastHorizonUnit">
+                <option value="days" selected>Dias</option>
+                <option value="weeks">Semanas</option>
+            </select>
+        </div>
+        <div class="col-sm-6 d-flex align-items-end">
+            <p class="text-muted mb-0">A projeção de itens abaixo usará esse horizonte após você executar novamente a simulação.</p>
+        </div>
+    </div>
+</div>
 <h3 data-i18n="all_probabilities">Todas as probabilidades</h3>
 <div class="row">
 <table class="table table-sm" id="probabilities">
@@ -842,6 +873,28 @@
 </tr>
 </tbody>
 </table>
+</div>
+<div class="card card-body text-left mb-4">
+    <h4 class="mb-3">Acompanhamento real (opcional)</h4>
+    <div class="form-row">
+        <div class="col-md-8">
+            <label for="actualRemainingSeries" class="font-weight-bold">Backlog remanescente por semana</label>
+            <textarea class="form-control text-monospace" id="actualRemainingSeries" rows="5" placeholder="Ex.: 2024-01-05, 45
+2024-01-12, 42
+2024-01-19, 38"></textarea>
+            <small class="form-text text-muted">Use um valor por linha. Você pode informar apenas números ou pares data, valor.</small>
+        </div>
+        <div class="col-md-4">
+            <div class="alert alert-secondary mb-0">
+                <p class="mb-1"><strong>Como usar?</strong></p>
+                <ul class="pl-3 mb-0" style="list-style: disc;">
+                    <li>Valores mais antigos em cima.</li>
+                    <li>Datas são opcionais.</li>
+                    <li>Sobrepomos essa série aos burndowns previstos.</li>
+                </ul>
+            </div>
+        </div>
+    </div>
 </div>
 <h3 data-i18n="charts">Gráficos</h3>
 <canvas id="res-duration-histogram"></canvas>

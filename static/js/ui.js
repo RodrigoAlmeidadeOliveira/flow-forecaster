@@ -7,7 +7,12 @@
         global = window;
     }
 
-    const $ = global.jQuery || global.$;
+    const maybeJQuery = global.jQuery || global.$;
+    if (!maybeJQuery || !maybeJQuery.fn || typeof maybeJQuery.fn.on !== 'function') {
+        console.error('[Flow Forecaster] jQuery not detected. UI logic disabled.');
+        return;
+    }
+    const $ = maybeJQuery;
     if (typeof $ !== 'function') {
         console.error('[Flow Forecaster] jQuery not detected. UI logic disabled.');
         return;
@@ -409,6 +414,83 @@ $(window).on("load", function () {
             .map(s => s.trim().length > 0 ? Number(s.trim()) : NaN)
             .filter(n => !isNaN(n))
             .filter(n => n >= 0);
+    }
+
+    function parseActualRemainingSeries(raw) {
+        const values = [];
+        const labels = [];
+        if (!raw) {
+            return { values, labels };
+        }
+
+        raw.split(/\r?\n/).forEach(line => {
+            if (!line) return;
+            const trimmed = line.trim();
+            if (!trimmed) return;
+
+            let datePart = null;
+            let valuePart = trimmed;
+
+            const delimiterMatch = trimmed.match(/[;,\t]/);
+            if (delimiterMatch) {
+                const split = trimmed.split(delimiterMatch[0]);
+                datePart = (split[0] || '').trim();
+                valuePart = (split[1] || '').trim();
+            } else if (trimmed.includes(' ')) {
+                const lastSpace = trimmed.lastIndexOf(' ');
+                const maybeValue = trimmed.slice(lastSpace + 1).trim();
+                const maybeDate = trimmed.slice(0, lastSpace).trim();
+                if (/^-?\d+(?:[\.,]\d+)?$/.test(maybeValue)) {
+                    datePart = maybeDate;
+                    valuePart = maybeValue;
+                }
+            }
+
+            const numeric = parseFloat(valuePart.replace(',', '.'));
+            if (!Number.isFinite(numeric)) return;
+
+            labels.push(datePart || `Semana ${labels.length + 1}`);
+            values.push(numeric);
+        });
+
+        return { values, labels };
+    }
+
+    function updateRiskSummaryUI(simulationData, result) {
+        const riskRows = $('#risks').find('.risk-row').not('#risk-row-template');
+        if (!riskRows.length) return;
+
+        riskRows.each((_idx, row) => {
+            const $row = $(row);
+            $row.find("input[name='expectedImpact']").val('-');
+            $row.find("input[name='impactRank']").val('-');
+        });
+
+        const risks = simulationData?.risks || [];
+        if (!risks.length) return;
+
+        const p85 = Number(result?.percentile_stats?.p85);
+        const severityScale = Number.isFinite(p85) && p85 > 0 ? p85 : 1;
+        const computed = [];
+
+        riskRows.each((idx, row) => {
+            const risk = risks[idx];
+            if (!risk || !risk.likelihood) return;
+            const probability = Number(risk.likelihood) / 100;
+            const baseImpact = Number(risk.mediumImpact || ((risk.lowImpact + risk.highImpact) / 2)) || 0;
+            const expected = probability * baseImpact;
+            const severity = expected * severityScale;
+            const $row = $(row);
+            $row.find("input[name='expectedImpact']").val(expected > 0 ? expected.toFixed(2) : '0');
+            computed.push({ index: idx, severity });
+        });
+
+        computed
+            .filter(item => item.severity > 0)
+            .sort((a, b) => b.severity - a.severity)
+            .forEach((item, order) => {
+                riskRows.eq(item.index).find("input[name='impactRank']").val(order + 1);
+            });
     }
 
     const isFiniteNumberLocal = window.__PF_isFiniteNumber || function(value) {
@@ -990,6 +1072,8 @@ $(window).on("load", function () {
     function addRisk() {
         const $row = $riskRowTemplate.clone();
         $row.insertBefore($('#add-risk-row'));
+        $row.find("input[name='expectedImpact']").val('-');
+        $row.find("input[name='impactRank']").val('-');
         return $row;
     }
 
@@ -1107,11 +1191,24 @@ $(window).on("load", function () {
         const teamFocusFactor = Math.round((teamFocusPercent / 100) * 1000) / 1000;
         updateTeamFocusUI(teamFocusPercent);
 
+        const rawThroughputSamples = parseSamples('#tpSamples');
+        const throughputCadenceDays = parseInt($('#throughputCadence').val(), 10) || 7;
+        const cadenceFactor = throughputCadenceDays > 0 ? throughputCadenceDays / 7 : 1;
+        const normalizedThroughputSamples = rawThroughputSamples.map(value => cadenceFactor ? value / cadenceFactor : value);
+
+        const horizonValueInput = parseInt($('#forecastHorizonValue').val(), 10);
+        const forecastHorizonValue = Number.isFinite(horizonValueInput) && horizonValueInput > 0 ? horizonValueInput : 30;
+        const forecastHorizonUnit = $('#forecastHorizonUnit').val() || 'days';
+
+        const actualSeriesRaw = $('#actualRemainingSeries').val() || '';
+        const actualSeriesParsed = parseActualRemainingSeries(actualSeriesRaw);
+
         const simulationData = {
             projectName: $('#projectName').val(),
             numberOfSimulations: parseInt($('#numberOfSimulations').val()),
             confidenceLevel: parseInt($('#confidenceLevel').val()) || 85,
-            tpSamples: parseSamples('#tpSamples'),
+            tpSamples: rawThroughputSamples,
+            tpSamplesNormalized: normalizedThroughputSamples,
             ltSamples: parseSamples('#ltSamples'),
             splitRateSamples: parseSamples('#splitRateSamples'),
             risks: parseRisks('#risks'),
@@ -1125,7 +1222,15 @@ $(window).on("load", function () {
             startDate: $('#startDate').val() || undefined,
             deadlineDate: $('#deadlineDate').val() || undefined,
             teamFocus: teamFocusFactor,
-            teamFocusPercent: teamFocusPercent
+            teamFocusPercent: teamFocusPercent,
+            throughputCadenceDays,
+            forecastHorizon: {
+                value: forecastHorizonValue,
+                unit: forecastHorizonUnit
+            },
+            actualRemainingRaw: actualSeriesRaw,
+            actualRemainingValues: actualSeriesParsed.values,
+            actualRemainingLabels: actualSeriesParsed.labels
         };
 
         if (backlogState.elementsPresent) {
@@ -1139,6 +1244,8 @@ $(window).on("load", function () {
             simulationData.backlogHighMultiplier = backlogState.highMultiplier;
             simulationData.backlogComplexity = backlogState.complexityKey;
         }
+
+        updateRiskSummaryUI(simulationData, null);
 
         if (!simulationData.tpSamples.some(n => n >= 1)) {
             alert("Must have at least one weekly throughput sample greater than zero");
@@ -1172,12 +1279,25 @@ $(window).on("load", function () {
         $results.val('');
         $('#res-effort').val('Running...');
 
+        const payload = JSON.parse(JSON.stringify(simulationData));
+        if (Array.isArray(simulationData.tpSamplesNormalized) && simulationData.tpSamplesNormalized.length) {
+            payload.tpSamples = simulationData.tpSamplesNormalized;
+        }
+        delete payload.tpSamplesNormalized;
+        payload.actualRemaining = {
+            values: simulationData.actualRemainingValues || [],
+            labels: simulationData.actualRemainingLabels || []
+        };
+        delete payload.actualRemainingValues;
+        delete payload.actualRemainingLabels;
+        delete payload.actualRemainingRaw;
+
         // Call backend API
         $.ajax({
             url: '/api/simulate',
             method: 'POST',
             contentType: 'application/json',
-            data: JSON.stringify(simulationData),
+            data: JSON.stringify(payload),
             success: function(result) {
                 displayResults(result, simulationData);
             },
