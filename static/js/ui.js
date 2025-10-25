@@ -1,4 +1,12 @@
 (function (global) {
+    if (typeof global === 'undefined' || global === null) {
+        if (typeof window === 'undefined') {
+            console.error('[Flow Forecaster] Global context unavailable for UI initialization.');
+            return;
+        }
+        global = window;
+    }
+
     const $ = global.jQuery || global.$;
     function isFiniteNumber(value) {
         return typeof value === 'number' && isFinite(value);
