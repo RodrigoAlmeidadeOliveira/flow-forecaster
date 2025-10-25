@@ -7,7 +7,12 @@
         global = window;
     }
 
-    const $ = global.jQuery || global.$;
+    const jQueryRef = global.jQuery || (global.$ && global.$.fn && global.$);
+    if (typeof jQueryRef !== 'function') {
+        console.error('[Flow Forecaster] jQuery not detected. UI interactions disabled.');
+        return;
+    }
+    const $ = jQueryRef;
     function isFiniteNumber(value) {
         return typeof value === 'number' && isFinite(value);
     }
