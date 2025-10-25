@@ -79,6 +79,16 @@ def parse_flexible_date(date_str: str) -> datetime:
     raise ValueError(f"Date {date_str} doesn't match expected day-month-year formats")
 
 
+@app.after_request
+def add_no_cache_headers(response):
+    """Add no-cache headers to HTML responses to prevent browser caching issues."""
+    if response.content_type and 'text/html' in response.content_type:
+        response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate, public, max-age=0'
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Expires'] = '0'
+    return response
+
+
 @app.route('/health')
 def health():
     """Health check endpoint."""

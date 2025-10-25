@@ -2338,4 +2338,4 @@ ${generateProgressBar(p50Items, backlog, 'P50 (arriscado)  ', Math.round((p50Ite
     $('#share').on('click', share);
     $('#run').on('click', runSimulation);
     $('#runDeadlineAnalysis').on('click', runDeadlineAnalysis);
-})(window.jQuery);
+})(window);
