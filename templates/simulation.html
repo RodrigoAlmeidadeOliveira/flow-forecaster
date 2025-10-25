@@ -1,0 +1,301 @@
+{% extends "base.html" %}
+{% block title %}Simulação Monte Carlo · Flow Forecaster{% endblock %}
+{% block page_title %}Simulação Monte Carlo{% endblock %}
+{% block page_subtitle %}Monte cenários, observe resultados probabilísticos e compartilhe rapidamente com o time.{% endblock %}
+{% block header_actions %}
+<button id="share" class="btn btn-outline-modern"><i class="fas fa-link mr-2"></i>Compartilhar cenário</button>
+<button id="run" class="btn btn-primary-modern"><i class="fas fa-play mr-2"></i>Executar simulação</button>
+{% endblock %}
+{% block content %}
+<div class="card-modern mb-4">
+    <div class="d-flex align-items-center justify-content-between flex-wrap">
+        <div>
+            <h4 class="mb-2">Dados de Throughput</h4>
+            <p class="text-muted mb-3">Cole seu histórico semanal de throughput para alimentar todas as simulações.</p>
+        </div>
+        <a href="{{ url_for('documentation') }}#throughput-vazao" target="_blank" rel="noopener" class="btn btn-outline-modern">
+            <i class="fas fa-book-open mr-2"></i>Ver guia rápido
+        </a>
+    </div>
+    <textarea class="form-control text-monospace" id="tpSamples" rows="4" placeholder="Exemplo: 5, 6, 7, 4, 8, 6, 5, 7, 6, 8" title="Historical weekly throughput used by all simulations"></textarea>
+    <small class="form-text text-muted mt-2" data-i18n="throughput_help">
+        Forneça amostras de throughput semanais uma vez e reutilize-as em simulações Monte Carlo e Aprendizado de Máquina.
+        <a href="https://flow-forecaster.fly.dev/documentacao#throughput-vazao" target="_blank" rel="noopener noreferrer">Saiba mais na documentação</a>.
+    </small>
+</div>
+
+<div class="grid-columns-2">
+    <div>
+        <div class="card-modern">
+            <h4 class="mb-3">Propriedades do projeto</h4>
+            <div class="input-group mb-3">
+                <div class="input-group-prepend">
+                    <span class="input-group-text" data-i18n="project_name" data-doc-tooltip="Defina um identificador amigável para acompanhar o cenário nas simulações e relatórios." data-doc-anchor="1-simulacao-monte-carlo">
+                        Nome do projeto
+                        <a class="doc-hint-icon" href="https://flow-forecaster.fly.dev/documentacao#1-simulacao-monte-carlo" target="_blank" rel="noopener" title="Defina um identificador amigável para acompanhar o cenário nas simulações e relatórios."><i class="fas fa-circle-question"></i></a>
+                    </span>
+                </div>
+                <input class="form-control" id="projectName" type="text" placeholder="Ex: Plataforma B2B" />
+            </div>
+
+            <div class="input-group mb-3">
+                <div class="input-group-prepend">
+                    <span class="input-group-text" data-doc-tooltip="Informe quantas pessoas efetivamente entregam itens por semana. Esse valor é usado para converter semanas em esforço (pessoa-semana) e compor análises de custo." data-doc-anchor="1-simulacao-monte-carlo">
+                        <span data-i18n="team_size">Tamanho da equipe</span><span class="text-danger">*</span>
+                    </span>
+                </div>
+                <input class="form-control" id="totalContributors" type="number" min="1" max="9999" value="1" title="Quantidade de pessoas ativas que contribuem semanalmente" />
+                <div class="input-group-append"><span class="input-group-text" data-i18n="contributors">contribuidores</span></div>
+            </div>
+
+            <div class="input-group mb-3">
+                <div class="input-group-prepend">
+                    <span class="input-group-text" data-i18n="min_contributors" data-doc-tooltip="Estime a quantidade mínima de pessoas que podem atuar no período. Útil para cenários com férias ou rodízios." data-doc-anchor="planejamento">
+                        Contribuidores mínimos
+                        <a class="doc-hint-icon" href="https://flow-forecaster.fly.dev/documentacao#planejamento" target="_blank" rel="noopener" title="Estime a quantidade mínima de pessoas que podem atuar no período. Útil para cenários com férias ou rodízios."><i class="fas fa-circle-question"></i></a>
+                    </span>
+                </div>
+                <input class="form-control" id="minContributors" type="number" min="1" max="9999" placeholder="(opcional)" />
+            </div>
+
+            <div class="input-group mb-3">
+                <div class="input-group-prepend">
+                    <span class="input-group-text" data-i18n="max_contributors" data-doc-tooltip="Registre o limite superior de pessoas que podem trabalhar simultaneamente no projeto." data-doc-anchor="planejamento">
+                        Contribuidores máximos
+                        <a class="doc-hint-icon" href="https://flow-forecaster.fly.dev/documentacao#planejamento" target="_blank" rel="noopener" title="Registre o limite superior de pessoas que podem trabalhar simultaneamente no projeto."><i class="fas fa-circle-question"></i></a>
+                    </span>
+                </div>
+                <input class="form-control" id="maxContributors" type="number" min="1" max="9999" placeholder="(opcional)" />
+            </div>
+
+            <div class="input-group mb-3">
+                <div class="input-group-prepend">
+                    <span class="input-group-text" data-i18n="historical_team_size_label" data-i18n-title="historical_team_size_tooltip" data-doc-tooltip="Informe quantas pessoas estavam ativas quando você coletou o throughput histórico. Isso permite ajustar simulações caso o time atual seja diferente." data-doc-anchor="coleta-de-dados">
+                        Tamanho histórico da equipe
+                        <a class="doc-hint-icon" href="https://flow-forecaster.fly.dev/documentacao#coleta-de-dados" target="_blank" rel="noopener" title="Informe quantas pessoas estavam ativas quando você coletou o throughput histórico. Isso permite ajustar simulações caso o time atual seja diferente."><i class="fas fa-circle-question"></i></a>
+                    </span>
+                </div>
+                <input class="form-control" id="historicalTeamSize" type="number" min="1" max="9999" value="1" placeholder="1" />
+            </div>
+        </div>
+
+        <div class="card-modern">
+            <h4 class="mb-3">Backlog e foco do time</h4>
+            <div class="form-group">
+                <label class="font-weight-bold" data-doc-tooltip="Informe o total de itens que precisam ser concluídos. Esse valor representa seu backlog alvo." data-doc-anchor="backlog">
+                    <span data-i18n="num_tasks">Número de tarefas</span><span class="text-danger">*</span>
+                    <a class="doc-hint-icon" href="https://flow-forecaster.fly.dev/documentacao#backlog" target="_blank" rel="noopener" title="Informe o total de itens que precisam ser concluídos. Esse valor representa seu backlog alvo."><i class="fas fa-circle-question"></i></a>
+                </label>
+                <div class="form-row">
+                    <div class="col-md-6">
+                        <div class="input-group mb-2">
+                            <div class="input-group-prepend"><span class="input-group-text" data-i18n="backlog_min_label">Mín</span></div>
+                            <input class="form-control" id="backlogMin" type="number" min="0" max="999999" value="1" />
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="input-group mb-2">
+                            <div class="input-group-prepend"><span class="input-group-text" data-i18n="backlog_max_label">Máx</span></div>
+                            <input class="form-control" id="backlogMax" type="number" min="0" max="999999" value="1" />
+                        </div>
+                    </div>
+                </div>
+                <div class="input-group mb-2">
+                    <div class="input-group-prepend"><span class="input-group-text" data-i18n="backlog_complexity_label">Complexidade</span></div>
+                    <select class="form-control" id="backlogComplexity">
+                        <option value="clear_understood" data-low-multiplier="1" data-high-multiplier="1" selected>Escopo claro e entendido (1× / 1×)</option>
+                        <option value="somewhat_understood" data-low-multiplier="1" data-high-multiplier="1.5">Parcialmente entendido (1× / 1,5×)</option>
+                        <option value="not_really_understood" data-low-multiplier="1.5" data-high-multiplier="2">Ainda pouco entendido (1,5× / 2×)</option>
+                        <option value="very_unclear" data-low-multiplier="1.75" data-high-multiplier="3">Muito incerto (1,75× / 3×)</option>
+                    </select>
+                </div>
+                <small id="backlogRangeHint" class="form-text text-muted" data-i18n="backlog_range_hint">Informe valores mínimos e máximos e escolha a complexidade para ajustarmos automaticamente o backlog.</small>
+                <small id="backlogRangeWarning" class="form-text text-warning"></small>
+                <div id="backlogAdjustedSummary" class="alert alert-light border py-2 px-3 mb-0" role="alert" data-i18n="backlog_adjusted_summary_placeholder">Backlog ajustado será exibido aqui.</div>
+                <input id="numberOfTasks" name="numberOfTasks" type="hidden" value="1" />
+            </div>
+
+            <div class="mt-4">
+                <label class="font-weight-bold d-flex align-items-center justify-content-between" for="teamFocusPercent">
+                    <span data-i18n="team_focus_label">Foco do time neste trabalho</span>
+                    <span class="badge badge-primary" id="teamFocusDisplay">100%</span>
+                </label>
+                <input class="custom-range" id="teamFocusPercent" type="range" min="25" max="100" step="5" value="100" />
+                <div class="btn-group btn-group-sm mt-2" role="group">
+                    <button type="button" class="btn btn-outline-modern team-focus-preset active" data-focus="100">100%</button>
+                    <button type="button" class="btn btn-outline-modern team-focus-preset" data-focus="75">75%</button>
+                    <button type="button" class="btn btn-outline-modern team-focus-preset" data-focus="50">50%</button>
+                    <button type="button" class="btn btn-outline-modern team-focus-preset" data-focus="25">25%</button>
+                </div>
+                <small class="form-text text-muted" data-i18n="team_focus_hint">Use quando o time dividir atenção com outras frentes. O throughput será multiplicado por este percentual.</small>
+                <input id="teamFocus" name="teamFocus" type="hidden" value="1" />
+            </div>
+        </div>
+    </div>
+
+    <div>
+        <div class="card-modern">
+            <h4 class="mb-3">Simulação e parâmetros</h4>
+            <div class="input-group mb-3">
+                <div class="input-group-prepend"><span class="input-group-text" data-i18n="num_simulations" data-i18n-tooltip="tooltip_num_simulations" data-doc-tooltip="Quanto maior o número de simulações, mais estável o resultado. Recomendamos pelo menos 10.000 execuções para cenários confiáveis." data-doc-anchor="1-simulacao-monte-carlo">Número de simulações<span class="text-danger">*</span></span></div>
+                <input class="form-control" id="numberOfSimulations" type="number" min="100" max="1000000" value="10000" />
+            </div>
+            <div class="input-group mb-3">
+                <div class="input-group-prepend"><span class="input-group-text" data-i18n="confidence_level">Nível de confiança</span></div>
+                <input class="form-control" id="confidenceLevel" type="number" min="50" max="99" value="85" />
+                <div class="input-group-append"><span class="input-group-text">%</span></div>
+            </div>
+            <div class="input-group mb-3">
+                <div class="input-group-prepend"><span class="input-group-text" data-i18n="start_date">Data de início</span></div>
+                <input class="form-control" id="startDate" type="date" />
+            </div>
+            <div class="input-group mb-3">
+                <div class="input-group-prepend"><span class="input-group-text" data-i18n="deadline">Prazo</span></div>
+                <input class="form-control" id="deadlineDate" type="date" />
+            </div>
+        </div>
+
+        <div class="card-modern">
+            <h4 class="mb-3">Dados adicionais</h4>
+            <div class="form-group">
+                <label class="font-weight-bold" for="ltSamples">Lead Time (dias)</label>
+                <textarea class="form-control text-monospace" id="ltSamples" rows="3" placeholder="Ex.: 15, 12, 18, 20"></textarea>
+                <small class="form-text text-muted">Opcional — insira o tempo de lead de tarefas para análises mais avançadas.</small>
+            </div>
+            <div class="form-group">
+                <label class="font-weight-bold" for="splitRateSamples">Taxas de split</label>
+                <textarea class="form-control text-monospace" id="splitRateSamples" rows="3" placeholder="Ex.: 1.0, 1.1, 1.2"></textarea>
+                <small class="form-text text-muted">Opcional — ajuste o quanto itens tendem a ser divididos.</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card-modern">
+    <h4 class="mb-3">Riscos do projeto</h4>
+    <div class="table-responsive table-modern">
+        <table class="table table-sm" id="risks">
+            <thead>
+                <tr class="text-uppercase text-muted">
+                    <th>Probabilidade</th>
+                    <th>Impacto baixo</th>
+                    <th>Impacto médio</th>
+                    <th>Impacto alto</th>
+                    <th>Descrição</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr class="d-flex risk-row" id="risk-row-template">
+                    <td class="col-2">
+                        <div class="input-group mb-3">
+                            <input class="form-control" max="100" min="1" name="likelihood" title="Probabilidade do risco acontecer (%)" type="number" />
+                            <div class="input-group-append d-none d-md-block"><span class="input-group-text">%</span></div>
+                        </div>
+                    </td>
+                    <td class="col-2">
+                        <div class="input-group mb-3">
+                            <input class="form-control" max="1000" min="0" name="lowImpact" title="Impacto mínimo em tarefas adicionais ou atraso" type="number" />
+                            <div class="input-group-append d-none d-lg-block"><span class="input-group-text" data-i18n="tasks">tarefas</span></div>
+                        </div>
+                    </td>
+                    <td class="col-2">
+                        <div class="input-group mb-3">
+                            <input class="form-control" max="1000" min="0" name="mediumImpact" title="Impacto médio mais provável se o risco ocorrer" type="number" />
+                            <div class="input-group-append d-none d-lg-block"><span class="input-group-text" data-i18n="tasks">tarefas</span></div>
+                        </div>
+                    </td>
+                    <td class="col-2">
+                        <div class="input-group mb-3">
+                            <input class="form-control" max="1000" min="0" name="highImpact" title="Impacto máximo esperado se o risco ocorrer" type="number" />
+                            <div class="input-group-append d-none d-lg-block"><span class="input-group-text" data-i18n="tasks">tarefas</span></div>
+                        </div>
+                    </td>
+                    <td class="col-4">
+                        <input class="form-control" name="description" title="Descrição sucinta do risco e gatilhos associados" type="text" />
+                    </td>
+                </tr>
+                <tr class="d-flex" id="add-risk-row">
+                    <td class="col-12 text-right"><button class="btn btn-outline-modern btn-sm" id="addRisk" type="button"><i class="fas fa-plus mr-2"></i>Adicionar risco</button></td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="card-modern probability-table-card">
+    <div class="d-flex align-items-center justify-content-between">
+        <h4 class="mb-3">Probabilidades principais</h4>
+        <div>
+            <button id="runDeadlineAnalysis" class="btn btn-outline-modern btn-sm"><i class="fas fa-calendar mr-2"></i>Analisar prazo</button>
+        </div>
+    </div>
+    <div id="results-main" class="results-panel">
+        <div class="metric-grid mb-4">
+            <div class="metric-card">
+                <div class="metric-label">Esforço máximo (P85)</div>
+                <div class="metric-value"><input id="res-effort" class="form-control-plaintext text-white font-weight-bold" readonly value="-" /></div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">Duração em semanas</div>
+                <div class="metric-value"><input id="res-duration" class="form-control-plaintext text-white font-weight-bold" readonly value="-" /></div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">Data provável de entrega</div>
+                <div class="metric-value"><input id="res-endDate" class="form-control-plaintext text-white font-weight-bold" readonly value="-" /></div>
+            </div>
+        </div>
+
+        <table class="table table-sm table-modern" id="probabilities">
+            <thead>
+                <tr class="probabilities-header">
+                    <th class="col-1">Chance</th>
+                    <th class="col-2">Esforço</th>
+                    <th class="col-2">Duração</th>
+                    <th class="col-2">Total de tarefas</th>
+                    <th class="col-2">Entrega estimada</th>
+                    <th class="col-3">Comentário</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr class="probabilities-row d-flex">
+                    <td class="col-12 text-center text-muted">Execute a simulação para ver as probabilidades.</td>
+                </tr>
+                <tr id="show-more-row" class="d-none">
+                    <td colspan="6" class="text-center"><button class="btn btn-outline-modern btn-sm" id="show-more" type="button">Exibir mais linhas</button></td>
+                </tr>
+            </tbody>
+        </table>
+
+        <textarea id="results" class="form-control mt-4" rows="6" readonly></textarea>
+    </div>
+</div>
+
+<div class="card-modern">
+    <h4 class="mb-3">Relatório de 30 dias</h4>
+    <div id="probability-report-30-days"></div>
+</div>
+
+<div class="card-modern">
+    <h4 class="mb-3">Estatísticas das entradas</h4>
+    <div id="input-stats"></div>
+</div>
+
+<div class="card-modern">
+    <h4 class="mb-3">Gráficos e distribuição</h4>
+    <div class="charts-grid">
+        <div class="chart-container">
+            <canvas id="res-duration-histogram"></canvas>
+        </div>
+        <div class="chart-container">
+            <canvas id="res-burn-downs"></canvas>
+        </div>
+        <div class="chart-container">
+            <canvas id="res-effort-scatter-plot"></canvas>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{{ url_for('static', filename='js/ui.js') }}?v=20241201"></script>
+{% endblock %}
