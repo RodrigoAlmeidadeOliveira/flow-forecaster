@@ -7,12 +7,7 @@
         global = window;
     }
 
-    const jQueryRef = global.jQuery || (global.$ && global.$.fn && global.$);
-    if (typeof jQueryRef !== 'function') {
-        console.error('[Flow Forecaster] jQuery not detected. UI interactions disabled.');
-        return;
-    }
-    const $ = jQueryRef;
+    const $ = global.jQuery || global.$;
     function isFiniteNumber(value) {
         return typeof value === 'number' && isFinite(value);
     }
@@ -1129,26 +1124,6 @@ $(window).on("load", function () {
             teamFocusPercent: teamFocusPercent
         };
 
-        if ((!simulationData.dependencies || simulationData.dependencies.length === 0)) {
-            try {
-                const storedDependencies = localStorage.getItem('ff:lastDependencies');
-                if (storedDependencies) {
-                    const parsed = JSON.parse(storedDependencies);
-                    if (Array.isArray(parsed)) {
-                        simulationData.dependencies = parsed;
-                    }
-                }
-            } catch (storageError) {
-                console.warn('[Flow Forecaster] Não foi possível carregar dependências salvas.', storageError);
-            }
-        }
-
-        try {
-            localStorage.setItem('ff:lastDependencies', JSON.stringify(simulationData.dependencies || []));
-        } catch (storageError) {
-            console.warn('[Flow Forecaster] Não foi possível persistir dependências atuais.', storageError);
-        }
-
         if (backlogState.elementsPresent) {
             simulationData.backlogOriginalMin = backlogState.rawMin;
             simulationData.backlogOriginalMax = backlogState.rawMax;
@@ -1209,21 +1184,10 @@ $(window).on("load", function () {
         });
     }
 
-function displayResults(result, simulationData) {
+    function displayResults(result, simulationData) {
         const $results = $('#results');
         $results.val('');
         const write = str => $results.val($results.val() + str);
-
-        try {
-            const snapshot = {
-                timestamp: new Date().toISOString(),
-                simulationData,
-                result
-            };
-            localStorage.setItem('ff:lastSimulation', JSON.stringify(snapshot));
-        } catch (storageError) {
-            console.warn('[Flow Forecaster] Unable to persist last simulation snapshot.', storageError);
-        }
 
         const confidenceLevel = simulationData.confidenceLevel;
         const reportPercentile = confidenceLevel / 100;
@@ -2338,50 +2302,48 @@ ${generateProgressBar(p50Items, backlog, 'P50 (arriscado)  ', Math.round((p50Ite
         }
     }
 
-    $(function initUIBindings() {
-        if ($('#backlogMin').length) {
-            $('#backlogMin, #backlogMax').on('input change', recalculateBacklog);
-            $('#backlogComplexity').on('change', recalculateBacklog);
-            recalculateBacklog();
-            window.addEventListener('languageChanged', () => {
-                updateBacklogSummary(computeBacklogState());
-            });
-        }
-
-        if ($('#teamFocusPercent').length) {
-            $('#teamFocusPercent').on('input change', function() {
-                updateTeamFocusUI($(this).val());
-            });
-            $('.team-focus-preset').on('click', function() {
-                updateTeamFocusUI($(this).data('focus'));
-            });
-            updateTeamFocusUI($('#teamFocusPercent').val());
-            window.addEventListener('languageChanged', () => {
-                updateTeamFocusUI(getTeamFocusPercent());
-            });
-        }
-
-        $('#tpSamples, #ltSamples').on('input change', markHistoricalChartsDirty);
-        $('a[data-toggle="tab"][href="#historical-charts"]').on('shown.bs.tab', function() {
-            updateHistoricalCharts(true);
+    if ($('#backlogMin').length) {
+        $('#backlogMin, #backlogMax').on('input change', recalculateBacklog);
+        $('#backlogComplexity').on('change', recalculateBacklog);
+        recalculateBacklog();
+        window.addEventListener('languageChanged', () => {
+            updateBacklogSummary(computeBacklogState());
         });
+    }
 
-        updateHistoricalCharts(false);
+    if ($('#teamFocusPercent').length) {
+        $('#teamFocusPercent').on('input change', function() {
+            updateTeamFocusUI($(this).val());
+        });
+        $('.team-focus-preset').on('click', function() {
+            updateTeamFocusUI($(this).data('focus'));
+        });
+        updateTeamFocusUI($('#teamFocusPercent').val());
+        window.addEventListener('languageChanged', () => {
+            updateTeamFocusUI(getTeamFocusPercent());
+        });
+    }
 
-        if (location.hash && location.hash.trim().length > 1) {
-            loadDataFromUrl();
-        }
-
-        window.onhashchange = function () {
-            if (currentlyLoadedHash !== location.hash) {
-                location.reload();
-            }
-        };
-
-        $('#addRisk').on('click', addRisk);
-        $('#addDependency').on('click', addDependency);
-        $('#share').on('click', share);
-        $('#run').on('click', runSimulation);
-        $('#runDeadlineAnalysis').on('click', runDeadlineAnalysis);
+    $('#tpSamples, #ltSamples').on('input change', markHistoricalChartsDirty);
+    $('a[data-toggle="tab"][href="#historical-charts"]').on('shown.bs.tab', function() {
+        updateHistoricalCharts(true);
     });
+
+    updateHistoricalCharts(false);
+
+    if (location.hash && location.hash.trim().length > 1) {
+        loadDataFromUrl();
+    }
+
+    window.onhashchange = function () {
+        if (currentlyLoadedHash != location.hash) {
+            location.reload();
+        }
+    };
+
+    $('#addRisk').on('click', addRisk);
+    $('#addDependency').on('click', addDependency);
+    $('#share').on('click', share);
+    $('#run').on('click', runSimulation);
+    $('#runDeadlineAnalysis').on('click', runDeadlineAnalysis);
 })(window);

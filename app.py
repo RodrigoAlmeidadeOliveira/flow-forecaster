@@ -97,26 +97,21 @@ def health():
 
 @app.route('/')
 def index():
-    """Redirect root to the new simulation dashboard."""
-    return redirect(url_for('simulation'))
-
-
-@app.route('/simulation')
-def simulation():
-    """Render the Monte Carlo simulation workspace."""
-    return render_template('simulation.html')
-
-
-@app.route('/statistics')
-def statistics():
-    """Render statistics and insights dashboard."""
-    return render_template('statistics.html')
-
-
-@app.route('/dependencies')
-def dependencies_view():
-    """Render dependencies management and insights."""
-    return render_template('dependencies.html')
+    """Render the main page."""
+    try:
+        return render_template('index.html')
+    except Exception as e:
+        # Fallback if template rendering fails
+        return f"""
+        <html>
+        <head><title>Flow Forecasting - Error</title></head>
+        <body>
+            <h1>Template Error</h1>
+            <p>Error loading template: {str(e)}</p>
+            <p>Template path: {app.template_folder}</p>
+        </body>
+        </html>
+        """, 500
 
 
 @app.route('/advanced')
@@ -127,8 +122,19 @@ def advanced():
 
 @app.route('/dependency-analysis')
 def dependency_analysis_page():
-    """Backward compatibility redirect to new dependencies workspace."""
-    return redirect(url_for('dependencies_view'))
+    """Render the dependency analysis page."""
+    try:
+        return render_template('dependency_analysis.html')
+    except Exception as e:
+        return f"""
+        <html>
+        <head><title>Dependency Analysis - Error</title></head>
+        <body>
+            <h1>Template Error</h1>
+            <p>Error loading dependency analysis template: {str(e)}</p>
+        </body>
+        </html>
+        """, 500
 
 
 @app.route('/documentacao')
