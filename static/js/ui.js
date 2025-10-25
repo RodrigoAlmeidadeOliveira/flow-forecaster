@@ -8,6 +8,10 @@
     }
 
     const $ = global.jQuery || global.$;
+    if (typeof $ !== 'function') {
+        console.error('[Flow Forecaster] jQuery not detected. UI logic disabled.');
+        return;
+    }
     function isFiniteNumber(value) {
         return typeof value === 'number' && isFinite(value);
     }
