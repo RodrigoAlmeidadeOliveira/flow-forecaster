@@ -16,6 +16,7 @@ from monte_carlo_unified import (
     forecast_how_many,
     forecast_when,
     percentile as mc_percentile,
+    calculate_risk_summary,
 )
 from ml_forecaster import MLForecaster
 from ml_deadline_forecaster import ml_analyze_deadline, ml_forecast_how_many, ml_forecast_when
@@ -1471,6 +1472,61 @@ def visualize_dependencies():
     except Exception as e:
         return jsonify({
             'error': f'Error generating visualization: {str(e)}'
+        }), 500
+
+
+@app.route('/api/risk-summary', methods=['POST'])
+def api_risk_summary():
+    """
+    Calculate risk summary with expected impact and ranking.
+
+    Expected JSON payload:
+    {
+        "risks": [
+            {
+                "likelihood": float (0-1 or 0-100),
+                "lowImpact": float,
+                "mediumImpact": float,
+                "highImpact": float,
+                "description": str (optional)
+            }
+        ],
+        "tpSamples": list[float] (optional),
+        "baselineDurationWeeks": float (optional)
+    }
+
+    Returns:
+        JSON with risk analysis including:
+        - risk_summaries: List of risks with expected impact and ranking
+        - total_expected_impact: Total expected impact
+        - high_priority_count: Count of high-priority risks
+        - recommendations: List of recommended actions
+    """
+    try:
+        data = request.json
+        risks = data.get('risks', [])
+        tp_samples = data.get('tpSamples')
+        baseline_duration_weeks = data.get('baselineDurationWeeks')
+
+        if not risks:
+            return jsonify({
+                'error': 'No risks provided'
+            }), 400
+
+        # Calculate risk summary
+        result = calculate_risk_summary(
+            risks=risks,
+            tp_samples=tp_samples,
+            baseline_duration_weeks=baseline_duration_weeks
+        )
+
+        return jsonify(convert_to_native_types(result))
+
+    except Exception as e:
+        import traceback
+        return jsonify({
+            'error': str(e),
+            'trace': traceback.format_exc()
         }), 500
 
 

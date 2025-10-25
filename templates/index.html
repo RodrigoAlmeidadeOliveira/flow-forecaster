@@ -695,6 +695,19 @@
 </tbody>
 </table>
 <div class="col-12 px-3" id="probability-report-30-days"></div>
+<div class="col-12 px-3 mt-3" id="risk-summary-container" style="display: none;">
+<div class="card">
+<div class="card-header bg-warning text-dark">
+<h5 class="mb-0">
+<i class="fas fa-chart-line"></i> Análise de Impacto de Riscos
+<a class="doc-hint-icon text-dark" href="#" data-toggle="tooltip" title="Sumário de riscos com impacto esperado e ranking de prioridade para mitigação"><i class="fas fa-circle-question"></i></a>
+</h5>
+</div>
+<div class="card-body">
+<div id="risk-summary-content"></div>
+</div>
+</div>
+</div>
 </div>
 </div>
 
@@ -2065,7 +2078,7 @@ a probabilidade de todas serem entregues no prazo é de <strong>1 em 2^n</strong
 <!-- Internationalization -->
 <script src="{{ url_for('static', filename='js/i18n.js') }}"></script>
 <!-- Custom JS -->
-<script src="{{ url_for('static', filename='js/ui.js') }}?v=1761428650"></script>
+<script src="{{ url_for('static', filename='js/ui.js') }}?v=1761435000"></script>
 <script src="{{ url_for('static', filename='js/advanced_forecast.js') }}"></script>
 <script src="{{ url_for('static', filename='js/demand_forecast.js') }}"></script>
 <script src="{{ url_for('static', filename='js/charts.js') }}"></script>

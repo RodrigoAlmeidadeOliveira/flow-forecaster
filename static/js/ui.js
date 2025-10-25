@@ -1085,6 +1085,136 @@ $(window).on("load", function () {
         $row.find("input[name='description']").val(risk.description);
     }
 
+    // Risk summary calculation and display
+    async function updateRiskSummary() {
+        const risks = parseRisks('#risks');
+
+        if (risks.length === 0) {
+            $('#risk-summary-container').hide();
+            return;
+        }
+
+        const tpSamples = parseDataSeries($('#tp').val());
+
+        try {
+            const response = await fetch('/api/risk-summary', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    risks: risks,
+                    tpSamples: tpSamples
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const result = await response.json();
+            displayRiskSummary(result);
+        } catch (error) {
+            console.error('Error calculating risk summary:', error);
+        }
+    }
+
+    function displayRiskSummary(result) {
+        const $container = $('#risk-summary-container');
+        const $content = $('#risk-summary-content');
+
+        if (!result || !result.risk_summaries || result.risk_summaries.length === 0) {
+            $container.hide();
+            return;
+        }
+
+        let html = '';
+
+        // Summary metrics
+        html += '<div class="row mb-3">';
+        html += '<div class="col-md-4">';
+        html += '<div class="card border-warning">';
+        html += '<div class="card-body text-center">';
+        html += '<h6 class="text-muted">Impacto Total Esperado</h6>';
+        html += `<h3 class="text-warning">${result.total_expected_impact}</h3>`;
+        html += '<p class="mb-0 small">histórias adicionais</p>';
+        html += '</div></div></div>';
+
+        html += '<div class="col-md-4">';
+        html += '<div class="card border-danger">';
+        html += '<div class="card-body text-center">';
+        html += '<h6 class="text-muted">Riscos de Alta Prioridade</h6>';
+        html += `<h3 class="text-danger">${result.high_priority_count}</h3>`;
+        html += `<p class="mb-0 small">de ${result.risk_count} riscos</p>`;
+        html += '</div></div></div>';
+
+        html += '<div class="col-md-4">';
+        html += '<div class="card border-info">';
+        html += '<div class="card-body text-center">';
+        html += '<h6 class="text-muted">Impacto P85</h6>';
+        html += `<h3 class="text-info">${result.total_p85_impact}</h3>`;
+        html += '<p class="mb-0 small">histórias (conservador)</p>';
+        html += '</div></div></div>';
+        html += '</div>';
+
+        // Recommendations
+        if (result.recommendations && result.recommendations.length > 0) {
+            html += '<div class="alert alert-info" role="alert">';
+            html += '<h6><i class="fas fa-lightbulb"></i> Recomendações</h6>';
+            html += '<ul class="mb-0">';
+            result.recommendations.forEach(rec => {
+                const iconClass = rec.priority === 'HIGH' ? 'exclamation-triangle' : 'info-circle';
+                html += `<li><i class="fas fa-${iconClass}"></i> ${rec.message}</li>`;
+            });
+            html += '</ul>';
+            html += '</div>';
+        }
+
+        // Risks table
+        html += '<h6 class="mt-3">Ranking de Riscos por Impacto Esperado</h6>';
+        html += '<div class="table-responsive">';
+        html += '<table class="table table-sm table-hover">';
+        html += '<thead class="thead-light">';
+        html += '<tr>';
+        html += '<th>Rank</th>';
+        html += '<th>Descrição</th>';
+        html += '<th>Prob.</th>';
+        html += '<th>Impacto Esperado</th>';
+        html += '<th>P85 Impacto</th>';
+        html += '<th>Severidade</th>';
+        html += '</tr>';
+        html += '</thead>';
+        html += '<tbody>';
+
+        result.risk_summaries.forEach(risk => {
+            let severityClass = 'secondary';
+            let severityIcon = 'info-circle';
+            if (risk.severity === 'HIGH') {
+                severityClass = 'danger';
+                severityIcon = 'exclamation-triangle';
+            } else if (risk.severity === 'MEDIUM') {
+                severityClass = 'warning';
+                severityIcon = 'exclamation-circle';
+            }
+
+            html += '<tr>';
+            html += `<td><span class="badge badge-${severityClass}">${risk.rank}</span></td>`;
+            html += `<td>${risk.description || 'Sem descrição'}</td>`;
+            html += `<td>${risk.likelihood_percent}%</td>`;
+            html += `<td><strong>${risk.expected_impact}</strong> histórias</td>`;
+            html += `<td>${risk.p85_impact} histórias</td>`;
+            html += `<td><span class="badge badge-${severityClass}"><i class="fas fa-${severityIcon}"></i> ${risk.severity_label}</span></td>`;
+            html += '</tr>';
+        });
+
+        html += '</tbody>';
+        html += '</table>';
+        html += '</div>';
+
+        $content.html(html);
+        $container.show();
+    }
+
     // Dependencies handling functions
     function parseDependencies(selector) {
         const dependencies = [];
@@ -2465,7 +2595,29 @@ ${generateProgressBar(p50Items, backlog, 'P50 (arriscado)  ', Math.round((p50Ite
         }
     };
 
-    $('#addRisk').on('click', addRisk);
+    // Risk summary update triggers
+    let riskSummaryTimeout;
+    function scheduleRiskSummaryUpdate() {
+        clearTimeout(riskSummaryTimeout);
+        riskSummaryTimeout = setTimeout(updateRiskSummary, 1000);
+    }
+
+    // Add risk button with risk summary update
+    $('#addRisk').on('click', function() {
+        addRisk();
+        scheduleRiskSummaryUpdate();
+    });
+
+    // Listen for changes in risk inputs to update summary
+    $(document).on('input change', '#risks input', function() {
+        scheduleRiskSummaryUpdate();
+    });
+
+    // Also update on throughput changes (affects time impact calculation)
+    $('#tp').on('input change', function() {
+        scheduleRiskSummaryUpdate();
+    });
+
     $('#addDependency').on('click', addDependency);
     $('#share').on('click', share);
     $('#run').on('click', runSimulation);

@@ -303,6 +303,155 @@ def describe_lead_time_samples(samples: List[float]) -> Optional[Dict[str, Any]]
     }
 
 
+def calculate_risk_summary(
+    risks: List[Dict[str, Any]],
+    tp_samples: Optional[List[float]] = None,
+    baseline_duration_weeks: Optional[float] = None
+) -> Dict[str, Any]:
+    """
+    Calculate expected impact and ranking for risks BEFORE running Monte Carlo.
+
+    This provides:
+    - Expected impact in stories for each risk
+    - Ranking by expected impact to prioritize mitigation
+    - P85 impact estimate for conservative planning
+
+    Args:
+        risks: List of risk dictionaries with keys:
+            - likelihood: Probability of occurrence (0-1 or 0-100)
+            - lowImpact: Low impact estimate in stories
+            - mediumImpact: Most likely impact (mode) in stories
+            - highImpact: High impact estimate in stories
+            - description: Risk description (optional)
+        tp_samples: Historical throughput samples (optional, for time impact)
+        baseline_duration_weeks: Baseline project duration for comparison (optional)
+
+    Returns:
+        Dictionary with:
+        - risk_summaries: List of risks with expected impact and ranking
+        - total_expected_impact: Total expected impact across all risks
+        - high_priority_count: Count of high-priority risks
+    """
+    if not risks:
+        return {
+            'risk_summaries': [],
+            'total_expected_impact': 0.0,
+            'high_priority_count': 0,
+            'recommendations': []
+        }
+
+    # Normalize likelihood to 0-1 range
+    normalized_risks = []
+    for idx, risk in enumerate(risks):
+        risk_copy = risk.copy()
+        likelihood = risk_copy.get('likelihood', 0)
+        if likelihood >= 1:
+            likelihood = likelihood / 100.0
+        risk_copy['likelihood'] = likelihood
+        risk_copy['original_index'] = idx
+        normalized_risks.append(risk_copy)
+
+    # Calculate expected impact for each risk
+    risk_analysis = []
+    for risk in normalized_risks:
+        likelihood = risk['likelihood']
+        low = risk.get('lowImpact', 0)
+        medium = risk.get('mediumImpact', (low + risk.get('highImpact', low)) / 2)
+        high = risk.get('highImpact', low)
+
+        # Expected value of triangular distribution: (a + b + c) / 3
+        expected_impact_value = (low + medium + high) / 3.0
+
+        # Expected impact considering probability of occurrence
+        expected_impact = likelihood * expected_impact_value
+
+        # Calculate P85 impact (conservative estimate)
+        # For triangular distribution, approximate P85
+        # P85 is closer to the mode-high range
+        p85_impact_value = medium + 0.85 * (high - medium)
+        p85_impact = likelihood * p85_impact_value
+
+        # Calculate impact range
+        impact_range = high - low
+
+        risk_analysis.append({
+            'description': risk.get('description', f'Risk {risk["original_index"] + 1}'),
+            'likelihood': likelihood,
+            'likelihood_percent': round(likelihood * 100, 1),
+            'low_impact': low,
+            'medium_impact': medium,
+            'high_impact': high,
+            'expected_impact_value': round(expected_impact_value, 1),
+            'expected_impact': round(expected_impact, 1),
+            'p85_impact_value': round(p85_impact_value, 1),
+            'p85_impact': round(p85_impact, 1),
+            'impact_range': impact_range,
+            'original_index': risk['original_index']
+        })
+
+    # Sort by expected impact (descending) to get ranking
+    risk_analysis_sorted = sorted(risk_analysis, key=lambda r: r['expected_impact'], reverse=True)
+
+    # Add ranking
+    for rank, risk_item in enumerate(risk_analysis_sorted, 1):
+        risk_item['rank'] = rank
+        # Classify severity
+        if rank <= max(1, len(risk_analysis_sorted) * 0.3):  # Top 30%
+            risk_item['severity'] = 'HIGH'
+            risk_item['severity_label'] = 'Alta'
+        elif rank <= max(1, len(risk_analysis_sorted) * 0.7):  # Middle 40%
+            risk_item['severity'] = 'MEDIUM'
+            risk_item['severity_label'] = 'Média'
+        else:  # Bottom 30%
+            risk_item['severity'] = 'LOW'
+            risk_item['severity_label'] = 'Baixa'
+
+    # Calculate totals
+    total_expected_impact = sum(r['expected_impact'] for r in risk_analysis_sorted)
+    total_p85_impact = sum(r['p85_impact'] for r in risk_analysis_sorted)
+    high_priority_count = sum(1 for r in risk_analysis_sorted if r['severity'] == 'HIGH')
+
+    # Generate recommendations
+    recommendations = []
+    if high_priority_count > 0:
+        recommendations.append({
+            'type': 'HIGH_PRIORITY',
+            'message': f'{high_priority_count} risco(s) de alta prioridade identificado(s). Priorize mitigação destes riscos.',
+            'priority': 'HIGH'
+        })
+
+    if total_expected_impact > 0:
+        if baseline_duration_weeks:
+            # Estimate time impact if we have throughput data
+            if tp_samples:
+                avg_throughput = sum(tp_samples) / len(tp_samples)
+                expected_delay_weeks = total_expected_impact / avg_throughput
+                delay_percent = (expected_delay_weeks / baseline_duration_weeks) * 100
+
+                recommendations.append({
+                    'type': 'TIME_IMPACT',
+                    'message': f'Impacto esperado: +{round(expected_delay_weeks, 1)} semanas ({round(delay_percent, 1)}% do prazo base)',
+                    'priority': 'MEDIUM',
+                    'value': expected_delay_weeks
+                })
+
+        recommendations.append({
+            'type': 'TOTAL_IMPACT',
+            'message': f'Impacto total esperado: {round(total_expected_impact, 1)} histórias adicionais',
+            'priority': 'MEDIUM',
+            'value': total_expected_impact
+        })
+
+    return {
+        'risk_summaries': risk_analysis_sorted,
+        'total_expected_impact': round(total_expected_impact, 1),
+        'total_p85_impact': round(total_p85_impact, 1),
+        'high_priority_count': high_priority_count,
+        'recommendations': recommendations,
+        'risk_count': len(risk_analysis_sorted)
+    }
+
+
 # ============================================================================
 # S-CURVE DISTRIBUTION (from monte_carlo.js)
 # ============================================================================
