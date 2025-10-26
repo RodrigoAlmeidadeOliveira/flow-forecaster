@@ -2556,70 +2556,73 @@ ${generateProgressBar(p50Items, backlog, 'P50 (arriscado)  ', Math.round((p50Ite
         }
     }
 
-    if ($('#backlogMin').length) {
-        $('#backlogMin, #backlogMax').on('input change', recalculateBacklog);
-        $('#backlogComplexity').on('change', recalculateBacklog);
-        recalculateBacklog();
-        window.addEventListener('languageChanged', () => {
-            updateBacklogSummary(computeBacklogState());
-        });
-    }
-
-    if ($('#teamFocusPercent').length) {
-        $('#teamFocusPercent').on('input change', function() {
-            updateTeamFocusUI($(this).val());
-        });
-        $('.team-focus-preset').on('click', function() {
-            updateTeamFocusUI($(this).data('focus'));
-        });
-        updateTeamFocusUI($('#teamFocusPercent').val());
-        window.addEventListener('languageChanged', () => {
-            updateTeamFocusUI(getTeamFocusPercent());
-        });
-    }
-
-    $('#tpSamples, #ltSamples').on('input change', markHistoricalChartsDirty);
-    $('a[data-toggle="tab"][href="#historical-charts"]').on('shown.bs.tab', function() {
-        updateHistoricalCharts(true);
-    });
-
-    updateHistoricalCharts(false);
-
-    if (location.hash && location.hash.trim().length > 1) {
-        loadDataFromUrl();
-    }
-
-    window.onhashchange = function () {
-        if (currentlyLoadedHash != location.hash) {
-            location.reload();
+    // Initialize UI when DOM is ready
+    $(function() {
+        if ($('#backlogMin').length) {
+            $('#backlogMin, #backlogMax').on('input change', recalculateBacklog);
+            $('#backlogComplexity').on('change', recalculateBacklog);
+            recalculateBacklog();
+            window.addEventListener('languageChanged', () => {
+                updateBacklogSummary(computeBacklogState());
+            });
         }
-    };
 
-    // Risk summary update triggers
-    let riskSummaryTimeout;
-    function scheduleRiskSummaryUpdate() {
-        clearTimeout(riskSummaryTimeout);
-        riskSummaryTimeout = setTimeout(updateRiskSummary, 1000);
-    }
+        if ($('#teamFocusPercent').length) {
+            $('#teamFocusPercent').on('input change', function() {
+                updateTeamFocusUI($(this).val());
+            });
+            $('.team-focus-preset').on('click', function() {
+                updateTeamFocusUI($(this).data('focus'));
+            });
+            updateTeamFocusUI($('#teamFocusPercent').val());
+            window.addEventListener('languageChanged', () => {
+                updateTeamFocusUI(getTeamFocusPercent());
+            });
+        }
 
-    // Add risk button with risk summary update
-    $('#addRisk').on('click', function() {
-        addRisk();
-        scheduleRiskSummaryUpdate();
+        $('#tpSamples, #ltSamples').on('input change', markHistoricalChartsDirty);
+        $('a[data-toggle="tab"][href="#historical-charts"]').on('shown.bs.tab', function() {
+            updateHistoricalCharts(true);
+        });
+
+        updateHistoricalCharts(false);
+
+        if (location.hash && location.hash.trim().length > 1) {
+            loadDataFromUrl();
+        }
+
+        window.onhashchange = function () {
+            if (currentlyLoadedHash != location.hash) {
+                location.reload();
+            }
+        };
+
+        // Risk summary update triggers
+        let riskSummaryTimeout;
+        function scheduleRiskSummaryUpdate() {
+            clearTimeout(riskSummaryTimeout);
+            riskSummaryTimeout = setTimeout(updateRiskSummary, 1000);
+        }
+
+        // Add risk button with risk summary update
+        $('#addRisk').on('click', function() {
+            addRisk();
+            scheduleRiskSummaryUpdate();
+        });
+
+        // Listen for changes in risk inputs to update summary
+        $(document).on('input change', '#risks input', function() {
+            scheduleRiskSummaryUpdate();
+        });
+
+        // Also update on throughput changes (affects time impact calculation)
+        $('#tp').on('input change', function() {
+            scheduleRiskSummaryUpdate();
+        });
+
+        $('#addDependency').on('click', addDependency);
+        $('#share').on('click', share);
+        $('#run').on('click', runSimulation);
+        $('#runDeadlineAnalysis').on('click', runDeadlineAnalysis);
     });
-
-    // Listen for changes in risk inputs to update summary
-    $(document).on('input change', '#risks input', function() {
-        scheduleRiskSummaryUpdate();
-    });
-
-    // Also update on throughput changes (affects time impact calculation)
-    $('#tp').on('input change', function() {
-        scheduleRiskSummaryUpdate();
-    });
-
-    $('#addDependency').on('click', addDependency);
-    $('#share').on('click', share);
-    $('#run').on('click', runSimulation);
-    $('#runDeadlineAnalysis').on('click', runDeadlineAnalysis);
 })(window);
