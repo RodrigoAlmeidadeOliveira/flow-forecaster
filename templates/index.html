@@ -335,7 +335,9 @@
        required="required"
        title="Quantidade mínima estimada de itens no backlog"
        type="number"
-       value="1"/>
+       value="1"
+       oninput="recalculateBacklog()"
+       onchange="recalculateBacklog()"/>
 <div class="input-group-append d-none d-lg-flex">
 <span class="input-group-text" data-i18n="tasks">tarefas</span>
 </div>
@@ -353,7 +355,9 @@
        required="required"
        title="Quantidade máxima estimada de itens no backlog"
        type="number"
-       value="1"/>
+       value="1"
+       oninput="recalculateBacklog()"
+       onchange="recalculateBacklog()"/>
 <div class="input-group-append d-none d-lg-flex">
 <span class="input-group-text" data-i18n="tasks">tarefas</span>
 </div>
@@ -368,7 +372,8 @@
 </div>
 <select class="form-control"
         id="backlogComplexity"
-        title="Multiplicadores aplicados ao backlog com base na complexidade do escopo">
+        title="Multiplicadores aplicados ao backlog com base na complexidade do escopo"
+        onchange="recalculateBacklog()">
 <option value="clear_understood"
         data-i18n="complexity_clear"
         data-low-multiplier="1"
@@ -689,7 +694,7 @@
 <td class="col-2"></td>
 <td class="col-2"></td>
 <td class="col-4">
-<button class="btn btn-secondary btn-sm" id="addRisk" type="button" data-i18n="add_row">Adicionar linha</button>
+<button class="btn btn-secondary btn-sm" id="addRisk" type="button" data-i18n="add_row" onclick="addRisk()">Adicionar linha</button>
 </td>
 </tr>
 </tbody>
@@ -790,7 +795,7 @@
 <td class="col-2"></td>
 <td class="col-2"></td>
 <td class="col-1">
-<button class="btn btn-success btn-sm" id="addDependency" type="button" title="Adicionar nova dependência">
+<button class="btn btn-success btn-sm" id="addDependency" type="button" title="Adicionar nova dependência" onclick="addDependency()">
 <i class="fas fa-plus"></i> Adicionar
 </button>
 </td>
@@ -801,8 +806,8 @@
 </div>
 
 <div class="container-fluid bg-12 text-center">
-<button class="btn btn-primary" id="run" type="button" data-i18n="run_simulation">Executar a simulação!</button>
-<button class="btn btn-secondary" id="share" title="Share simulation" type="button" data-i18n="share">Compartilhar</button>
+<button class="btn btn-primary" id="run" type="button" data-i18n="run_simulation" onclick="runSimulation()">Executar a simulação!</button>
+<button class="btn btn-secondary" id="share" title="Share simulation" type="button" data-i18n="share" onclick="share()">Compartilhar</button>
 </div>
 <div class="container-fluid bg-12 text-center" id="results-main" style="display:none">
 <h2 data-i18n="results_title">Resultados da Simulação</h2>

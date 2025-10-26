@@ -2625,4 +2625,11 @@ ${generateProgressBar(p50Items, backlog, 'P50 (arriscado)  ', Math.round((p50Ite
         $('#run').on('click', runSimulation);
         $('#runDeadlineAnalysis').on('click', runDeadlineAnalysis);
     });
+
+    // Export functions to global scope for inline onclick handlers
+    global.addRisk = addRisk;
+    global.addDependency = addDependency;
+    global.runSimulation = runSimulation;
+    global.share = share;
+    global.recalculateBacklog = recalculateBacklog;
 })(window);
