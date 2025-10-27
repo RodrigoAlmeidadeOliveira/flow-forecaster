@@ -2905,16 +2905,24 @@ a probabilidade de todas serem entregues no prazo é de <strong>1 em 2^n</strong
             function showTab(hash, options = {}) {
                 const normalized = normalizeHash(hash) || normalizeHash(DEFAULT_TAB);
                 const selector = TAB_MAP[normalized];
+
+                console.log('[showTab] hash:', hash, '| normalized:', normalized, '| selector:', selector);
+
                 if (!selector) {
+                    console.warn('[showTab] No selector found for hash:', normalized);
                     return false;
                 }
 
                 const $tabLink = $(selector);
+                console.log('[showTab] $tabLink.length:', $tabLink.length);
+
                 if (!$tabLink.length) {
+                    console.warn('[showTab] Tab link not found:', selector);
                     return false;
                 }
 
                 $tabLink.tab('show');
+                console.log('[showTab] Called .tab("show") on:', selector);
 
                 if (!options.suppressHash && normalized !== normalizeHash(window.location.hash)) {
                     history.replaceState(null, '', normalized);
