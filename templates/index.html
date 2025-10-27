@@ -138,6 +138,18 @@
         .tooltip.show {
             opacity: 1;
         }
+
+        .tab-iframe {
+            width: 100%;
+            min-height: 1200px;
+            border: 0;
+        }
+
+        @media (max-width: 768px) {
+            .tab-iframe {
+                min-height: 900px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -155,7 +167,7 @@
 <a class="nav-link" data-target="#demand-forecast" href="#demand-forecast">Previsão de Demanda</a>
 </li>
 <li class="nav-item">
-<a class="nav-link" href="/forecast-vs-actual">
+<a class="nav-link" data-target="#forecast-vs-actual-tab" href="#forecast-vs-actual-tab">
 <i class="fas fa-balance-scale"></i> Forecast vs Actual
 </a>
 </li>
@@ -242,6 +254,11 @@
 <li class="nav-item">
 <a aria-controls="trend-analysis" aria-selected="false" class="nav-link" data-toggle="tab" href="#trend-analysis" id="tab-trend-link" role="tab">
 <i class="fas fa-chart-line"></i> Análise de Tendências
+</a>
+</li>
+<li class="nav-item">
+<a aria-controls="forecast-vs-actual-tab" aria-selected="false" class="nav-link" data-toggle="tab" href="#forecast-vs-actual-tab" id="tab-forecast-vs-actual" role="tab">
+<i class="fas fa-balance-scale"></i> Forecast vs Actual
 </a>
 </li>
 <li class="nav-item">
@@ -2159,12 +2176,17 @@ Histograma mostrando a distribuição de probabilidade do esforço estimado usan
             <div class="card-body">
                 <div class="list-group" id="lt-trend-alerts-list">
                     <div class="list-group-item text-muted">Nenhum alerta gerado. Execute a análise para obter recomendações.</div>
-                </div>
-            </div>
-        </div>
     </div>
 </div>
-<div aria-labelledby="dependency-tab-link" class="tab-pane fade" id="dependency-analysis-tab" role="tabpanel">
+</div>
+</div>
+</div>
+<div aria-labelledby="tab-forecast-vs-actual" class="tab-pane fade" id="forecast-vs-actual-tab" role="tabpanel">
+    <div class="pt-4 pb-5">
+        <iframe src="/forecast-vs-actual" title="Forecast vs Actual" class="tab-iframe"></iframe>
+    </div>
+</div>
+                <div aria-labelledby="dependency-tab-link" class="tab-pane fade" id="dependency-analysis-tab" role="tabpanel">
 <div class="pt-4 pb-5">
 <div class="container text-center">
 <h2>📊 Análise de Impacto de Dependências</h2>
@@ -2578,6 +2600,8 @@ a probabilidade de todas serem entregues no prazo é de <strong>1 em 2^n</strong
                     $('#tab-cost-link').tab('show');
                 } else if (hash === '#trend-analysis') {
                     $('#tab-trend-link').tab('show');
+                } else if (hash === '#forecast-vs-actual-tab' || hash === '#forecast-vs-actual') {
+                    $('#tab-forecast-vs-actual').tab('show');
                 } else if (hash === '#dependency-analysis-tab' || hash === '#dependency-analysis') {
                     $('#dependency-tab-link').tab('show');
                 } else if (hash === '#executive-dashboard' || hash === '#dashboard') {
@@ -2608,7 +2632,7 @@ a probabilidade de todas serem entregues no prazo é de <strong>1 em 2^n</strong
 
             $('a[data-toggle="tab"]').on('shown.bs.tab', function (e) {
                 const target = $(e.target).attr('href');
-                if (target === '#advanced-forecast' || target === '#demand-forecast' || target === '#mc-forecast' || target === '#deadline-analysis' || target === '#historical-charts' || target === '#trend-analysis' || target === '#dependency-analysis-tab' || target === '#executive-dashboard' || target === '#portfolio-dashboard') {
+                if (target === '#advanced-forecast' || target === '#demand-forecast' || target === '#mc-forecast' || target === '#deadline-analysis' || target === '#historical-charts' || target === '#trend-analysis' || target === '#forecast-vs-actual-tab' || target === '#dependency-analysis-tab' || target === '#executive-dashboard' || target === '#portfolio-dashboard') {
                     history.replaceState(null, null, target);
                 }
             });

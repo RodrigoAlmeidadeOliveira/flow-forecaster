@@ -2560,6 +2560,8 @@ ${generateProgressBar(p50Items, backlog, 'P50 (arriscado)  ', Math.round((p50Ite
         '#historical-charts',
         '#cost-analysis',
         '#trend-analysis',
+        '#forecast-vs-actual-tab',
+        '#forecast-vs-actual',
         '#dependency-analysis-tab',
         '#dependency-analysis',
         '#executive-dashboard',
