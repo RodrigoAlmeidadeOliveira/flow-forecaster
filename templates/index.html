@@ -240,6 +240,11 @@
 <a aria-controls="cost-analysis" aria-selected="false" class="nav-link" data-toggle="tab" href="#cost-analysis" id="tab-cost-link" role="tab" data-i18n="tab_cost">Análise de Custos</a>
 </li>
 <li class="nav-item">
+<a aria-controls="trend-analysis" aria-selected="false" class="nav-link" data-toggle="tab" href="#trend-analysis" id="tab-trend-link" role="tab">
+<i class="fas fa-chart-line"></i> Análise de Tendências
+</a>
+</li>
+<li class="nav-item">
                         <a aria-controls="dependency-analysis-tab" aria-selected="false" class="nav-link" data-toggle="tab" href="#dependency-analysis-tab" id="dependency-tab-link" role="tab" data-i18n="dependency_analysis_tab">Análise de Dependências</a>
 </li>
 <li class="nav-item">
@@ -1926,6 +1931,139 @@ Histograma mostrando a distribuição de probabilidade do esforço estimado usan
 </div>
 </div>
 </div>
+<div aria-labelledby="tab-trend-link" class="tab-pane fade" id="trend-analysis" role="tabpanel">
+<div class="pt-4 pb-5">
+<div class="container text-center">
+<h2 class="mb-3"><i class="fas fa-chart-line"></i> Análise Automática de Tendências</h2>
+<p class="text-muted">Com base nos dados de throughput informados, detectamos direção, sazonalidade, anomalias e projetamos ganhos potenciais.</p>
+</div>
+<div class="container">
+<div class="alert alert-danger d-none" id="trend-analysis-error" role="alert"></div>
+<div class="card mb-4">
+<div class="card-body">
+<div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between">
+<div class="mb-3 mb-md-0">
+<h4 class="mb-2"><i class="fas fa-bolt text-warning"></i> Executar análise com seus dados atuais</h4>
+<p class="mb-0 text-muted">Usamos os valores cadastrados no campo <strong>Throughput</strong> na aba principal para extrair tendências.</p>
+</div>
+<div class="text-md-right">
+<button class="btn btn-primary btn-lg" id="runTrendAnalysisBtn" type="button">
+<i class="fas fa-play-circle"></i> Analisar Tendências
+</button>
+<div class="mt-2">
+<a class="small text-muted scroll-to-throughput" href="#tpSamples">
+<i class="fas fa-edit"></i> Editar dados de throughput
+</a>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="text-center py-5 d-none" id="trend-analysis-loading">
+<div class="spinner-border text-primary" role="status">
+<span class="sr-only">Carregando...</span>
+</div>
+<p class="mt-3 text-muted mb-0">Calculando tendências, sazonalidade e alertas...</p>
+</div>
+<div class="d-none" id="trend-analysis-results">
+<div class="row">
+<div class="col-lg-3 col-md-6 mb-3">
+<div class="card h-100">
+<div class="card-body">
+<h6 class="text-uppercase text-muted font-weight-bold">Status Geral</h6>
+<p class="h4 mb-1" id="trend-status-value">—</p>
+<small class="text-muted" id="trend-status-detail">—</small>
+</div>
+</div>
+</div>
+<div class="col-lg-3 col-md-6 mb-3">
+<div class="card h-100">
+<div class="card-body">
+<h6 class="text-uppercase text-muted font-weight-bold">Variação Recente vs. Histórico</h6>
+<p class="h4 mb-1" id="trend-change-value">—</p>
+<small class="text-muted" id="trend-change-detail">—</small>
+</div>
+</div>
+</div>
+<div class="col-lg-3 col-md-6 mb-3">
+<div class="card h-100">
+<div class="card-body">
+<h6 class="text-uppercase text-muted font-weight-bold">Nível de Confiança</h6>
+<p class="h4 mb-1" id="trend-confidence-value">—</p>
+<small class="text-muted" id="trend-confidence-detail">—</small>
+</div>
+</div>
+</div>
+<div class="col-lg-3 col-md-6 mb-3">
+<div class="card h-100">
+<div class="card-body">
+<h6 class="text-uppercase text-muted font-weight-bold">Volatilidade Recente</h6>
+<p class="h4 mb-1" id="trend-volatility-value">—</p>
+<small class="text-muted" id="trend-volatility-detail">—</small>
+</div>
+</div>
+</div>
+</div>
+<div class="row">
+<div class="col-lg-6 mb-3">
+<div class="card h-100">
+<div class="card-header bg-light">
+<h5 class="mb-0"><i class="fas fa-wave-square text-primary"></i> Sazonalidade</h5>
+</div>
+<div class="card-body" id="trend-seasonality-content">
+<p class="text-muted mb-0">Execute a análise para detectar padrões sazonais.</p>
+</div>
+</div>
+</div>
+<div class="col-lg-6 mb-3">
+<div class="card h-100">
+<div class="card-header bg-light">
+<h5 class="mb-0"><i class="fas fa-exclamation-triangle text-danger"></i> Anomalias e Volatilidade</h5>
+</div>
+<div class="card-body" id="trend-anomalies-content">
+<p class="text-muted mb-0">Nenhum cálculo disponível até executar a análise.</p>
+</div>
+</div>
+</div>
+</div>
+<div class="card mb-3">
+<div class="card-header bg-light d-flex align-items-center justify-content-between">
+<h5 class="mb-0"><i class="fas fa-rocket text-success"></i> Projeções de Melhoria</h5>
+<small class="text-muted" id="trend-projection-horizon">—</small>
+</div>
+<div class="card-body">
+<div class="table-responsive">
+<table class="table table-sm table-striped mb-0" id="trend-projections-table">
+<thead>
+<tr>
+<th>Cenário</th>
+<th>Taxa de Melhoria</th>
+<th>Valor em 4 períodos</th>
+<th>Meta (se definida)</th>
+<th>Observações</th>
+</tr>
+</thead>
+<tbody>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+<div class="card">
+<div class="card-header bg-light">
+<h5 class="mb-0"><i class="fas fa-bell text-danger"></i> Alertas &amp; Recomendações</h5>
+</div>
+<div class="card-body">
+<div class="list-group" id="trend-alerts-list">
+<div class="list-group-item text-muted">Nenhum alerta gerado. Execute a análise para obter recomendações.</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
                 <div aria-labelledby="dependency-tab-link" class="tab-pane fade" id="dependency-analysis-tab" role="tabpanel">
 <div class="pt-4 pb-5">
 <div class="container text-center">
@@ -2320,6 +2458,7 @@ a probabilidade de todas serem entregues no prazo é de <strong>1 em 2^n</strong
 <script src="{{ url_for('static', filename='js/cost_analysis.js') }}"></script>
 <script src="{{ url_for('static', filename='js/forecast-persistence.js') }}"></script>
 <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+<script src="{{ url_for('static', filename='js/trend_insights.js') }}"></script>
 <script>
         $(function () {
             // Initialize Bootstrap tooltips
@@ -2337,6 +2476,8 @@ a probabilidade de todas serem entregues no prazo é de <strong>1 em 2^n</strong
                     $('#tab-historical-link').tab('show');
                 } else if (hash === '#cost-analysis') {
                     $('#tab-cost-link').tab('show');
+                } else if (hash === '#trend-analysis') {
+                    $('#tab-trend-link').tab('show');
                 } else if (hash === '#mc-forecast') {
                     $('#tab-mc-link').tab('show');
                 }
@@ -2357,7 +2498,7 @@ a probabilidade de todas serem entregues no prazo é de <strong>1 em 2^n</strong
 
             $('a[data-toggle="tab"]').on('shown.bs.tab', function (e) {
                 const target = $(e.target).attr('href');
-                if (target === '#advanced-forecast' || target === '#demand-forecast' || target === '#mc-forecast' || target === '#deadline-analysis' || target === '#historical-charts' || target === '#executive-dashboard' || target === '#portfolio-dashboard') {
+                if (target === '#advanced-forecast' || target === '#demand-forecast' || target === '#mc-forecast' || target === '#deadline-analysis' || target === '#historical-charts' || target === '#trend-analysis' || target === '#executive-dashboard' || target === '#portfolio-dashboard') {
                     history.replaceState(null, null, target);
                 }
             });

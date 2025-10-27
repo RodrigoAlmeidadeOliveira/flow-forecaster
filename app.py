@@ -48,6 +48,7 @@ from portfolio_analyzer import (
     create_prioritization_matrix,
     generate_portfolio_alerts
 )
+from trend_analysis import comprehensive_trend_analysis
 
 app = Flask(__name__)
 
@@ -1543,6 +1544,62 @@ def api_risk_summary():
             risks=risks,
             tp_samples=tp_samples,
             baseline_duration_weeks=baseline_duration_weeks
+        )
+
+        return jsonify(convert_to_native_types(result))
+
+    except Exception as e:
+        import traceback
+        return jsonify({
+            'error': str(e),
+            'trace': traceback.format_exc()
+        }), 500
+
+
+@app.route('/api/trend-analysis', methods=['POST'])
+def api_trend_analysis():
+    """
+    Execute automatic trend analysis for throughput data.
+
+    Expected JSON payload:
+    {
+        "tpSamples": list[float] or str (comma-separated),
+        "metricName": str (optional, default: "throughput")
+    }
+    """
+    try:
+        data = request.json or {}
+        tp_samples_raw = data.get('tpSamples')
+        metric_name = data.get('metricName', 'throughput')
+
+        if tp_samples_raw is None:
+            return jsonify({'error': 'tpSamples are required for trend analysis'}), 400
+
+        if isinstance(tp_samples_raw, str):
+            try:
+                throughput_samples = [
+                    float(x.strip())
+                    for x in tp_samples_raw.split(',')
+                    if x.strip()
+                ]
+            except ValueError:
+                return jsonify({'error': 'Invalid throughput samples format'}), 400
+        elif isinstance(tp_samples_raw, list):
+            try:
+                throughput_samples = [float(x) for x in tp_samples_raw]
+            except (TypeError, ValueError):
+                return jsonify({'error': 'tpSamples list must contain numeric values'}), 400
+        else:
+            return jsonify({'error': 'tpSamples must be provided as list or comma-separated string'}), 400
+
+        throughput_samples = [value for value in throughput_samples if np.isfinite(value)]
+
+        if len(throughput_samples) < 3:
+            return jsonify({'error': 'At least 3 throughput samples are required for trend analysis'}), 400
+
+        result = comprehensive_trend_analysis(
+            throughput_samples,
+            metric_name=metric_name or 'throughput'
         )
 
         return jsonify(convert_to_native_types(result))
