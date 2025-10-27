@@ -27,6 +27,7 @@ class TrendAnalysis:
     confidence_level: float  # 0-1
     slope_confidence_interval: Tuple[float, float]
     volatility: float  # Recent standard deviation
+    higher_is_better: bool  # True when increases indicate improvement
 
     # Visual data for plotting
     trend_line: List[float]  # Fitted trend line values
@@ -46,6 +47,7 @@ class TrendAnalysis:
             'confidence_level': round(self.confidence_level, 3),
             'slope_confidence_interval': [round(v, 4) for v in self.slope_confidence_interval],
             'volatility': round(self.volatility, 3),
+            'higher_is_better': self.higher_is_better,
             'trend_line': [round(v, 2) for v in self.trend_line]
         }
 
@@ -210,7 +212,8 @@ def _slope_confidence_interval(
 
 def detect_trend(
     data: List[float],
-    significance_level: float = 0.05
+    significance_level: float = 0.05,
+    higher_is_better: bool = True
 ) -> TrendAnalysis:
     """
     Detect trend in time series data using linear regression and Mann-Kendall test.
@@ -234,16 +237,20 @@ def detect_trend(
     trend_line = slope * x + intercept
     tau, mann_kendall_pvalue = _mann_kendall_test(data_array)
 
+    direction_multiplier = 1 if higher_is_better else -1
+    effective_slope = slope * direction_multiplier
+    effective_tau = (tau * direction_multiplier) if tau is not None else None
+
     # Determine trend direction and strength
     r_strength = abs(r_value)
-    tau_strength = abs(tau) if tau is not None else 0.0
+    tau_strength = abs(effective_tau) if effective_tau is not None else 0.0
     trend_strength = float(np.clip(0.7 * (r_strength ** 2) + 0.3 * tau_strength, 0, 1))
 
-    if tau is not None and abs(tau) >= 0.2:
-        trend_direction = 'improving' if tau > 0 else 'declining'
-    elif abs(slope) < 0.01:  # Very small slope
+    if effective_tau is not None and abs(effective_tau) >= 0.2:
+        trend_direction = 'improving' if effective_tau > 0 else 'declining'
+    elif abs(effective_slope) < 0.01:  # Very small slope
         trend_direction = 'stable'
-    elif slope > 0:
+    elif effective_slope > 0:
         trend_direction = 'improving'
     else:
         trend_direction = 'declining'
@@ -276,6 +283,7 @@ def detect_trend(
         confidence_level=confidence_level,
         slope_confidence_interval=slope_confidence_interval,
         volatility=volatility,
+        higher_is_better=higher_is_better,
         trend_line=trend_line.tolist()
     )
 
@@ -653,6 +661,7 @@ def generate_performance_alerts(
     trend: TrendAnalysis,
     anomalies: AnomalyDetection,
     seasonality: Optional[SeasonalityAnalysis] = None,
+    higher_is_better: bool = True,
     metric_name: str = 'throughput'
 ) -> List[PerformanceAlert]:
     """
@@ -678,17 +687,29 @@ def generate_performance_alerts(
 
     # Alert 1: Significant degradation
     if trend.trend_direction == 'declining' and trend.is_significant:
-        severity = 'critical' if abs(trend.change_pct) > 20 else 'high' if abs(trend.change_pct) > 10 else 'medium'
+        magnitude = abs(trend.change_pct)
+        severity = 'critical' if magnitude > 20 else 'high' if magnitude > 10 else 'medium'
+        variation_noun = 'queda' if higher_is_better else 'aumento'
+        degrade_message = (
+            f'{metric_name.capitalize()} em declínio: {magnitude:.1f}% de {variation_noun} detectado'
+            if higher_is_better
+            else f'{metric_name.capitalize()} piorando: aumento de {magnitude:.1f}% identificado'
+        )
+        degrade_recommendation = (
+            'Investigue possíveis causas: mudanças no time, aumento de complexidade, impedimentos técnicos.'
+            if higher_is_better
+            else 'Investigue gargalos e esperas no fluxo: filas maiores, dependências externas, retrabalhos frequentes.'
+        )
 
         alerts.append(PerformanceAlert(
             severity=severity,
             alert_type='degradation',
-            message=f'{metric_name.capitalize()} em declínio: {abs(trend.change_pct):.1f}% de queda detectada',
+            message=degrade_message,
             metric=metric_name,
             current_value=trend.recent_avg,
             expected_value=trend.historical_avg,
             deviation_pct=trend.change_pct,
-            recommendation='Investigue possíveis causas: mudanças no time, aumento de complexidade, impedimentos técnicos.'
+            recommendation=degrade_recommendation
         ))
 
     # Alert 2: High anomaly count
@@ -736,7 +757,7 @@ def generate_performance_alerts(
     # Alert 4: Stagnation (no improvement)
     if trend.trend_direction == 'stable' and len(data) >= 8:
         # Check if there's been no improvement for a while
-        recent_trend = detect_trend(data[-8:])
+        recent_trend = detect_trend(data[-8:], higher_is_better=higher_is_better)
         if abs(recent_trend.change_pct) < 5:  # Less than 5% change
             alerts.append(PerformanceAlert(
                 severity='medium',
@@ -749,25 +770,28 @@ def generate_performance_alerts(
                 recommendation='Considere iniciativas de melhoria: retrospectivas focadas, experimentos de processo, treinamento do time.'
             ))
 
-    # Alert 5: Seasonality driven degradation
+    # Alert 5: Seasonality driven variation
     if seasonality and seasonality.has_seasonality and seasonality.patterns.get('end_period_drop'):
         alerts.append(PerformanceAlert(
             severity='medium',
             alert_type='seasonality',
-            message='Queda recorrente ao final do ciclo detectada. Ajuste previsões para absorver esse comportamento.',
+            message='Variação recorrente no fim do ciclo detectada. Ajuste previsões e capacidade para absorver esse comportamento.',
             metric=metric_name,
             current_value=current_value,
             expected_value=expected_value,
             deviation_pct=((current_value - expected_value) / expected_value * 100) if expected_value > 0 else 0,
-            recommendation='Planeje capacidade extra para o final do ciclo ou distribua melhor as entregas ao longo do período.'
+            recommendation='Planeje capacidade extra ou distribua melhor as entregas ao longo do período.'
         ))
 
     # Alert 6: Positive trend (recognition)
-    if trend.trend_direction == 'improving' and trend.is_significant and trend.change_pct > 15:
+    improvement_threshold_met = trend.change_pct > 15 if higher_is_better else trend.change_pct < -15
+    if trend.trend_direction == 'improving' and trend.is_significant and improvement_threshold_met:
+        improvement_magnitude = abs(trend.change_pct)
+        improvement_phrase = 'aumento' if higher_is_better else 'redução'
         alerts.append(PerformanceAlert(
             severity='low',
             alert_type='improvement',
-            message=f'✓ {metric_name.capitalize()} melhorando: {trend.change_pct:.1f}% de aumento!',
+            message=f'✓ {metric_name.capitalize()} melhorando: {improvement_magnitude:.1f}% de {improvement_phrase}!',
             metric=metric_name,
             current_value=trend.recent_avg,
             expected_value=trend.historical_avg,
@@ -782,7 +806,8 @@ def comprehensive_trend_analysis(
     data: List[float],
     metric_name: str = 'throughput',
     detect_seasonality: bool = True,
-    project_future: bool = True
+    project_future: bool = True,
+    higher_is_better: bool = True
 ) -> Dict:
     """
     Perform comprehensive trend analysis combining all methods.
@@ -803,7 +828,7 @@ def comprehensive_trend_analysis(
         }
 
     # Perform all analyses
-    trend = detect_trend(data)
+    trend = detect_trend(data, higher_is_better=higher_is_better)
     anomalies = detect_anomalies(data, method='iqr')
 
     seasonality = None
@@ -819,6 +844,7 @@ def comprehensive_trend_analysis(
         trend,
         anomalies,
         seasonality=seasonality,
+        higher_is_better=higher_is_better,
         metric_name=metric_name
     )
 
@@ -830,6 +856,7 @@ def comprehensive_trend_analysis(
         'anomalies': anomalies.to_dict(),
         'projections': [p.to_dict() for p in projections] if projections else None,
         'alerts': [a.to_dict() for a in alerts],
+        'higher_is_better': higher_is_better,
         'summary': {
             'overall_status': trend.trend_direction,
             'is_healthy': trend.trend_direction in ['improving', 'stable'] and anomalies.anomalies_count <= len(data) * 0.1,

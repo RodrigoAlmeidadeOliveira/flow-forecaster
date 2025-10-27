@@ -7,6 +7,7 @@ from flask import Flask, render_template, request, jsonify, redirect, url_for
 import json
 import base64
 import numpy as np
+import re
 from datetime import datetime, timedelta
 from typing import Optional
 from monte_carlo_unified import (
@@ -1559,50 +1560,122 @@ def api_risk_summary():
 @app.route('/api/trend-analysis', methods=['POST'])
 def api_trend_analysis():
     """
-    Execute automatic trend analysis for throughput data.
+    Execute automatic trend analysis for throughput and optional lead time data.
 
     Expected JSON payload:
     {
         "tpSamples": list[float] or str (comma-separated),
+        "ltSamples": list[float] or str (comma-separated, optional),
         "metricName": str (optional, default: "throughput")
     }
     """
     try:
         data = request.json or {}
         tp_samples_raw = data.get('tpSamples')
+        lt_samples_raw = data.get('ltSamples', data.get('leadTimeSamples'))
         metric_name = data.get('metricName', 'throughput')
 
-        if tp_samples_raw is None:
-            return jsonify({'error': 'tpSamples are required for trend analysis'}), 400
+        if tp_samples_raw is None and lt_samples_raw is None:
+            return jsonify({'error': 'Provide throughput (tpSamples) or lead time (ltSamples) samples for trend analysis'}), 400
 
-        if isinstance(tp_samples_raw, str):
-            try:
-                throughput_samples = [
-                    float(x.strip())
-                    for x in tp_samples_raw.split(',')
-                    if x.strip()
-                ]
-            except ValueError:
-                return jsonify({'error': 'Invalid throughput samples format'}), 400
-        elif isinstance(tp_samples_raw, list):
-            try:
-                throughput_samples = [float(x) for x in tp_samples_raw]
-            except (TypeError, ValueError):
-                return jsonify({'error': 'tpSamples list must contain numeric values'}), 400
-        else:
-            return jsonify({'error': 'tpSamples must be provided as list or comma-separated string'}), 400
+        def parse_samples(raw, label):
+            if raw is None:
+                return []
+            if isinstance(raw, str):
+                tokens = [chunk.strip() for chunk in re.split(r'[\s,;\\n]+', raw)]
+                values = []
+                for token in tokens:
+                    if not token:
+                        continue
+                    try:
+                        values.append(float(token.replace(',', '.')))
+                    except ValueError:
+                        raise ValueError(f'Invalid {label} samples format')
+            elif isinstance(raw, list):
+                values = []
+                for item in raw:
+                    try:
+                        values.append(float(item))
+                    except (TypeError, ValueError):
+                        raise ValueError(f'{label} samples must contain numeric values')
+            else:
+                raise ValueError(f'{label} samples must be provided as list or text')
 
-        throughput_samples = [value for value in throughput_samples if np.isfinite(value)]
+            return [value for value in values if np.isfinite(value)]
 
-        if len(throughput_samples) < 3:
-            return jsonify({'error': 'At least 3 throughput samples are required for trend analysis'}), 400
+        try:
+            throughput_samples = parse_samples(tp_samples_raw, 'Throughput')
+            lead_time_samples = parse_samples(lt_samples_raw, 'Lead time')
+        except ValueError as parse_error:
+            return jsonify({'error': str(parse_error)}), 400
 
-        result = comprehensive_trend_analysis(
-            throughput_samples,
-            metric_name=metric_name or 'throughput'
-        )
+        metrics_results = []
+        warnings = []
 
-        return jsonify(convert_to_native_types(result))
+        if throughput_samples:
+            if len(throughput_samples) < 3:
+                warnings.append('Pelo menos 3 amostras de throughput são necessárias para analisar tendências.')
+            else:
+                throughput_result = comprehensive_trend_analysis(
+                    throughput_samples,
+                    metric_name=metric_name or 'throughput',
+                    higher_is_better=True
+                )
+                throughput_result['metric_key'] = 'throughput'
+                throughput_result['display_name'] = 'Throughput'
+                metrics_results.append(throughput_result)
+        elif tp_samples_raw is not None:
+            warnings.append('Pelo menos 3 amostras de throughput são necessárias para analisar tendências.')
+
+        if lead_time_samples:
+            if len(lead_time_samples) < 3:
+                warnings.append('Pelo menos 3 amostras de tempo de lead são necessárias para analisar tendências.')
+            else:
+                lead_time_result = comprehensive_trend_analysis(
+                    lead_time_samples,
+                    metric_name='lead_time',
+                    higher_is_better=False
+                )
+                lead_time_result['metric_key'] = 'lead_time'
+                lead_time_result['display_name'] = 'Tempo de Lead'
+                metrics_results.append(lead_time_result)
+        elif lt_samples_raw not in (None, []):
+            warnings.append('Pelo menos 3 amostras de tempo de lead são necessárias para analisar tendências.')
+
+        if not metrics_results:
+            message = 'Forneça pelo menos 3 amostras de throughput ou tempo de lead para calcular tendências.'
+            return jsonify({'error': message, 'warnings': warnings}), 400
+
+        response_payload = {
+            'metrics': metrics_results
+        }
+
+        if warnings:
+            response_payload['warnings'] = warnings
+
+        primary_metric = None
+        for metric in metrics_results:
+            if metric.get('metric_key') == 'throughput':
+                primary_metric = metric
+                break
+        if primary_metric is None:
+            primary_metric = metrics_results[0]
+
+        # Provide backward-compatible keys for existing consumers
+        if primary_metric:
+            response_payload.update({
+                'metric_name': primary_metric.get('metric_name'),
+                'data_points': primary_metric.get('data_points'),
+                'trend': primary_metric.get('trend'),
+                'seasonality': primary_metric.get('seasonality'),
+                'anomalies': primary_metric.get('anomalies'),
+                'projections': primary_metric.get('projections'),
+                'alerts': primary_metric.get('alerts'),
+                'summary': primary_metric.get('summary'),
+                'higher_is_better': primary_metric.get('higher_is_better')
+            })
+
+        return jsonify(convert_to_native_types(response_payload))
 
     except Exception as e:
         import traceback
