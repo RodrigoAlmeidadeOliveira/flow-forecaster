@@ -2581,61 +2581,99 @@ a probabilidade de todas serem entregues no prazo é de <strong>1 em 2^n</strong
 <script src="{{ url_for('static', filename='js/forecast-persistence.js') }}"></script>
 <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
 <script src="{{ url_for('static', filename='js/trend_insights.js') }}"></script>
-<script>
+    <script>
         $(function () {
-            // Initialize Bootstrap tooltips
             $('[data-toggle="tooltip"]').tooltip();
 
-            function activateTabFromHash() {
-                const hash = window.location.hash;
-                if (hash === '#advanced-forecast') {
-                    $('#tab-advanced-link').tab('show');
-                } else if (hash === '#demand-forecast') {
-                    $('#tab-demand-link').tab('show');
-                } else if (hash === '#deadline-analysis') {
-                    $('#tab-deadline-link').tab('show');
-                } else if (hash === '#historical-charts') {
-                    $('#tab-historical-link').tab('show');
-                } else if (hash === '#cost-analysis') {
-                    $('#tab-cost-link').tab('show');
-                } else if (hash === '#trend-analysis') {
-                    $('#tab-trend-link').tab('show');
-                } else if (hash === '#forecast-vs-actual-tab' || hash === '#forecast-vs-actual') {
-                    $('#tab-forecast-vs-actual').tab('show');
-                } else if (hash === '#dependency-analysis-tab' || hash === '#dependency-analysis') {
-                    $('#dependency-tab-link').tab('show');
-                } else if (hash === '#executive-dashboard' || hash === '#dashboard') {
-                    $('#tab-dashboard-link').tab('show');
-                } else if (hash === '#portfolio-dashboard' || hash === '#portfolio') {
-                    $('#tab-portfolio-link').tab('show');
-                } else if (hash === '#mc-forecast') {
-                    $('#tab-mc-link').tab('show');
+            const TAB_MAP = {
+                '#mc-forecast': '#tab-mc-link',
+                '#advanced-forecast': '#tab-advanced-link',
+                '#demand-forecast': '#tab-demand-link',
+                '#deadline-analysis': '#tab-deadline-link',
+                '#historical-charts': '#tab-historical-link',
+                '#cost-analysis': '#tab-cost-link',
+                '#trend-analysis': '#tab-trend-link',
+                '#forecast-vs-actual': '#tab-forecast-vs-actual',
+                '#forecast-vs-actual-tab': '#tab-forecast-vs-actual',
+                '#dependency-analysis': '#dependency-tab-link',
+                '#dependency-analysis-tab': '#dependency-tab-link',
+                '#executive-dashboard': '#tab-dashboard-link',
+                '#dashboard': '#tab-dashboard-link',
+                '#portfolio-dashboard': '#tab-portfolio-link',
+                '#portfolio': '#tab-portfolio-link'
+            };
+
+            const DEFAULT_TAB = '#mc-forecast';
+
+            function normalizeHash(hash) {
+                if (!hash) {
+                    return '';
+                }
+                let value = hash.trim();
+                if (!value) {
+                    return '';
+                }
+                if (!value.startsWith('#')) {
+                    value = `#${value}`;
+                }
+                return value.toLowerCase();
+            }
+
+            function showTab(hash, options = {}) {
+                const normalized = normalizeHash(hash) || normalizeHash(DEFAULT_TAB);
+                const selector = TAB_MAP[normalized];
+                if (!selector) {
+                    return false;
+                }
+
+                const $tabLink = $(selector);
+                if (!$tabLink.length) {
+                    return false;
+                }
+
+                $tabLink.tab('show');
+
+                if (!options.suppressHash && normalized !== normalizeHash(window.location.hash)) {
+                    history.replaceState(null, '', normalized);
+                }
+
+                return true;
+            }
+
+            function handleHashChange() {
+                const currentHash = normalizeHash(window.location.hash);
+                if (!showTab(currentHash, { suppressHash: true })) {
+                    showTab(DEFAULT_TAB, { suppressHash: true });
                 }
             }
 
-            activateTabFromHash();
-            setTimeout(activateTabFromHash, 100);
-            // Ensure hash-based activation also runs after all assets load
-            $(window).on('load', activateTabFromHash);
-
-            window.addEventListener('hashchange', activateTabFromHash);
-
-            $('#navbarsExampleDefault a.nav-link[data-target]').on('click', function (e) {
+            $('#navbarsExampleDefault').on('click', 'a.nav-link[data-target]', function (event) {
                 const target = $(this).data('target');
-                if (target && target.startsWith('#')) {
-                    e.preventDefault();
-                    $(`#forecastTabs a[href="${target}"]`).tab('show');
+                if (typeof target === 'string' && target.startsWith('#')) {
+                    event.preventDefault();
+                    showTab(target);
                     $('html, body').animate({ scrollTop: $('#forecastTabs').offset().top - 70 }, 300);
-                    history.replaceState(null, null, target);
                 }
             });
 
-            $('a[data-toggle="tab"]').on('shown.bs.tab', function (e) {
-                const target = $(e.target).attr('href');
-                if (target === '#advanced-forecast' || target === '#demand-forecast' || target === '#mc-forecast' || target === '#deadline-analysis' || target === '#historical-charts' || target === '#trend-analysis' || target === '#forecast-vs-actual-tab' || target === '#dependency-analysis-tab' || target === '#executive-dashboard' || target === '#portfolio-dashboard') {
-                    history.replaceState(null, null, target);
+            $('#forecastTabs').on('click', 'a.nav-link[data-toggle="tab"]', function (event) {
+                const href = $(this).attr('href');
+                if (typeof href === 'string' && href.startsWith('#')) {
+                    event.preventDefault();
+                    showTab(href);
                 }
             });
+
+            $('#forecastTabs').on('shown.bs.tab', 'a[data-toggle="tab"]', function (event) {
+                const target = $(event.target).attr('href');
+                if (typeof target === 'string' && target.startsWith('#')) {
+                    history.replaceState(null, '', normalizeHash(target));
+                }
+            });
+
+            window.addEventListener('hashchange', handleHashChange);
+            $(window).on('load', handleHashChange);
+            handleHashChange();
         });
     </script>
     <script src="{{ url_for('static', filename='js/portfolio.js') }}"></script>
