@@ -383,9 +383,8 @@
             $container.hide();
         }
     };
-})();
 
-$(window).on("load", function () {
+    $(window).on("load", function () {
     const TOOLTIP_DELAY = 500;
     const DOC_BASE_URL = "https://flow-forecaster.fly.dev/documentacao";
 
@@ -2560,6 +2559,7 @@ ${generateProgressBar(p50Items, backlog, 'P50 (arriscado)  ', Math.round((p50Ite
             return false;
         }
     }
+    }); // Close $(window).on("load")
 
     // Initialize UI when DOM is ready
     $(function() {
@@ -2632,9 +2632,9 @@ ${generateProgressBar(p50Items, backlog, 'P50 (arriscado)  ', Math.round((p50Ite
     });
 
     // Export functions to global scope for inline onclick handlers
-    global.addRisk = addRisk;
-    global.addDependency = addDependency;
-    global.runSimulation = runSimulation;
-    global.share = share;
-    global.recalculateBacklog = recalculateBacklog;
+    window.addRisk = addRisk;
+    window.addDependency = addDependency;
+    window.runSimulation = runSimulation;
+    window.share = share;
+    window.recalculateBacklog = recalculateBacklog;
 })(window);
