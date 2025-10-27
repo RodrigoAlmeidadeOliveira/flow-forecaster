@@ -70,7 +70,12 @@ def reset_db():
 
 
 # Initialize database on import
-if not os.path.exists('forecaster.db') or os.path.getsize('forecaster.db') == 0:
+db_file = DB_PATH.replace('sqlite:///', '').replace('sqlite:////', '/')
+if not os.path.exists(db_file) or os.path.getsize(db_file) == 0:
+    # Ensure directory exists
+    db_dir = os.path.dirname(db_file)
+    if db_dir and not os.path.exists(db_dir):
+        os.makedirs(db_dir, exist_ok=True)
     init_db()
 
 ensure_schema()

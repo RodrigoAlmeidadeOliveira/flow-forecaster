@@ -4,6 +4,9 @@
 app = "flow-forecaster"
 primary_region = "gru"
 
+[env]
+  DATABASE_URL = "sqlite:////data/forecaster.db"
+
 [build]
 
 [http_service]
@@ -22,3 +25,7 @@ primary_region = "gru"
 [[statics]]
   guest_path = "/app/static"
   url_prefix = "/static/"
+
+[mounts]
+  source = "flow_forecaster_data"
+  destination = "/data"
