@@ -2560,13 +2560,17 @@ ${generateProgressBar(p50Items, backlog, 'P50 (arriscado)  ', Math.round((p50Ite
         }
     }
 
-    // Export functions defined in window.on("load") to global scope
-    window.addRisk = addRisk;
-    window.addDependency = addDependency;
-    window.runSimulation = runSimulation;
-    window.share = share;
-    window.markHistoricalChartsDirty = markHistoricalChartsDirty;
-    window.runDeadlineAnalysis = runDeadlineAnalysis;
+        // Export functions and variables defined in window.on("load") to global scope for use by $(function()) block
+        window.addRisk = addRisk;
+        window.addDependency = addDependency;
+        window.runSimulation = runSimulation;
+        window.share = share;
+        window.markHistoricalChartsDirty = markHistoricalChartsDirty;
+        window.runDeadlineAnalysis = runDeadlineAnalysis;
+        window.updateHistoricalCharts = updateHistoricalCharts;
+        window.loadDataFromUrl = loadDataFromUrl;
+        window.updateRiskSummary = updateRiskSummary;
+        window.currentlyLoadedHash = currentlyLoadedHash;
     }); // Close $(window).on("load")
 
     // Initialize UI when DOM is ready
@@ -2593,19 +2597,19 @@ ${generateProgressBar(p50Items, backlog, 'P50 (arriscado)  ', Math.round((p50Ite
             });
         }
 
-        $('#tpSamples, #ltSamples').on('input change', markHistoricalChartsDirty);
+        $('#tpSamples, #ltSamples').on('input change', window.markHistoricalChartsDirty);
         $('a[data-toggle="tab"][href="#historical-charts"]').on('shown.bs.tab', function() {
-            updateHistoricalCharts(true);
+            window.updateHistoricalCharts(true);
         });
 
-        updateHistoricalCharts(false);
+        window.updateHistoricalCharts(false);
 
         if (location.hash && location.hash.trim().length > 1) {
-            loadDataFromUrl();
+            window.loadDataFromUrl();
         }
 
         window.onhashchange = function () {
-            if (currentlyLoadedHash != location.hash) {
+            if (window.currentlyLoadedHash != location.hash) {
                 location.reload();
             }
         };
@@ -2614,12 +2618,12 @@ ${generateProgressBar(p50Items, backlog, 'P50 (arriscado)  ', Math.round((p50Ite
         let riskSummaryTimeout;
         function scheduleRiskSummaryUpdate() {
             clearTimeout(riskSummaryTimeout);
-            riskSummaryTimeout = setTimeout(updateRiskSummary, 1000);
+            riskSummaryTimeout = setTimeout(window.updateRiskSummary, 1000);
         }
 
         // Add risk button with risk summary update
         $('#addRisk').on('click', function() {
-            addRisk();
+            window.addRisk();
             scheduleRiskSummaryUpdate();
         });
 
@@ -2633,10 +2637,10 @@ ${generateProgressBar(p50Items, backlog, 'P50 (arriscado)  ', Math.round((p50Ite
             scheduleRiskSummaryUpdate();
         });
 
-        $('#addDependency').on('click', addDependency);
-        $('#share').on('click', share);
-        $('#run').on('click', runSimulation);
-        $('#runDeadlineAnalysis').on('click', runDeadlineAnalysis);
+        $('#addDependency').on('click', window.addDependency);
+        $('#share').on('click', window.share);
+        $('#run').on('click', window.runSimulation);
+        $('#runDeadlineAnalysis').on('click', window.runDeadlineAnalysis);
     });
 
     // Export functions to global scope for inline onclick handlers
