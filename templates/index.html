@@ -808,6 +808,8 @@
 <div class="container-fluid bg-12 text-center">
 <button class="btn btn-primary" id="run" type="button" data-i18n="run_simulation" onclick="runSimulation()">Executar a simulação!</button>
 <button class="btn btn-secondary" id="share" title="Share simulation" type="button" data-i18n="share" onclick="share()">Compartilhar</button>
+<button class="btn btn-success" id="saveForecast" type="button" title="Salvar análise atual" onclick="openSaveModal()"><i class="fas fa-save"></i> Salvar</button>
+<button class="btn btn-info" id="loadForecast" type="button" title="Carregar análise salva" onclick="openLoadModal()"><i class="fas fa-folder-open"></i> Carregar</button>
 </div>
 <div class="container-fluid bg-12 text-center" id="results-main" style="display:none">
 <h2 data-i18n="results_title">Resultados da Simulação</h2>
@@ -2050,6 +2052,84 @@ a probabilidade de todas serem entregues no prazo é de <strong>1 em 2^n</strong
 </div>
 <br/><br/>
 </main>
+
+<!-- Save Forecast Modal -->
+<div class="modal fade" id="saveForecastModal" tabindex="-1" role="dialog" aria-labelledby="saveForecastModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="saveForecastModalLabel"><i class="fas fa-save"></i> Salvar Análise</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form id="saveForecastForm">
+                    <div class="form-group">
+                        <label for="forecastName">Nome da Análise *</label>
+                        <input type="text" class="form-control" id="forecastName" required placeholder="Ex: Sprint 1 - Análise de Prazo">
+                    </div>
+                    <div class="form-group">
+                        <label for="forecastDescription">Descrição</label>
+                        <textarea class="form-control" id="forecastDescription" rows="3" placeholder="Informações adicionais sobre esta análise..."></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="projectName">Projeto</label>
+                        <input type="text" class="form-control" id="projectName" placeholder="Nome do projeto">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-success" onclick="saveForecast()"><i class="fas fa-save"></i> Salvar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Load Forecast Modal -->
+<div class="modal fade" id="loadForecastModal" tabindex="-1" role="dialog" aria-labelledby="loadForecastModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="loadForecastModalLabel"><i class="fas fa-folder-open"></i> Carregar Análise</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="card mb-3">
+                    <div class="card-body">
+                        <h6 class="card-title"><i class="fas fa-upload"></i> Importar de Arquivo JSON</h6>
+                        <div class="input-group">
+                            <div class="custom-file">
+                                <input type="file" class="custom-file-input" id="importFileInput" accept=".json">
+                                <label class="custom-file-label" for="importFileInput">Escolher arquivo...</label>
+                            </div>
+                            <div class="input-group-append">
+                                <button class="btn btn-primary" type="button" onclick="importForecastFromFile()">
+                                    <i class="fas fa-file-import"></i> Importar
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <hr>
+                <h6><i class="fas fa-database"></i> Análises Salvas</h6>
+                <div id="loadingForecasts" class="text-center" style="display:none;">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="sr-only">Carregando...</span>
+                    </div>
+                </div>
+                <div id="forecastsList"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Fechar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- jQuery -->
 <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
 <!-- Bootstrap JS -->
@@ -2083,11 +2163,12 @@ a probabilidade de todas serem entregues no prazo é de <strong>1 em 2^n</strong
 <!-- Internationalization -->
 <script src="{{ url_for('static', filename='js/i18n.js') }}"></script>
 <!-- Custom JS -->
-<script src="{{ url_for('static', filename='js/ui.js') }}?v=1761529600"></script>
+<script src="{{ url_for('static', filename='js/ui.js') }}?v=1761530000"></script>
 <script src="{{ url_for('static', filename='js/advanced_forecast.js') }}"></script>
 <script src="{{ url_for('static', filename='js/demand_forecast.js') }}"></script>
 <script src="{{ url_for('static', filename='js/charts.js') }}"></script>
 <script src="{{ url_for('static', filename='js/cost_analysis.js') }}"></script>
+<script src="{{ url_for('static', filename='js/forecast-persistence.js') }}"></script>
 <script>
         $(function () {
             // Initialize Bootstrap tooltips

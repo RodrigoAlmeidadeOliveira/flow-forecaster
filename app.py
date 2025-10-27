@@ -28,8 +28,13 @@ from cost_pert_beta import (
     calculate_effort_based_cost,
     calculate_effort_based_cost_with_percentiles
 )
+from database import get_session, close_session, init_db
+from models import Project, Forecast, Actual
 
 app = Flask(__name__)
+
+# Initialize database
+init_db()
 
 # Debugging: Print routes at startup
 import sys
@@ -1530,6 +1535,226 @@ def api_risk_summary():
             'error': str(e),
             'trace': traceback.format_exc()
         }), 500
+
+
+# ============================================================================
+# FORECAST PERSISTENCE API ENDPOINTS
+# ============================================================================
+
+@app.route('/api/projects', methods=['GET', 'POST'])
+def handle_projects():
+    """List all projects or create a new one"""
+    session = get_session()
+    try:
+        if request.method == 'GET':
+            projects = session.query(Project).all()
+            return jsonify([p.to_dict() for p in projects])
+
+        elif request.method == 'POST':
+            data = request.json
+            project = Project(
+                name=data['name'],
+                description=data.get('description'),
+                team_size=data.get('team_size', 1)
+            )
+            session.add(project)
+            session.commit()
+            return jsonify(project.to_dict()), 201
+
+    except Exception as e:
+        session.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        session.close()
+
+
+@app.route('/api/projects/<int:project_id>', methods=['GET', 'PUT', 'DELETE'])
+def handle_project(project_id):
+    """Get, update, or delete a specific project"""
+    session = get_session()
+    try:
+        project = session.query(Project).get(project_id)
+        if not project:
+            return jsonify({'error': 'Project not found'}), 404
+
+        if request.method == 'GET':
+            return jsonify(project.to_dict())
+
+        elif request.method == 'PUT':
+            data = request.json
+            if 'name' in data:
+                project.name = data['name']
+            if 'description' in data:
+                project.description = data['description']
+            if 'team_size' in data:
+                project.team_size = data['team_size']
+            project.updated_at = datetime.utcnow()
+            session.commit()
+            return jsonify(project.to_dict())
+
+        elif request.method == 'DELETE':
+            session.delete(project)
+            session.commit()
+            return '', 204
+
+    except Exception as e:
+        session.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        session.close()
+
+
+@app.route('/api/forecasts', methods=['GET', 'POST'])
+def handle_forecasts():
+    """List forecasts or save a new forecast"""
+    session = get_session()
+    try:
+        if request.method == 'GET':
+            # Optional filter by project_id
+            project_id = request.args.get('project_id', type=int)
+            query = session.query(Forecast)
+            if project_id:
+                query = query.filter_by(project_id=project_id)
+
+            forecasts = query.order_by(Forecast.created_at.desc()).all()
+            return jsonify([f.to_summary() for f in forecasts])
+
+        elif request.method == 'POST':
+            data = request.json
+
+            # Create or get project
+            project_id = data.get('project_id')
+            if not project_id:
+                # Create default project if not specified
+                project = Project(name=data.get('project_name', 'Unnamed Project'))
+                session.add(project)
+                session.flush()
+                project_id = project.id
+
+            # Create forecast
+            forecast = Forecast(
+                project_id=project_id,
+                name=data['name'],
+                description=data.get('description'),
+                forecast_type=data.get('forecast_type', 'deadline'),
+                forecast_data=json.dumps(data['forecast_data']),
+                input_data=json.dumps(data['input_data']),
+                backlog=data.get('backlog'),
+                deadline_date=data.get('deadline_date'),
+                start_date=data.get('start_date'),
+                weeks_to_deadline=data.get('weeks_to_deadline'),
+                projected_weeks_p85=data.get('projected_weeks_p85'),
+                can_meet_deadline=data.get('can_meet_deadline'),
+                scope_completion_pct=data.get('scope_completion_pct'),
+                created_by=data.get('created_by')
+            )
+
+            session.add(forecast)
+            session.commit()
+            return jsonify(forecast.to_dict()), 201
+
+    except Exception as e:
+        session.rollback()
+        import traceback
+        return jsonify({
+            'error': str(e),
+            'trace': traceback.format_exc()
+        }), 500
+    finally:
+        session.close()
+
+
+@app.route('/api/forecasts/<int:forecast_id>', methods=['GET', 'DELETE'])
+def handle_forecast(forecast_id):
+    """Get or delete a specific forecast"""
+    session = get_session()
+    try:
+        forecast = session.query(Forecast).get(forecast_id)
+        if not forecast:
+            return jsonify({'error': 'Forecast not found'}), 404
+
+        if request.method == 'GET':
+            return jsonify(forecast.to_dict())
+
+        elif request.method == 'DELETE':
+            session.delete(forecast)
+            session.commit()
+            return '', 204
+
+    except Exception as e:
+        session.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        session.close()
+
+
+@app.route('/api/forecasts/<int:forecast_id>/export', methods=['GET'])
+def export_forecast(forecast_id):
+    """Export a forecast as JSON file"""
+    session = get_session()
+    try:
+        forecast = session.query(Forecast).get(forecast_id)
+        if not forecast:
+            return jsonify({'error': 'Forecast not found'}), 404
+
+        # Return full forecast data as downloadable JSON
+        from flask import make_response
+        response = make_response(json.dumps(forecast.to_dict(), indent=2))
+        response.headers['Content-Type'] = 'application/json'
+        response.headers['Content-Disposition'] = f'attachment; filename=forecast_{forecast_id}.json'
+        return response
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        session.close()
+
+
+@app.route('/api/forecasts/import', methods=['POST'])
+def import_forecast():
+    """Import a forecast from JSON"""
+    session = get_session()
+    try:
+        data = request.json
+
+        # Create or get project
+        project_id = data.get('project_id')
+        if not project_id:
+            project = Project(name=data.get('project_name', 'Imported Project'))
+            session.add(project)
+            session.flush()
+            project_id = project.id
+
+        # Create forecast from imported data
+        forecast = Forecast(
+            project_id=project_id,
+            name=data.get('name', 'Imported Forecast'),
+            description=data.get('description'),
+            forecast_type=data.get('forecast_type', 'deadline'),
+            forecast_data=json.dumps(data.get('forecast_data', {})),
+            input_data=json.dumps(data.get('input_data', {})),
+            backlog=data.get('backlog'),
+            deadline_date=data.get('deadline_date'),
+            start_date=data.get('start_date'),
+            weeks_to_deadline=data.get('weeks_to_deadline'),
+            projected_weeks_p85=data.get('projected_weeks_p85'),
+            can_meet_deadline=data.get('can_meet_deadline'),
+            scope_completion_pct=data.get('scope_completion_pct')
+        )
+
+        session.add(forecast)
+        session.commit()
+        return jsonify(forecast.to_dict()), 201
+
+    except Exception as e:
+        session.rollback()
+        import traceback
+        return jsonify({
+            'error': str(e),
+            'trace': traceback.format_exc()
+        }), 500
+    finally:
+        session.close()
 
 
 for rule in app.url_map.iter_rules():
