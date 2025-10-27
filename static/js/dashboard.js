@@ -43,7 +43,7 @@ function updateCurrentKPIs() {
 
     // Get backlog
     const backlog = getCurrentBacklog();
-    $('#kpi-backlog').text(backlog || '-');
+    $('#kpi-backlog').text(Number.isFinite(backlog) ? backlog : '-');
 
     // Get deadline probability from last results
     if (window.lastSimulationResults && window.lastSimulationResults.duration_p85) {
@@ -100,6 +100,8 @@ async function loadHistoricalMetrics() {
             const date = new Date(f.created_at).toLocaleDateString('pt-BR');
             const statusClass = f.can_meet_deadline ? 'success' : 'danger';
             const statusIcon = f.can_meet_deadline ? 'check-circle' : 'exclamation-triangle';
+            const backlogValue = Number(f.backlog || 0);
+            const projectedWeeks = Number(f.projected_weeks_p85 || 0);
 
             html += `
                 <div class="list-group-item list-group-item-action">
@@ -112,7 +114,7 @@ async function loadHistoricalMetrics() {
                             <i class="fas fa-${statusIcon}"></i>
                             ${f.can_meet_deadline ? 'Prazo OK' : 'Risco de Atraso'}
                         </span>
-                        ${f.backlog || 0} itens | ${(f.projected_weeks_p85 || 0).toFixed(1)} sem
+                        ${backlogValue} itens | ${projectedWeeks.toFixed(1)} sem
                     </p>
                 </div>
             `;
@@ -133,74 +135,115 @@ async function loadHistoricalMetrics() {
 
 // Create throughput trend chart
 function createThroughputTrendChart(forecasts) {
-    const ctx = document.getElementById('dashboard-throughput-chart');
-    if (!ctx) return;
+    const canvas = document.getElementById('dashboard-throughput-chart');
+    if (!canvas) return;
 
-    // Extract data
-    const labels = forecasts.map(f => {
-        const date = new Date(f.created_at);
-        return date.toLocaleDateString('pt-BR', { month: 'short', day: 'numeric' });
-    }).reverse();
-
-    const durations = forecasts.map(f => f.projected_weeks_p85 || 0).reverse();
-    const backlogs = forecasts.map(f => f.backlog || 0).reverse();
-
-    // Destroy previous chart if exists
     if (dashboardChart) {
-        dashboardChart.destroy();
+        try {
+            dashboardChart.destroy();
+        } catch (err) {
+            console.warn('Failed to destroy dashboard chart', err);
+        }
+        dashboardChart = null;
     }
 
-    // Create new chart
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const validForecasts = Array.isArray(forecasts)
+        ? forecasts.filter(f => f && (f.projected_weeks_p85 != null || f.backlog != null))
+        : [];
+
+    if (validForecasts.length === 0) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        return;
+    }
+
+    const labels = [];
+    const durations = [];
+    const backlogs = [];
+
+    validForecasts.slice().reverse().forEach(f => {
+        const date = f.created_at ? new Date(f.created_at) : null;
+        labels.push(date ? date.toLocaleDateString('pt-BR', { month: 'short', day: 'numeric' }) : '');
+        durations.push(Number(f.projected_weeks_p85) || 0);
+        backlogs.push(Number(f.backlog) || 0);
+    });
+
     dashboardChart = new Chart(ctx, {
         type: 'line',
         data: {
-            labels: labels,
+            labels,
             datasets: [
                 {
                     label: 'Duração Projetada (P85) - semanas',
                     data: durations,
                     borderColor: 'rgb(75, 192, 192)',
                     backgroundColor: 'rgba(75, 192, 192, 0.2)',
-                    yAxisID: 'y',
+                    yAxisID: 'duration-axis',
+                    fill: false,
                 },
                 {
                     label: 'Backlog - itens',
                     data: backlogs,
                     borderColor: 'rgb(255, 159, 64)',
                     backgroundColor: 'rgba(255, 159, 64, 0.2)',
-                    yAxisID: 'y1',
+                    yAxisID: 'backlog-axis',
+                    fill: false,
                 }
             ]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            interaction: {
+            tooltips: {
                 mode: 'index',
                 intersect: false,
             },
+            hover: {
+                mode: 'index',
+                intersect: false,
+            },
+            legend: {
+                position: 'bottom'
+            },
             scales: {
-                y: {
-                    type: 'linear',
-                    display: true,
-                    position: 'left',
-                    title: {
-                        display: true,
-                        text: 'Semanas'
+                xAxes: [{
+                    ticks: {
+                        autoSkip: true,
+                        maxTicksLimit: 8
+                    },
+                    gridLines: {
+                        display: false
                     }
-                },
-                y1: {
-                    type: 'linear',
-                    display: true,
-                    position: 'right',
-                    title: {
-                        display: true,
-                        text: 'Itens'
+                }],
+                yAxes: [
+                    {
+                        id: 'duration-axis',
+                        position: 'left',
+                        ticks: {
+                            beginAtZero: true
+                        },
+                        scaleLabel: {
+                            display: true,
+                            labelString: 'Semanas'
+                        }
                     },
-                    grid: {
-                        drawOnChartArea: false,
-                    },
-                },
+                    {
+                        id: 'backlog-axis',
+                        position: 'right',
+                        ticks: {
+                            beginAtZero: true
+                        },
+                        scaleLabel: {
+                            display: true,
+                            labelString: 'Itens'
+                        },
+                        gridLines: {
+                            drawOnChartArea: false
+                        }
+                    }
+                ]
             }
         }
     });
@@ -303,4 +346,6 @@ $(document).on('shown.bs.tab', 'a[href="#executive-dashboard"]', function () {
 });
 
 // Export to global scope
+window.updateCurrentKPIs = updateCurrentKPIs;
+window.updateProjectHealth = updateProjectHealth;
 window.refreshDashboard = refreshDashboard;
