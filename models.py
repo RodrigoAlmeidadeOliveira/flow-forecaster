@@ -19,6 +19,26 @@ class Project(Base):
     name = Column(String(200), nullable=False)
     description = Column(Text, nullable=True)
     team_size = Column(Integer, default=1)
+
+    # Portfolio management fields
+    status = Column(String(50), default='active')  # active, on_hold, completed, cancelled
+    priority = Column(Integer, default=3)  # 1 (highest) to 5 (lowest)
+    business_value = Column(Integer, default=50)  # 0-100 scale
+    risk_level = Column(String(20), default='medium')  # low, medium, high, critical
+    capacity_allocated = Column(Float, default=1.0)  # FTE (Full-Time Equivalent)
+    strategic_importance = Column(String(20), default='medium')  # low, medium, high, critical
+
+    # Project dates
+    start_date = Column(String(20), nullable=True)  # DD/MM/YYYY
+    target_end_date = Column(String(20), nullable=True)  # DD/MM/YYYY
+
+    # Project owner/stakeholder
+    owner = Column(String(200), nullable=True)
+    stakeholder = Column(String(200), nullable=True)
+
+    # Tags for categorization
+    tags = Column(Text, nullable=True)  # JSON array of tags
+
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -31,6 +51,17 @@ class Project(Base):
             'name': self.name,
             'description': self.description,
             'team_size': self.team_size,
+            'status': self.status,
+            'priority': self.priority,
+            'business_value': self.business_value,
+            'risk_level': self.risk_level,
+            'capacity_allocated': self.capacity_allocated,
+            'strategic_importance': self.strategic_importance,
+            'start_date': self.start_date,
+            'target_end_date': self.target_end_date,
+            'owner': self.owner,
+            'stakeholder': self.stakeholder,
+            'tags': json.loads(self.tags) if self.tags else [],
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None,
             'forecasts_count': len(self.forecasts) if self.forecasts else 0

@@ -115,3 +115,157 @@ Melhorias Sugeridas
   enterprise completa de predictive analytics para projetos".
 
   Qual dessas áreas te interessa mais? Posso ajudar a implementar qualquer uma delas! 🚀
+
+
+
+  27/10/2025
+
+    ---
+  ✅ RECÉM IMPLEMENTADO (100%)
+
+  1. Forecast vs Actual Tracking ⭐⭐⭐⭐⭐
+
+  - ✅ Interface UI para registrar actuals
+  - ✅ Métricas de acurácia (MAPE, RMSE, MAE, R²)
+  - ✅ Dashboard completo com visualizações
+  - ✅ Backtesting automático (walk-forward e expanding window)
+  - ✅ Alertas de qualidade de dados
+  - ✅ Recomendações automáticas
+
+  2. Persistência e Histórico ⭐⭐⭐⭐⭐
+
+  - ✅ Banco de dados SQLAlchemy com models (Project, Forecast, Actual)
+  - ✅ API REST completa para CRUD
+  - ✅ Export/Import JSON
+  - ✅ Versionamento de forecasts
+
+  ---
+  🎯 PRÓXIMAS PRIORIDADES (Recomendadas)
+
+  FASE 1 - Quick Wins (1-2 semanas) 🚀
+
+  1. Análise de Cenários (What-If) ⭐⭐⭐⭐⭐
+
+  Por quê? Valor imediato para tomada de decisão
+
+  O que implementar:
+  - Interface para criar 3 cenários: Otimista / Realista / Pessimista
+  - Comparação lado-a-lado em tabela e gráficos
+  - What-if interativo: "E se adicionar 2 pessoas?"
+  - Sensitivity analysis: qual parâmetro tem mais impacto
+
+  Complexidade: 🟡 MédiaImpacto: 🔥 Muito AltoArquivos: scenario_analysis.py, templates/scenario_analysis.html
+
+  ---
+  2. Export para PDF e Excel ⭐⭐⭐⭐
+
+  Por quê? Comunicação profissional com stakeholders
+
+  O que implementar:
+  - Export de forecasts para PDF (biblioteca ReportLab)
+  - Export para Excel com gráficos (biblioteca openpyxl)
+  - Template de relatório profissional
+  - Botão de export em cada análise
+
+  Complexidade: 🟢 BaixaImpacto: 🔥 AltoArquivos: report_generator.py, adicionar endpoints em app.py
+
+  ---
+  FASE 2 - High Value (2-4 semanas) 💎
+
+  3. Integração com Jira ⭐⭐⭐⭐⭐
+
+  Por quê? Elimina trabalho manual, aumenta adoção
+
+  O que implementar:
+  - Autenticação com Jira (API Token)
+  - Import automático de throughput (issues completadas por semana)
+  - Import de backlog atual
+  - Sincronização periódica (webhook ou polling)
+  - Interface de configuração
+
+  Complexidade: 🔴 AltaImpacto: 🔥🔥 AltíssimoArquivos: integrations/jira_connector.py, templates/integrations.html
+
+  ---
+  4. Dashboard de Portfolio (Multi-Projeto) ⭐⭐⭐⭐
+
+  Por quê? Visão consolidada de múltiplos projetos
+
+  O que implementar:
+  - Lista de todos os projetos ativos
+  - Comparação de health score (MAPE, bias)
+  - Análise de capacidade compartilhada
+  - Priorização visual (valor vs risco)
+  - Alertas por projeto
+
+  Complexidade: 🟡 MédiaImpacto: 🔥 AltoArquivos: templates/portfolio_dashboard.html, static/js/portfolio.js
+
+  ---
+  FASE 3 - Advanced Features (4-8 semanas) 🚀
+
+  5. Análise de Tendências Automática ⭐⭐⭐
+
+  O que implementar:
+  - Detecção automática de tendências (throughput melhorando/piorando)
+  - Análise de sazonalidade
+  - Detecção de anomalias (outliers)
+  - Projeção de melhoria: "Se melhorar 10% por sprint..."
+  - Alertas de degradação de performance
+
+  Complexidade: 🔴 AltaImpacto: 🔥 AltoArquivos: trend_analysis.py
+
+  ---
+  6. Integração com Azure DevOps e GitHub ⭐⭐⭐⭐
+
+  O que implementar:
+  - Conector Azure DevOps (Work Items)
+  - Conector GitHub (Issues, PRs, Projects)
+  - Análise de velocity por repositório
+  - Import de métricas de código (commits, PRs)
+
+  Complexidade: 🔴 AltaImpacto: 🔥 AltoArquivos: integrations/azure_connector.py, integrations/github_connector.py
+
+  ---
+  7. Wizards e Onboarding ⭐⭐⭐
+
+  O que implementar:
+  - Wizard guiado para primeira análise (step-by-step)
+  - Templates por tipo de projeto (Scrum, Kanban, SAFe)
+  - Tutorial interativo
+  - Samples de dados para teste
+
+  Complexidade: 🟡 MédiaImpacto: 🔥 MédioArquivos: templates/onboarding.html, static/js/wizard.js
+
+  ---
+  FASE 4 - Enterprise Features (8+ semanas) 🏢
+
+  8. Features Específicas Avançadas
+
+  - Forecast de defeitos/bugs baseado em histórico
+  - Análise de technical debt impact
+  - Forecast de capacidade vs demanda
+  - Rolling wave planning
+  - Correlação entre riscos
+  - Probabilistic roadmaps
+
+  ---
+  📊 Matriz de Priorização
+
+  | Feature                       | Complexidade | Impacto         | Tempo   | Prioridade |
+  |-------------------------------|--------------|-----------------|---------|------------|
+  | Análise de Cenários (What-If) | 🟡 Média     | 🔥🔥 Muito Alto | 1-2 sem | #1         |
+  | Export PDF/Excel              | 🟢 Baixa     | 🔥 Alto         | 1 sem   | #2         |
+  | Integração Jira               | 🔴 Alta      | 🔥🔥 Altíssimo  | 2-3 sem | #3         |
+  | Dashboard Portfolio           | 🟡 Média     | 🔥 Alto         | 2 sem   | #4         |
+  | Análise de Tendências         | 🔴 Alta      | 🔥 Alto         | 3-4 sem | #5         |
+  | Azure DevOps/GitHub           | 🔴 Alta      | 🔥 Alto         | 2-3 sem | #6         |
+  | Wizards/Onboarding            | 🟡 Média     | 🔥 Médio        | 2 sem   | #7         |
+
+
+
+
+  ###### INCLUIR NO ESCOPO #######
+
+  1) acesso via google oauth2
+  2) vender créditos de simulação 
+    Aceitar pagamentos via pix e paypal
+  3)

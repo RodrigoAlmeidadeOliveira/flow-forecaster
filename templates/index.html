@@ -245,6 +245,11 @@
 <li class="nav-item">
 <a aria-controls="executive-dashboard" aria-selected="false" class="nav-link" data-toggle="tab" href="#executive-dashboard" id="tab-dashboard-link" role="tab">Dashboard Executivo</a>
 </li>
+<li class="nav-item">
+<a aria-controls="portfolio-dashboard" aria-selected="false" class="nav-link" data-toggle="tab" href="#portfolio-dashboard" id="tab-portfolio-link" role="tab">
+<i class="fas fa-briefcase"></i> Portfolio
+</a>
+</li>
 </ul>
 <div class="tab-content" id="forecastTabsContent">
 <div aria-labelledby="tab-mc-link" class="tab-pane fade show active" id="mc-forecast" role="tabpanel">
@@ -2186,6 +2191,15 @@ a probabilidade de todas serem entregues no prazo é de <strong>1 em 2^n</strong
 </div>
 </div>
 
+<!-- Portfolio Dashboard Tab -->
+<div aria-labelledby="tab-portfolio-link" class="tab-pane fade" id="portfolio-dashboard" role="tabpanel">
+    <div class="container-fluid pt-4">
+        <div id="portfolio-content">
+            <!-- Content will be dynamically loaded by portfolio.js -->
+        </div>
+    </div>
+</div>
+
 <br/><br/>
 </main>
 
@@ -2343,11 +2357,12 @@ a probabilidade de todas serem entregues no prazo é de <strong>1 em 2^n</strong
 
             $('a[data-toggle="tab"]').on('shown.bs.tab', function (e) {
                 const target = $(e.target).attr('href');
-                if (target === '#advanced-forecast' || target === '#demand-forecast' || target === '#mc-forecast' || target === '#deadline-analysis' || target === '#historical-charts' || target === '#executive-dashboard') {
+                if (target === '#advanced-forecast' || target === '#demand-forecast' || target === '#mc-forecast' || target === '#deadline-analysis' || target === '#historical-charts' || target === '#executive-dashboard' || target === '#portfolio-dashboard') {
                     history.replaceState(null, null, target);
                 }
             });
         });
     </script>
+    <script src="{{ url_for('static', filename='js/portfolio.js') }}"></script>
 </body>
 </html>

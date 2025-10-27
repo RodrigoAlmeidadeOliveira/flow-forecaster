@@ -42,6 +42,12 @@ from backtesting import (
     compare_confidence_levels,
     generate_backtest_report
 )
+from portfolio_analyzer import (
+    calculate_project_health_score,
+    analyze_portfolio_capacity,
+    create_prioritization_matrix,
+    generate_portfolio_alerts
+)
 
 app = Flask(__name__)
 
@@ -2259,6 +2265,221 @@ def api_backtest():
             'error': str(e),
             'trace': traceback.format_exc()
         }), 500
+
+
+# ============================================================================
+# PORTFOLIO MANAGEMENT API ENDPOINTS
+# ============================================================================
+
+@app.route('/api/portfolio/dashboard', methods=['GET'])
+def portfolio_dashboard():
+    """
+    Get comprehensive portfolio dashboard data.
+    Includes health scores, capacity analysis, prioritization matrix, and alerts.
+    """
+    session = get_session()
+    try:
+        # Get all projects
+        projects = session.query(Project).all()
+
+        if not projects:
+            return jsonify({
+                'has_data': False,
+                'message': 'Nenhum projeto cadastrado. Crie projetos para visualizar o portfolio.'
+            })
+
+        # Get forecasts for each project
+        all_forecasts = session.query(Forecast).all()
+        forecasts_by_project = {}
+        for forecast in all_forecasts:
+            if forecast.project_id not in forecasts_by_project:
+                forecasts_by_project[forecast.project_id] = []
+            forecasts_by_project[forecast.project_id].append(forecast)
+
+        # Get actuals mapped by forecast_id
+        all_actuals = session.query(Actual).all()
+        actuals_map = {}
+        for actual in all_actuals:
+            if actual.forecast_id not in actuals_map:
+                actuals_map[actual.forecast_id] = []
+            actuals_map[actual.forecast_id].append(actual)
+
+        # Calculate health scores for each project
+        health_scores = []
+        for project in projects:
+            project_forecasts = forecasts_by_project.get(project.id, [])
+            health_score = calculate_project_health_score(
+                project,
+                project_forecasts,
+                actuals_map
+            )
+            health_scores.append(health_score)
+
+        # Analyze capacity
+        capacity_analysis = analyze_portfolio_capacity(projects)
+
+        # Create prioritization matrix
+        prioritization_matrix = create_prioritization_matrix(projects)
+
+        # Generate alerts
+        alerts = generate_portfolio_alerts(projects, health_scores, capacity_analysis)
+
+        # Portfolio summary
+        active_projects = [p for p in projects if p.status == 'active']
+        total_business_value = sum(p.business_value for p in active_projects)
+        avg_health_score = np.mean([hs.overall_score for hs in health_scores]) if health_scores else 0
+
+        return jsonify({
+            'has_data': True,
+            'summary': {
+                'total_projects': len(projects),
+                'active_projects': len(active_projects),
+                'completed_projects': len([p for p in projects if p.status == 'completed']),
+                'on_hold_projects': len([p for p in projects if p.status == 'on_hold']),
+                'total_business_value': total_business_value,
+                'avg_health_score': round(avg_health_score, 2)
+            },
+            'health_scores': [hs.to_dict() for hs in health_scores],
+            'capacity_analysis': capacity_analysis.to_dict(),
+            'prioritization_matrix': prioritization_matrix.to_dict(),
+            'alerts': alerts,
+            'projects': [p.to_dict() for p in projects]
+        })
+
+    except Exception as e:
+        import traceback
+        return jsonify({
+            'error': str(e),
+            'trace': traceback.format_exc()
+        }), 500
+    finally:
+        session.close()
+
+
+@app.route('/api/portfolio/health/<int:project_id>', methods=['GET'])
+def project_health_details(project_id):
+    """Get detailed health analysis for a specific project."""
+    session = get_session()
+    try:
+        project = session.query(Project).get(project_id)
+        if not project:
+            return jsonify({'error': 'Project not found'}), 404
+
+        # Get forecasts and actuals
+        forecasts = session.query(Forecast).filter_by(project_id=project_id).all()
+
+        actuals_map = {}
+        for forecast in forecasts:
+            actuals = session.query(Actual).filter_by(forecast_id=forecast.id).all()
+            if actuals:
+                actuals_map[forecast.id] = actuals
+
+        # Calculate health score
+        health_score = calculate_project_health_score(project, forecasts, actuals_map)
+
+        return jsonify({
+            'project': project.to_dict(),
+            'health_score': health_score.to_dict(),
+            'forecasts': [f.to_summary() for f in forecasts],
+            'actuals_count': sum(len(a) for a in actuals_map.values())
+        })
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        session.close()
+
+
+@app.route('/api/portfolio/capacity', methods=['GET'])
+def portfolio_capacity():
+    """Get portfolio capacity analysis."""
+    session = get_session()
+    try:
+        projects = session.query(Project).all()
+
+        # Get total capacity from query params (optional)
+        total_capacity = request.args.get('total_capacity', type=float)
+
+        capacity_analysis = analyze_portfolio_capacity(projects, total_capacity)
+
+        return jsonify(capacity_analysis.to_dict())
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        session.close()
+
+
+@app.route('/api/portfolio/prioritization', methods=['GET'])
+def portfolio_prioritization():
+    """Get prioritization matrix for portfolio."""
+    session = get_session()
+    try:
+        projects = session.query(Project).all()
+        prioritization_matrix = create_prioritization_matrix(projects)
+
+        return jsonify(prioritization_matrix.to_dict())
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        session.close()
+
+
+@app.route('/api/projects/<int:project_id>', methods=['PUT'])
+def update_project_details(project_id):
+    """Update project details (extended version with portfolio fields)."""
+    session = get_session()
+    try:
+        project = session.query(Project).get(project_id)
+        if not project:
+            return jsonify({'error': 'Project not found'}), 404
+
+        data = request.json
+
+        # Update basic fields
+        if 'name' in data:
+            project.name = data['name']
+        if 'description' in data:
+            project.description = data['description']
+        if 'team_size' in data:
+            project.team_size = data['team_size']
+
+        # Update portfolio fields
+        if 'status' in data:
+            project.status = data['status']
+        if 'priority' in data:
+            project.priority = data['priority']
+        if 'business_value' in data:
+            project.business_value = data['business_value']
+        if 'risk_level' in data:
+            project.risk_level = data['risk_level']
+        if 'capacity_allocated' in data:
+            project.capacity_allocated = data['capacity_allocated']
+        if 'strategic_importance' in data:
+            project.strategic_importance = data['strategic_importance']
+        if 'start_date' in data:
+            project.start_date = data['start_date']
+        if 'target_end_date' in data:
+            project.target_end_date = data['target_end_date']
+        if 'owner' in data:
+            project.owner = data['owner']
+        if 'stakeholder' in data:
+            project.stakeholder = data['stakeholder']
+        if 'tags' in data:
+            import json
+            project.tags = json.dumps(data['tags']) if isinstance(data['tags'], list) else data['tags']
+
+        project.updated_at = datetime.utcnow()
+        session.commit()
+
+        return jsonify(project.to_dict())
+
+    except Exception as e:
+        session.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        session.close()
 
 
 for rule in app.url_map.iter_rules():
