@@ -2583,11 +2583,11 @@ a probabilidade de todas serem entregues no prazo é de <strong>1 em 2^n</strong
                     $('#tab-cost-link').tab('show');
                 } else if (hash === '#trend-analysis') {
                     $('#tab-trend-link').tab('show');
-                } else if (hash === '#dependency-analysis-tab') {
+                } else if (hash === '#dependency-analysis-tab' || hash === '#dependency-analysis') {
                     $('#dependency-tab-link').tab('show');
-                } else if (hash === '#executive-dashboard') {
+                } else if (hash === '#executive-dashboard' || hash === '#dashboard') {
                     $('#tab-dashboard-link').tab('show');
-                } else if (hash === '#portfolio-dashboard') {
+                } else if (hash === '#portfolio-dashboard' || hash === '#portfolio') {
                     $('#tab-portfolio-link').tab('show');
                 } else if (hash === '#mc-forecast') {
                     $('#tab-mc-link').tab('show');
@@ -2595,6 +2595,9 @@ a probabilidade de todas serem entregues no prazo é de <strong>1 em 2^n</strong
             }
 
             activateTabFromHash();
+            setTimeout(activateTabFromHash, 100);
+            // Ensure hash-based activation also runs after all assets load
+            $(window).on('load', activateTabFromHash);
 
             window.addEventListener('hashchange', activateTabFromHash);
 
@@ -2604,6 +2607,7 @@ a probabilidade de todas serem entregues no prazo é de <strong>1 em 2^n</strong
                     e.preventDefault();
                     $(`#forecastTabs a[href="${target}"]`).tab('show');
                     $('html, body').animate({ scrollTop: $('#forecastTabs').offset().top - 70 }, 300);
+                    history.replaceState(null, null, target);
                 }
             });
 
