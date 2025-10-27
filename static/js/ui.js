@@ -1407,6 +1407,8 @@
             window.renderInputStats('#input-stats', null);
         }
 
+        window.lastSimulationData = simulationData;
+
         $('#results-main').show();
         const $results = $('#results');
         $results.val('');
@@ -1458,6 +1460,44 @@
         const backlogSummary = result.backlog_summary || {};
 
         console.log('Monte Carlo Simulation Results:', { effort, duration, effortValues, durationValues, confidenceLevel });
+
+        const durationP50 = percentile(durationValues, 0.5);
+        const durationP85 = percentile(durationValues, 0.85);
+        const durationP95 = percentile(durationValues, 0.95);
+        const effortP50 = percentile(effortValues, 0.5);
+        const effortP85 = percentile(effortValues, 0.85);
+        const effortP95 = percentile(effortValues, 0.95);
+
+        let canMeetDeadline = null;
+        if (simulationData.startDate && simulationData.deadlineDate) {
+            const startMoment = moment(simulationData.startDate);
+            const deadlineMoment = moment(simulationData.deadlineDate);
+            if (startMoment.isValid() && deadlineMoment.isValid()) {
+                const weeksAvailable = Math.max(0, deadlineMoment.diff(startMoment, 'weeks', true));
+                canMeetDeadline = weeksAvailable >= durationP85;
+            }
+        }
+
+        window.lastSimulationResults = {
+            duration_p50: durationP50,
+            duration_p85: durationP85,
+            duration_p95: durationP95,
+            effort_p50: effortP50,
+            effort_p85: effortP85,
+            effort_p95: effortP95,
+            backlog: simulationData.numberOfTasks || null,
+            confidence_level: confidenceLevel,
+            timestamp: new Date().toISOString(),
+            can_meet_deadline: canMeetDeadline,
+            scope_completion_pct: result.scope_completion_pct || null
+        };
+
+        if (typeof window.updateCurrentKPIs === 'function') {
+            window.updateCurrentKPIs();
+        }
+        if (typeof window.updateProjectHealth === 'function') {
+            window.updateProjectHealth();
+        }
 
         $('#res-summary-header').text(`Project forecast summary (with ${confidenceLevel}% of confidence):`);
 

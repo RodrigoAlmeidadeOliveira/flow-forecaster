@@ -23,20 +23,38 @@ async function saveForecast() {
     }
 
     try {
+        const simulationData = window.lastSimulationData || {};
+        const throughputSamples = (simulationData.tpSamples && simulationData.tpSamples.length)
+            ? simulationData.tpSamples
+            : collectThroughputSamples();
+        const backlogValue = Number.isFinite(simulationData.numberOfTasks)
+            ? simulationData.numberOfTasks
+            : getCurrentBacklog();
+
         // Collect all current state
         const inputData = {
-            tpSamples: collectThroughputSamples(),
-            backlog: parseInt($('#backlog').val() || 0),
-            teamSize: parseInt($('#team-size').val() || 1),
-            workingDays: parseInt($('#working-days').val() || 5),
-            startDate: $('#start-date').val(),
-            endDate: $('#end-date').val(),
-            deadlineDate: $('#deadlineDate').val(),
+            tpSamples: throughputSamples,
+            backlog: backlogValue,
+            teamSize: Number.isFinite(simulationData.totalContributors)
+                ? simulationData.totalContributors
+                : parseInt($('#totalContributors').val() || 0, 10),
+            workingDays: Number.isFinite(simulationData.throughputCadenceDays)
+                ? simulationData.throughputCadenceDays
+                : 5,
+            startDate: simulationData.startDate || $('#startDate').val(),
+            endDate: simulationData.endDate || '',
+            deadlineDate: simulationData.deadlineDate || $('#deadlineDate').val(),
             risks: collectRisks(),
             dependencies: collectDependencies(),
-            teamFocus: parseFloat($('#team-focus').val() || 1.0),
-            sCurveA: parseFloat($('#s-curve-a').val() || 0),
-            sCurveB: parseFloat($('#s-curve-b').val() || 0)
+            teamFocus: Number.isFinite(simulationData.teamFocus)
+                ? simulationData.teamFocus
+                : getTeamFocusFactor(),
+            confidenceLevel: Number.isFinite(simulationData.confidenceLevel)
+                ? simulationData.confidenceLevel
+                : parseInt($('#confidenceLevel').val() || 85, 10),
+            numberOfSimulations: Number.isFinite(simulationData.numberOfSimulations)
+                ? simulationData.numberOfSimulations
+                : parseInt($('#numberOfSimulations').val() || 10000, 10)
         };
 
         // Get last simulation results if available
@@ -166,35 +184,89 @@ async function loadForecast(id) {
 
         // Restore throughput samples
         if (input.tpSamples && Array.isArray(input.tpSamples)) {
-            $('#tp-samples-textarea').val(input.tpSamples.join('\n'));
+            $('#tpSamples').val(input.tpSamples.join(', '));
         }
 
         // Restore basic fields
-        $('#backlog').val(input.backlog || '');
-        $('#team-size').val(input.teamSize || 1);
-        $('#working-days').val(input.workingDays || 5);
-        $('#start-date').val(input.startDate || '');
-        $('#end-date').val(input.endDate || '');
+        if (Number.isFinite(input.backlog)) {
+            $('#numberOfTasks').val(input.backlog);
+            $('#backlog').val(input.backlog);
+            if (typeof window.recalculateBacklog === 'function') {
+                window.recalculateBacklog();
+            }
+        }
+
+        if (Number.isFinite(input.teamSize)) {
+            $('#totalContributors').val(input.teamSize);
+            $('#minContributors').val(input.teamSize);
+            $('#maxContributors').val(input.teamSize);
+        }
+
+        if (Number.isFinite(input.numberOfSimulations)) {
+            $('#numberOfSimulations').val(input.numberOfSimulations);
+        }
+
+        if (Number.isFinite(input.confidenceLevel)) {
+            $('#confidenceLevel').val(input.confidenceLevel);
+        }
+
+        $('#startDate').val(input.startDate || '');
         $('#deadlineDate').val(input.deadlineDate || '');
-        $('#team-focus').val(input.teamFocus || 1.0);
-        $('#s-curve-a').val(input.sCurveA || 0);
-        $('#s-curve-b').val(input.sCurveB || 0);
+        if (typeof input.teamFocus === 'number') {
+            const percent = Math.round(input.teamFocus * 100);
+            $('#teamFocusPercent').val(percent).trigger('change');
+        }
 
         // Restore risks
         if (input.risks && Array.isArray(input.risks)) {
             // Clear existing risks
-            $('#risk-list tbody').empty();
-            // Add loaded risks
+            $('#risks .risk-row').not('#risk-row-template').remove();
             input.risks.forEach(risk => {
-                // This would need to call the addRisk function from ui.js
-                // For now, we'll store it and let the user see it
+                if (typeof window.addRisk === 'function') {
+                    const $row = window.addRisk();
+                    if ($row && $row.length) {
+                        $row.find("input[name='likelihood']").val(risk.likelihood || '');
+                        $row.find("input[name='lowImpact']").val(risk.lowImpact || '');
+                        $row.find("input[name='mediumImpact']").val(risk.mediumImpact || '');
+                        $row.find("input[name='highImpact']").val(risk.highImpact || '');
+                        $row.find("input[name='description']").val(risk.description || '');
+                    }
+                }
             });
+            if (typeof window.updateRiskSummary === 'function') {
+                window.updateRiskSummary();
+            }
         }
 
         // Restore dependencies
         if (input.dependencies && Array.isArray(input.dependencies)) {
-            $('#dependency-list tbody').empty();
-            // Add loaded dependencies
+            $('#dependencies .dependency-row').not('#dependency-row-template').remove();
+            input.dependencies.forEach(dep => {
+                if (typeof window.addDependency === 'function') {
+                    const $row = window.addDependency();
+                    if ($row && $row.length) {
+                        $row.find("input[name='dependency_name']").val(dep.name || '');
+                        $row.find("input[name='dependency_source_project']").val(dep.source_project || '');
+                        $row.find("input[name='dependency_target_project']").val(dep.target_project || '');
+                        $row.find("input[name='dep_probability']").val(
+                            dep.on_time_probability != null ? Math.round(dep.on_time_probability * 100) : ''
+                        );
+                        $row.find("input[name='dep_delay']").val(dep.delay_impact_days || '');
+                        $row.find("select[name='dependency_criticality']").val(dep.criticality || 'MEDIUM');
+                    }
+                }
+            });
+        }
+
+        window.lastSimulationData = input;
+        if (forecast.forecast_data) {
+            window.lastSimulationResults = forecast.forecast_data;
+        }
+        if (typeof window.updateCurrentKPIs === 'function') {
+            window.updateCurrentKPIs();
+        }
+        if (typeof window.updateProjectHealth === 'function') {
+            window.updateProjectHealth();
         }
 
         // Close modal
@@ -235,39 +307,78 @@ async function deleteForecast(id) {
 // Helper functions
 
 function collectThroughputSamples() {
-    const text = $('#tp-samples-textarea').val();
-    if (!text) return [];
-    return text.split('\n')
-        .map(line => parseFloat(line.trim()))
-        .filter(n => !isNaN(n) && n > 0);
+    const text = $('#tpSamples').val() || '';
+    if (!text.trim()) return [];
+    return text
+        .split(/[\s,;]+/)
+        .map(value => parseFloat(value.trim()))
+        .filter(value => !Number.isNaN(value) && value > 0);
 }
 
 function collectRisks() {
     const risks = [];
-    $('#risk-list tbody tr').each(function() {
-        const row = $(this);
-        risks.push({
-            name: row.find('td:eq(0)').text(),
-            probability: parseFloat(row.find('td:eq(1)').text()) / 100,
-            impact: parseFloat(row.find('td:eq(2)').text())
+    $('#risks .risk-row')
+        .not('#risk-row-template')
+        .each(function() {
+            const $row = $(this);
+            const likelihood = parseInt($row.find("input[name='likelihood']").val() || '0', 10);
+            const lowImpact = parseInt($row.find("input[name='lowImpact']").val() || '0', 10);
+            const mediumImpact = parseInt($row.find("input[name='mediumImpact']").val() || '0', 10);
+            const highImpact = parseInt($row.find("input[name='highImpact']").val() || '0', 10);
+            const description = $row.find("input[name='description']").val() || '';
+
+            if (likelihood || lowImpact || mediumImpact || highImpact || description) {
+                risks.push({
+                    likelihood,
+                    lowImpact,
+                    mediumImpact,
+                    highImpact,
+                    description
+                });
+            }
         });
-    });
     return risks;
 }
 
 function collectDependencies() {
     const dependencies = [];
-    $('#dependency-list tbody tr').each(function() {
-        const row = $(this);
-        dependencies.push({
-            name: row.find('td:eq(0)').text(),
-            source_project: row.find('td:eq(1)').text(),
-            target_project: row.find('td:eq(2)').text(),
-            on_time_probability: parseFloat(row.find('td:eq(3)').text()) / 100,
-            delay_impact_days: parseFloat(row.find('td:eq(4)').text())
+    $('#dependencies .dependency-row')
+        .not('#dependency-row-template')
+        .each(function() {
+            const $row = $(this);
+            const name = $row.find("input[name='dependency_name']").val();
+            const source = $row.find("input[name='dependency_source_project']").val();
+            const target = $row.find("input[name='dependency_target_project']").val();
+
+            if (!name || !source || !target) {
+                return;
+            }
+
+            dependencies.push({
+                name,
+                source_project: source,
+                target_project: target,
+                on_time_probability: parseFloat($row.find("input[name='dep_probability']").val() || '0') / 100,
+                delay_impact_days: parseFloat($row.find("input[name='dep_delay']").val() || '0'),
+                criticality: $row.find("select[name='dependency_criticality']").val() || 'MEDIUM'
+            });
         });
-    });
     return dependencies;
+}
+
+function getCurrentBacklog() {
+    const hiddenBacklog = parseInt($('#numberOfTasks').val() || '0', 10);
+    if (Number.isFinite(hiddenBacklog) && hiddenBacklog > 0) {
+        return hiddenBacklog;
+    }
+    const advancedBacklog = parseInt($('#backlog').val() || '0', 10);
+    return Number.isFinite(advancedBacklog) ? advancedBacklog : 0;
+}
+
+function getTeamFocusFactor() {
+    const slider = parseFloat($('#teamFocusPercent').val() || '100');
+    if (!Number.isFinite(slider)) return 1;
+    return Math.round((slider / 100) * 1000) / 1000;
 }
 
 function escapeHtml(text) {

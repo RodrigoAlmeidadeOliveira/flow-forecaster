@@ -5,6 +5,24 @@
 
 let dashboardChart = null;
 
+function parseThroughputSamples() {
+    const raw = $('#tpSamples').val() || '';
+    if (!raw.trim()) return [];
+    return raw
+        .split(/[\s,;]+/)
+        .map(value => parseFloat(value.trim()))
+        .filter(value => !Number.isNaN(value) && value >= 0);
+}
+
+function getCurrentBacklog() {
+    const primary = parseInt($('#numberOfTasks').val(), 10);
+    if (Number.isFinite(primary) && primary >= 0) {
+        return primary;
+    }
+    const advancedBacklog = parseInt($('#backlog').val(), 10);
+    return Number.isFinite(advancedBacklog) && advancedBacklog >= 0 ? advancedBacklog : 0;
+}
+
 // Refresh dashboard with current data
 async function refreshDashboard() {
     updateCurrentKPIs();
@@ -15,21 +33,17 @@ async function refreshDashboard() {
 // Update KPIs from current simulation
 function updateCurrentKPIs() {
     // Get throughput from samples
-    const tpText = $('#tp-samples-textarea').val();
-    if (tpText) {
-        const samples = tpText.split('\n')
-            .map(line => parseFloat(line.trim()))
-            .filter(n => !isNaN(n) && n > 0);
-
-        if (samples.length > 0) {
-            const avgThroughput = samples.reduce((a, b) => a + b, 0) / samples.length;
-            $('#kpi-throughput').text(avgThroughput.toFixed(1));
-        }
+    const samples = parseThroughputSamples();
+    if (samples.length > 0) {
+        const avgThroughput = samples.reduce((a, b) => a + b, 0) / samples.length;
+        $('#kpi-throughput').text(avgThroughput.toFixed(1));
+    } else {
+        $('#kpi-throughput').text('-');
     }
 
     // Get backlog
-    const backlog = parseInt($('#backlog').val()) || 0;
-    $('#kpi-backlog').text(backlog);
+    const backlog = getCurrentBacklog();
+    $('#kpi-backlog').text(backlog || '-');
 
     // Get deadline probability from last results
     if (window.lastSimulationResults && window.lastSimulationResults.duration_p85) {
@@ -38,7 +52,7 @@ function updateCurrentKPIs() {
 
         // Calculate deadline success probability
         const deadlineDate = $('#deadlineDate').val();
-        const startDate = $('#start-date').val();
+        const startDate = $('#startDate').val();
 
         if (deadlineDate && startDate) {
             const weeksAvailable = calculateWeeksDiff(startDate, deadlineDate);
@@ -57,6 +71,9 @@ function updateCurrentKPIs() {
         } else {
             $('#kpi-deadline-prob').text('-');
         }
+    } else {
+        $('#kpi-duration').text('-');
+        $('#kpi-deadline-prob').text('-');
     }
 }
 
@@ -192,30 +209,39 @@ function createThroughputTrendChart(forecasts) {
 // Update project health indicators
 function updateProjectHealth() {
     // Capacity calculation
-    const backlog = parseInt($('#backlog').val()) || 0;
-    const tpText = $('#tp-samples-textarea').val();
+    const backlog = getCurrentBacklog();
+    const samples = parseThroughputSamples();
 
-    if (tpText && backlog > 0) {
-        const samples = tpText.split('\n')
-            .map(line => parseFloat(line.trim()))
-            .filter(n => !isNaN(n) && n > 0);
+    if (samples.length > 0 && backlog > 0) {
+        const avgThroughput = samples.reduce((a, b) => a + b, 0) / samples.length;
+        const weeksNeeded = backlog / avgThroughput;
 
-        if (samples.length > 0) {
-            const avgThroughput = samples.reduce((a, b) => a + b, 0) / samples.length;
-            const weeksNeeded = backlog / avgThroughput;
-
-            // Capacity percentage (lower is better)
-            const capacity = Math.min(100, Math.round((weeksNeeded / 52) * 100)); // % of year
-            $('#health-capacity-bar')
-                .css('width', capacity + '%')
-                .text(capacity + '%')
-                .removeClass('bg-success bg-warning bg-danger')
-                .addClass(capacity < 30 ? 'bg-success' : capacity < 70 ? 'bg-warning' : 'bg-danger');
-        }
+        // Capacity percentage (lower is better)
+        const capacity = Math.min(100, Math.round((weeksNeeded / 52) * 100)); // % of year
+        $('#health-capacity-bar')
+            .css('width', capacity + '%')
+            .text(capacity + '%')
+            .removeClass('bg-success bg-warning bg-danger bg-secondary')
+            .addClass(capacity < 30 ? 'bg-success' : capacity < 70 ? 'bg-warning' : 'bg-danger');
+    } else {
+        $('#health-capacity-bar')
+            .css('width', '0%')
+            .text('0%')
+            .removeClass('bg-success bg-warning bg-danger')
+            .addClass('bg-secondary');
     }
 
     // Risk level
-    const riskCount = $('#risk-list tbody tr').length;
+    const riskCount = $('#risks .risk-row')
+        .not('#risk-row-template')
+        .filter(function () {
+            const $row = $(this);
+            const likelihood = parseFloat($row.find("input[name='likelihood']").val() || '0');
+            const lowImpact = parseFloat($row.find("input[name='lowImpact']").val() || '0');
+            const mediumImpact = parseFloat($row.find("input[name='mediumImpact']").val() || '0');
+            const highImpact = parseFloat($row.find("input[name='highImpact']").val() || '0');
+            return likelihood > 0 || lowImpact > 0 || mediumImpact > 0 || highImpact > 0;
+        }).length;
     $('#health-risk-count').text(riskCount);
 
     let riskLevel = 'Baixo';
@@ -229,26 +255,24 @@ function updateProjectHealth() {
     }
 
     $('#health-risk-level').text(riskLevel);
-    $('#health-risk').removeClass('alert-success alert-warning alert-danger').addClass(riskClass);
+    $('#health-risk').removeClass('alert-success alert-warning alert-danger alert-secondary').addClass(riskClass);
 
     // Confidence level
-    if (tpText) {
-        const samples = tpText.split('\n').filter(line => line.trim()).length;
-        $('#health-samples-count').text(samples);
+    const sampleCount = samples.length;
+    $('#health-samples-count').text(sampleCount);
 
-        let confidence = 'Baixa';
-        let confClass = 'alert-danger';
-        if (samples >= 15) {
-            confidence = 'Alta';
-            confClass = 'alert-success';
-        } else if (samples >= 8) {
-            confidence = 'Média';
-            confClass = 'alert-warning';
-        }
-
-        $('#health-confidence-level').text(confidence);
-        $('#health-confidence').removeClass('alert-success alert-warning alert-danger').addClass(confClass);
+    let confidence = 'Baixa';
+    let confClass = 'alert-danger';
+    if (sampleCount >= 15) {
+        confidence = 'Alta';
+        confClass = 'alert-success';
+    } else if (sampleCount >= 8) {
+        confidence = 'Média';
+        confClass = 'alert-warning';
     }
+
+    $('#health-confidence-level').text(confidence);
+    $('#health-confidence').removeClass('alert-success alert-warning alert-danger alert-secondary').addClass(confClass);
 }
 
 // Helper: Calculate weeks difference

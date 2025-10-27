@@ -1,0 +1,28 @@
+Process Mining Integration – Flow Forecaster Alignment
+======================================================
+
+Escopo Avaliado
+---------------
+- Repositório WorkshopMCS com módulos de mineração de processos (PM4Py), ML, Monte Carlo e otimização.
+- Artefatos principais: `src/enhanced_pm_ml_features.py`, `ProcessMiningIntegration/*`, `hybrid_cost_models/*`, `hybrid_cost_analysis/*`, `tdabc_*`, `integration_guide.py`.
+- Objetivo: verificar aderência desses experimentos com o Flow Forecaster.
+
+Forças Observadas
+-----------------
+- Extração de 80+ features estruturais, de fluxo, recursos, qualidade e tempo prontas para ML (`enhanced_pm_ml_features`). JSONs gerados podem alimentar o `MLForecaster` do Flow.
+- Distribuições de duração, transições e padrões de chegada por estágio exportadas para JSON (`monte_carlo_distributions.json`), alinhadas com os parâmetros `ltSamples`, `splitRateSamples`, `contributorsDistribution` do `monte_carlo_unified.py`.
+- Módulo híbrido de custos integra TDABC/ABC/Value-Based e treina modelos Random Forest/GBT para atraso/custo (`hybrid_cost_analyzer.py`, `hybrid_cost_models/*`), complementando o simulador PERT-Beta do Flow.
+- `process_mining_integration_handler.py` já organiza features, distribuições e parâmetros de otimização, facilitando ingestão em pipelines externos.
+
+Riscos / Ajustes Necessários
+----------------------------
+- Dependências adicionais (PM4Py, NetworkX, Seaborn) inexistentes no `requirements.txt` do Flow; avaliar impacto de peso, compatibilidade e footprint.
+- Granularidade dos dados: Flow opera com séries semanais simples; os logs exigem agregações para throughput e validação de consistência (`case_duration_cv` vs `tpSamples`).
+- Modelos pré-treinados de custo/atraso foram calibrados em dataset específico; é preciso checar generalização e ajustar escalas de custo às penalidades do Flow.
+- Governança: logs e pesos pré-treinados carregam risco de dados sensíveis; requer documentação de anonimização e política de atualização.
+
+Próximos Passos Recomendados
+----------------------------
+1. Construir protótipo que leia um log via `ProcessMiningIntegration`, gera `tpSamples`, `ltSamples`, `splitRateSamples` e executa o motor atual do Flow para comparação.
+2. Testar ingestão dos modelos de atraso/custo (PKLs) como serviço opcional, confrontando saídas com `cost_pert_beta.py`.
+3. Avaliar performance e dependências (benchmark com/sem PM4Py) e registrar pipeline de anonimização antes de integração definitiva.
