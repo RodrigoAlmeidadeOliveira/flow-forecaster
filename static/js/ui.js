@@ -2559,6 +2559,13 @@ ${generateProgressBar(p50Items, backlog, 'P50 (arriscado)  ', Math.round((p50Ite
             return false;
         }
     }
+
+    // Export functions defined in window.on("load") to global scope
+    window.addRisk = addRisk;
+    window.addDependency = addDependency;
+    window.runSimulation = runSimulation;
+    window.share = share;
+    window.markHistoricalChartsDirty = markHistoricalChartsDirty;
     }); // Close $(window).on("load")
 
     // Initialize UI when DOM is ready
@@ -2632,9 +2639,5 @@ ${generateProgressBar(p50Items, backlog, 'P50 (arriscado)  ', Math.round((p50Ite
     });
 
     // Export functions to global scope for inline onclick handlers
-    window.addRisk = addRisk;
-    window.addDependency = addDependency;
-    window.runSimulation = runSimulation;
-    window.share = share;
     window.recalculateBacklog = recalculateBacklog;
 })(window);
