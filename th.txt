@@ -9,3 +9,6 @@ lead time
 th
 1,1,2,1,1,11,1,2,4,5,1,4,1,5,1,3,3,2,1,4,7,2,3,3,1,1,12,5,8,4,2,4,1,5,1,2,4,7,4,1,6,1,30,4,3,2,1,1,6,1,2,1,1,1,1,1,2,3,2,1,1,1,2,2,4,1,1,2,4,1,1,4,1,1,1,1,3,2,1,6,1,1,3,2,1,1,1
 2,4,1,3,1,1,3,1
+
+gh secret set FLY_API_TOKEN --body "FlyV1 fm2_lJPECAAAAAAACm1txBDRPOwWPecRcTBExUhXqk09wrVodHRwczovL2FwaS5mbHkuaW8vdjGWAJLOABP2hB8Lk7lodHRwczovL2FwaS5mbHkuaW8vYWFhL3YxxDzmX+8D/dI1LQw1ZcEMKKHGcWmPk8Jabjx4Wha127gIpT4vhJy1anP71mFxkcgEcp/p00CAbnGQFqOJLizETtw+0VGqZBbp1fbbj/crhrsJcRVqn9v9Ck7gmJ+OiNyLVyvmbW10sHbIZcnrKf2zaOnDxPrMqwoTiDpq1RcXa2+rSeisGovn/tPlWQ7Jlw2SlAORgc4ApfmWHwWRgqdidWlsZGVyH6J3Zx8BxCCKDevha78ipgwvDQp7ugX8MPhPVtRlYK9cjvMvSaR0GQ==,fm2_lJPETtw+0VGqZBbp1fbbj/crhrsJcRVqn9v9Ck7gmJ+OiNyLVyvmbW10sHbIZcnrKf2zaOnDxPrMqwoTiDpq1RcXa2+rSeisGovn/tPlWQ7Jl8QQuaTg2JQZAUHNObW40gEgzcO5aHR0cHM6Ly9hcGkuZmx5LmlvL2FhYS92MZgEks5o/7whzmrg778XzgATLYMKkc4AEy2DDMQQVpG2OJH5lmsNjTmJyJ3O8cQgWmqTI8CdSpfso0rYNdOUIc0pPL9xVxrMeZaEwu017Rk=" --repo RodrigoAlmeidadeOliveira/flow-forecaster
+
