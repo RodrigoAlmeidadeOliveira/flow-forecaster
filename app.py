@@ -30,6 +30,18 @@ from cost_pert_beta import (
 )
 from database import get_session, close_session, init_db
 from models import Project, Forecast, Actual
+from accuracy_metrics import (
+    calculate_accuracy_metrics,
+    calculate_time_series_metrics,
+    detect_data_quality_issues,
+    generate_recommendations
+)
+from backtesting import (
+    run_walk_forward_backtest,
+    run_expanding_window_backtest,
+    compare_confidence_levels,
+    generate_backtest_report
+)
 
 app = Flask(__name__)
 
@@ -1755,6 +1767,498 @@ def import_forecast():
         }), 500
     finally:
         session.close()
+
+
+# ============================================================================
+# FORECAST VS ACTUAL TRACKING API ENDPOINTS
+# ============================================================================
+
+@app.route('/forecast-vs-actual')
+def forecast_vs_actual_page():
+    """Render the Forecast vs Actual dashboard page"""
+    try:
+        return render_template('forecast_vs_actual.html')
+    except Exception as e:
+        return f"""
+        <html>
+        <head><title>Forecast vs Actual - Error</title></head>
+        <body>
+            <h1>Template Error</h1>
+            <p>Error loading Forecast vs Actual template: {str(e)}</p>
+        </body>
+        </html>
+        """, 500
+
+
+@app.route('/api/actuals', methods=['GET', 'POST'])
+def handle_actuals():
+    """List actuals or create a new actual record"""
+    session = get_session()
+    try:
+        if request.method == 'GET':
+            # Optional filter by forecast_id
+            forecast_id = request.args.get('forecast_id', type=int)
+            query = session.query(Actual)
+
+            if forecast_id:
+                query = query.filter_by(forecast_id=forecast_id)
+
+            actuals = query.order_by(Actual.recorded_at.desc()).all()
+            return jsonify([a.to_dict() for a in actuals])
+
+        elif request.method == 'POST':
+            data = request.json
+
+            # Validate forecast exists
+            forecast_id = data.get('forecast_id')
+            if not forecast_id:
+                return jsonify({'error': 'forecast_id is required'}), 400
+
+            forecast = session.query(Forecast).get(forecast_id)
+            if not forecast:
+                return jsonify({'error': 'Forecast not found'}), 404
+
+            # Parse dates
+            actual_completion_date = data.get('actual_completion_date')
+
+            # Calculate actual weeks taken if dates provided
+            actual_weeks_taken = data.get('actual_weeks_taken')
+            if not actual_weeks_taken and actual_completion_date and forecast.start_date:
+                try:
+                    start_dt = parse_flexible_date(forecast.start_date)
+                    end_dt = parse_flexible_date(actual_completion_date)
+                    actual_weeks_taken = (end_dt - start_dt).days / 7.0
+                except Exception:
+                    actual_weeks_taken = None
+
+            # Calculate errors
+            weeks_error = None
+            weeks_error_pct = None
+            if actual_weeks_taken and forecast.projected_weeks_p85:
+                weeks_error = actual_weeks_taken - forecast.projected_weeks_p85
+                weeks_error_pct = (weeks_error / forecast.projected_weeks_p85) * 100
+
+            scope_error_pct = None
+            actual_items_completed = data.get('actual_items_completed')
+            if actual_items_completed and forecast.backlog:
+                actual_scope_pct = (actual_items_completed / forecast.backlog) * 100
+                expected_scope_pct = forecast.scope_completion_pct or 100
+                scope_error_pct = actual_scope_pct - expected_scope_pct
+
+            # Create actual record
+            actual = Actual(
+                forecast_id=forecast_id,
+                actual_completion_date=actual_completion_date,
+                actual_weeks_taken=actual_weeks_taken,
+                actual_items_completed=actual_items_completed,
+                actual_scope_delivered_pct=data.get('actual_scope_delivered_pct'),
+                weeks_error=weeks_error,
+                weeks_error_pct=weeks_error_pct,
+                scope_error_pct=scope_error_pct,
+                notes=data.get('notes'),
+                recorded_by=data.get('recorded_by')
+            )
+
+            session.add(actual)
+            session.commit()
+            return jsonify(actual.to_dict()), 201
+
+    except Exception as e:
+        session.rollback()
+        import traceback
+        return jsonify({
+            'error': str(e),
+            'trace': traceback.format_exc()
+        }), 500
+    finally:
+        session.close()
+
+
+@app.route('/api/actuals/<int:actual_id>', methods=['GET', 'PUT', 'DELETE'])
+def handle_actual(actual_id):
+    """Get, update, or delete a specific actual record"""
+    session = get_session()
+    try:
+        actual = session.query(Actual).get(actual_id)
+        if not actual:
+            return jsonify({'error': 'Actual not found'}), 404
+
+        if request.method == 'GET':
+            return jsonify(actual.to_dict())
+
+        elif request.method == 'PUT':
+            data = request.json
+
+            # Update fields
+            if 'actual_completion_date' in data:
+                actual.actual_completion_date = data['actual_completion_date']
+            if 'actual_weeks_taken' in data:
+                actual.actual_weeks_taken = data['actual_weeks_taken']
+            if 'actual_items_completed' in data:
+                actual.actual_items_completed = data['actual_items_completed']
+            if 'actual_scope_delivered_pct' in data:
+                actual.actual_scope_delivered_pct = data['actual_scope_delivered_pct']
+            if 'notes' in data:
+                actual.notes = data['notes']
+
+            # Recalculate errors
+            forecast = actual.forecast
+            if actual.actual_weeks_taken and forecast.projected_weeks_p85:
+                actual.weeks_error = actual.actual_weeks_taken - forecast.projected_weeks_p85
+                actual.weeks_error_pct = (actual.weeks_error / forecast.projected_weeks_p85) * 100
+
+            actual.recorded_at = datetime.utcnow()
+            session.commit()
+            return jsonify(actual.to_dict())
+
+        elif request.method == 'DELETE':
+            session.delete(actual)
+            session.commit()
+            return '', 204
+
+    except Exception as e:
+        session.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        session.close()
+
+
+@app.route('/api/accuracy-analysis', methods=['GET'])
+def accuracy_analysis():
+    """
+    Calculate accuracy metrics for forecasts vs actuals.
+
+    Query parameters:
+        - forecast_id: Optional, analyze specific forecast
+        - project_id: Optional, analyze all forecasts for a project
+        - limit: Optional, limit number of records (default: 100)
+    """
+    session = get_session()
+    try:
+        forecast_id = request.args.get('forecast_id', type=int)
+        project_id = request.args.get('project_id', type=int)
+        limit = request.args.get('limit', type=int, default=100)
+
+        # Build query
+        query = session.query(Forecast, Actual).join(
+            Actual, Forecast.id == Actual.forecast_id
+        )
+
+        if forecast_id:
+            query = query.filter(Forecast.id == forecast_id)
+        elif project_id:
+            query = query.filter(Forecast.project_id == project_id)
+
+        records = query.order_by(Forecast.created_at.desc()).limit(limit).all()
+
+        if not records:
+            return jsonify({
+                'error': 'No forecast-actual pairs found',
+                'metrics': None
+            }), 404
+
+        # Extract forecasts and actuals
+        forecasts_p85 = []
+        actuals_weeks = []
+        dates = []
+        tp_samples_list = []
+
+        for forecast, actual in records:
+            if forecast.projected_weeks_p85 and actual.actual_weeks_taken:
+                forecasts_p85.append(forecast.projected_weeks_p85)
+                actuals_weeks.append(actual.actual_weeks_taken)
+                dates.append(forecast.created_at)
+
+                # Try to extract throughput samples from input_data
+                try:
+                    input_data = json.loads(forecast.input_data)
+                    tp_samples = input_data.get('tpSamples', [])
+                    if tp_samples:
+                        tp_samples_list.append(tp_samples)
+                except:
+                    pass
+
+        if len(forecasts_p85) < 2:
+            return jsonify({
+                'error': 'Need at least 2 forecast-actual pairs for meaningful analysis',
+                'count': len(forecasts_p85)
+            }), 400
+
+        # Calculate accuracy metrics
+        metrics = calculate_accuracy_metrics(forecasts_p85, actuals_weeks)
+
+        # Calculate time-series metrics
+        ts_metrics = calculate_time_series_metrics(
+            forecasts_p85,
+            actuals_weeks,
+            dates
+        )
+
+        # Detect data quality issues
+        avg_tp_samples = tp_samples_list[0] if tp_samples_list else None
+        issues = detect_data_quality_issues(
+            forecasts_p85,
+            actuals_weeks,
+            avg_tp_samples
+        )
+
+        # Generate recommendations
+        recommendations = generate_recommendations(metrics, issues)
+
+        # Get quality ratings
+        quality_ratings = metrics.get_quality_rating()
+
+        # Prepare detailed comparison data
+        comparisons = []
+        for forecast, actual in records:
+            if forecast.projected_weeks_p85 and actual.actual_weeks_taken:
+                comparisons.append({
+                    'forecast_id': forecast.id,
+                    'forecast_name': forecast.name,
+                    'project_name': forecast.project.name if forecast.project else None,
+                    'created_at': forecast.created_at.isoformat(),
+                    'forecasted_weeks': round(forecast.projected_weeks_p85, 2),
+                    'actual_weeks': round(actual.actual_weeks_taken, 2),
+                    'error_weeks': round(actual.weeks_error, 2) if actual.weeks_error else None,
+                    'error_pct': round(actual.weeks_error_pct, 2) if actual.weeks_error_pct else None,
+                    'backlog': forecast.backlog,
+                    'notes': actual.notes
+                })
+
+        return jsonify({
+            'metrics': metrics.to_dict(),
+            'time_series_metrics': ts_metrics,
+            'quality_ratings': quality_ratings,
+            'issues': issues,
+            'recommendations': recommendations,
+            'comparisons': comparisons,
+            'summary': {
+                'total_comparisons': len(comparisons),
+                'date_range': {
+                    'first': dates[-1].isoformat() if dates else None,
+                    'last': dates[0].isoformat() if dates else None
+                }
+            }
+        })
+
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+    except Exception as e:
+        import traceback
+        return jsonify({
+            'error': str(e),
+            'trace': traceback.format_exc()
+        }), 500
+    finally:
+        session.close()
+
+
+@app.route('/api/forecast-vs-actual/dashboard', methods=['GET'])
+def forecast_vs_actual_dashboard_data():
+    """
+    Get comprehensive dashboard data for forecast vs actual analysis.
+    Includes summary statistics, recent comparisons, and trends.
+    """
+    session = get_session()
+    try:
+        # Get all forecast-actual pairs
+        records = session.query(Forecast, Actual).join(
+            Actual, Forecast.id == Actual.forecast_id
+        ).order_by(Forecast.created_at.desc()).limit(100).all()
+
+        if not records:
+            return jsonify({
+                'has_data': False,
+                'message': 'Nenhum dado de forecast vs actual disponível. Registre resultados reais para começar.'
+            })
+
+        # Calculate overall metrics
+        forecasts_p85 = []
+        actuals_weeks = []
+
+        for forecast, actual in records:
+            if forecast.projected_weeks_p85 and actual.actual_weeks_taken:
+                forecasts_p85.append(forecast.projected_weeks_p85)
+                actuals_weeks.append(actual.actual_weeks_taken)
+
+        if len(forecasts_p85) < 2:
+            return jsonify({
+                'has_data': False,
+                'message': f'Apenas {len(forecasts_p85)} comparações disponíveis. Mínimo: 2.'
+            })
+
+        metrics = calculate_accuracy_metrics(forecasts_p85, actuals_weeks)
+        quality_ratings = metrics.get_quality_rating()
+
+        # Get project-wise breakdown
+        project_stats = {}
+        for forecast, actual in records:
+            if not forecast.project or not forecast.projected_weeks_p85 or not actual.actual_weeks_taken:
+                continue
+
+            project_name = forecast.project.name
+            if project_name not in project_stats:
+                project_stats[project_name] = {
+                    'forecasts': [],
+                    'actuals': [],
+                    'count': 0
+                }
+
+            project_stats[project_name]['forecasts'].append(forecast.projected_weeks_p85)
+            project_stats[project_name]['actuals'].append(actual.actual_weeks_taken)
+            project_stats[project_name]['count'] += 1
+
+        # Calculate metrics per project
+        project_metrics = {}
+        for project_name, data in project_stats.items():
+            if len(data['forecasts']) >= 2:
+                try:
+                    proj_metrics = calculate_accuracy_metrics(data['forecasts'], data['actuals'])
+                    project_metrics[project_name] = {
+                        'mape': proj_metrics.mape,
+                        'accuracy_rate': proj_metrics.accuracy_rate,
+                        'count': data['count'],
+                        'bias': proj_metrics.bias_direction
+                    }
+                except:
+                    pass
+
+        # Recent comparisons (last 10)
+        recent_comparisons = []
+        for forecast, actual in records[:10]:
+            if forecast.projected_weeks_p85 and actual.actual_weeks_taken:
+                recent_comparisons.append({
+                    'forecast_id': forecast.id,
+                    'forecast_name': forecast.name,
+                    'project_name': forecast.project.name if forecast.project else None,
+                    'created_at': forecast.created_at.isoformat(),
+                    'forecasted_weeks': round(forecast.projected_weeks_p85, 2),
+                    'actual_weeks': round(actual.actual_weeks_taken, 2),
+                    'error_pct': round(actual.weeks_error_pct, 2) if actual.weeks_error_pct else None
+                })
+
+        return jsonify({
+            'has_data': True,
+            'overall_metrics': metrics.to_dict(),
+            'quality_ratings': quality_ratings,
+            'project_metrics': project_metrics,
+            'recent_comparisons': recent_comparisons,
+            'summary': {
+                'total_comparisons': len(forecasts_p85),
+                'total_projects': len(project_metrics),
+                'overall_quality': quality_ratings['overall']
+            }
+        })
+
+    except Exception as e:
+        import traceback
+        return jsonify({
+            'error': str(e),
+            'trace': traceback.format_exc()
+        }), 500
+    finally:
+        session.close()
+
+
+@app.route('/api/backtest', methods=['POST'])
+def api_backtest():
+    """
+    Run backtesting on historical throughput data.
+
+    Expected JSON payload:
+    {
+        "tpSamples": list[float],
+        "backlog": int,
+        "method": "walk_forward" or "expanding_window" (default: walk_forward),
+        "minTrainSize": int (default: 5),
+        "confidenceLevel": "P50", "P85", or "P95" (default: P85),
+        "nSimulations": int (default: 10000),
+        "compareConfidenceLevels": bool (default: false)
+    }
+
+    Returns:
+        JSON with backtest results
+    """
+    try:
+        data = request.json
+        tp_samples = data.get('tpSamples', [])
+        backlog = data.get('backlog', 0)
+        method = data.get('method', 'walk_forward')
+        min_train_size = data.get('minTrainSize', 5)
+        confidence_level = data.get('confidenceLevel', 'P85')
+        n_simulations = data.get('nSimulations', 10000)
+        compare_levels = data.get('compareConfidenceLevels', False)
+
+        # Validation
+        if not tp_samples or len(tp_samples) < min_train_size + 1:
+            return jsonify({
+                'error': f'Need at least {min_train_size + 1} throughput samples for backtesting. Got {len(tp_samples)}.'
+            }), 400
+
+        if backlog <= 0:
+            return jsonify({'error': 'Backlog must be greater than zero'}), 400
+
+        if method not in ['walk_forward', 'expanding_window']:
+            return jsonify({'error': 'Method must be "walk_forward" or "expanding_window"'}), 400
+
+        # Run backtesting
+        if compare_levels:
+            # Compare across confidence levels
+            results_by_level = compare_confidence_levels(
+                tp_samples,
+                backlog,
+                min_train_size=min_train_size,
+                n_simulations=n_simulations
+            )
+
+            response = {
+                'method': 'comparison',
+                'results_by_level': {}
+            }
+
+            for level, summary in results_by_level.items():
+                if summary:
+                    response['results_by_level'][level] = summary.to_dict()
+                    response['results_by_level'][level]['report'] = generate_backtest_report(summary)
+                else:
+                    response['results_by_level'][level] = None
+
+        else:
+            # Single backtest
+            if method == 'walk_forward':
+                summary = run_walk_forward_backtest(
+                    tp_samples,
+                    backlog,
+                    min_train_size=min_train_size,
+                    test_size=1,
+                    confidence_level=confidence_level,
+                    n_simulations=n_simulations
+                )
+            else:  # expanding_window
+                summary = run_expanding_window_backtest(
+                    tp_samples,
+                    backlog,
+                    initial_train_size=min_train_size,
+                    confidence_level=confidence_level,
+                    n_simulations=n_simulations
+                )
+
+            response = {
+                'method': method,
+                'summary': summary.to_dict(),
+                'report': generate_backtest_report(summary)
+            }
+
+        return jsonify(convert_to_native_types(response))
+
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+    except Exception as e:
+        import traceback
+        return jsonify({
+            'error': str(e),
+            'trace': traceback.format_exc()
+        }), 500
 
 
 for rule in app.url_map.iter_rules():

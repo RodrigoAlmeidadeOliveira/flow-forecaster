@@ -85,7 +85,6 @@ Melhorias Sugeridas
   1. Forecast vs Actual Tracking ⭐⭐⭐⭐⭐
 
   Fundamental para validar se as previsões estão funcionando e melhorar ao longo do tempo.
-
   2. Salvamento de Análises e Histórico ⭐⭐⭐⭐⭐
 
   Permitir salvar forecasts e comparar com versões anteriores.

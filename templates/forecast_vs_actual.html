@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Forecast vs Actual - Flow Forecaster</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        body {
+            background-color: #f8f9fa;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        }
+        .navbar {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .card {
+            border: none;
+            border-radius: 10px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .metric-card {
+            text-align: center;
+            padding: 20px;
+            transition: transform 0.2s;
+        }
+        .metric-card:hover {
+            transform: translateY(-5px);
+        }
+        .metric-value {
+            font-size: 2.5rem;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+        .metric-label {
+            color: #6c757d;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .quality-badge {
+            font-size: 0.9rem;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-weight: 600;
+        }
+        .quality-excellent { background-color: #d4edda; color: #155724; }
+        .quality-good { background-color: #d1ecf1; color: #0c5460; }
+        .quality-acceptable { background-color: #fff3cd; color: #856404; }
+        .quality-poor { background-color: #f8d7da; color: #721c24; }
+        .comparison-row {
+            padding: 12px;
+            border-bottom: 1px solid #e9ecef;
+            transition: background-color 0.2s;
+        }
+        .comparison-row:hover {
+            background-color: #f8f9fa;
+        }
+        .error-positive {
+            color: #dc3545;
+        }
+        .error-negative {
+            color: #28a745;
+        }
+        .issue-card {
+            border-left: 4px solid;
+            margin-bottom: 10px;
+            padding: 12px;
+            background-color: #fff;
+            border-radius: 4px;
+        }
+        .issue-high { border-left-color: #dc3545; }
+        .issue-medium { border-left-color: #ffc107; }
+        .issue-warning { border-left-color: #17a2b8; }
+        .chart-container {
+            position: relative;
+            height: 400px;
+            margin-top: 20px;
+        }
+        .btn-register-actual {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 8px;
+            font-weight: 600;
+            transition: transform 0.2s;
+        }
+        .btn-register-actual:hover {
+            transform: translateY(-2px);
+            color: white;
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+        .spinner-border-sm {
+            width: 1rem;
+            height: 1rem;
+        }
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+        }
+        .empty-state i {
+            font-size: 4rem;
+            color: #d 757d;
+            margin-bottom: 20px;
+        }
+        .table-hover tbody tr:hover {
+            background-color: #f8f9fa;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-dark navbar-expand-lg mb-4">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="/">
+                <i class="fas fa-chart-line"></i> Flow Forecaster
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/">
+                            <i class="fas fa-home"></i> Home
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/deadline-analysis">
+                            <i class="fas fa-calendar-alt"></i> Análise de Deadline
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/forecast-vs-actual">
+                            <i class="fas fa-balance-scale"></i> Forecast vs Actual
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/documentacao">
+                            <i class="fas fa-book"></i> Documentação
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="container-fluid px-4">
+        <!-- Header -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h1 class="mb-2">
+                            <i class="fas fa-balance-scale text-primary"></i>
+                            Forecast vs Actual
+                        </h1>
+                        <p class="text-muted">
+                            Compare suas previsões com os resultados reais e avalie a acurácia do modelo
+                        </p>
+                    </div>
+                    <div>
+                        <button class="btn btn-register-actual" data-bs-toggle="modal" data-bs-target="#registerActualModal">
+                            <i class="fas fa-plus"></i> Registrar Resultado Real
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Loading State -->
+        <div id="loading-state" class="text-center" style="display: none;">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Carregando...</span>
+            </div>
+            <p class="mt-2 text-muted">Carregando dados...</p>
+        </div>
+
+        <!-- Empty State -->
+        <div id="empty-state" class="card" style="display: none;">
+            <div class="card-body">
+                <div class="empty-state">
+                    <i class="fas fa-chart-bar"></i>
+                    <h3>Nenhum dado disponível</h3>
+                    <p class="text-muted mb-4">
+                        Comece registrando resultados reais das suas previsões para visualizar métricas de acurácia.
+                    </p>
+                    <button class="btn btn-register-actual" data-bs-toggle="modal" data-bs-target="#registerActualModal">
+                        <i class="fas fa-plus"></i> Registrar Primeiro Resultado
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Dashboard Content -->
+        <div id="dashboard-content" style="display: none;">
+            <!-- Summary Metrics -->
+            <div class="row mb-4">
+                <div class="col-md-3">
+                    <div class="card metric-card">
+                        <div class="metric-label">MAPE</div>
+                        <div class="metric-value text-primary" id="metric-mape">-</div>
+                        <span class="quality-badge" id="badge-mape">-</span>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card metric-card">
+                        <div class="metric-label">Taxa de Acurácia</div>
+                        <div class="metric-value text-success" id="metric-accuracy">-</div>
+                        <span class="quality-badge" id="badge-accuracy">-</span>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card metric-card">
+                        <div class="metric-label">R² (Correlação)</div>
+                        <div class="metric-value text-info" id="metric-r-squared">-</div>
+                        <span class="quality-badge" id="badge-r-squared">-</span>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card metric-card">
+                        <div class="metric-label">Qualidade Geral</div>
+                        <div class="metric-value" id="metric-overall">-</div>
+                        <span class="quality-badge" id="badge-overall">-</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Additional Stats -->
+            <div class="row mb-4">
+                <div class="col-md-4">
+                    <div class="card">
+                        <div class="card-body">
+                            <h6 class="card-subtitle mb-2 text-muted">Total de Comparações</h6>
+                            <h3 id="total-comparisons">-</h3>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card">
+                        <div class="card-body">
+                            <h6 class="card-subtitle mb-2 text-muted">Viés de Previsão</h6>
+                            <h3 id="bias-direction">-</h3>
+                            <small class="text-muted" id="bias-count">-</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card">
+                        <div class="card-body">
+                            <h6 class="card-subtitle mb-2 text-muted">Erro Médio</h6>
+                            <h3 id="mean-error">-</h3>
+                            <small class="text-muted">MAE (semanas)</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Issues and Recommendations -->
+            <div class="row mb-4">
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header bg-warning text-dark">
+                            <h5 class="mb-0">
+                                <i class="fas fa-exclamation-triangle"></i>
+                                Alertas de Qualidade
+                            </h5>
+                        </div>
+                        <div class="card-body" id="issues-container">
+                            <p class="text-muted">Nenhum alerta detectado.</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header bg-info text-white">
+                            <h5 class="mb-0">
+                                <i class="fas fa-lightbulb"></i>
+                                Recomendações
+                            </h5>
+                        </div>
+                        <div class="card-body" id="recommendations-container">
+                            <p class="text-muted">Nenhuma recomendação disponível.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Comparison Chart -->
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">
+                                <i class="fas fa-chart-line"></i>
+                                Forecast vs Actual - Últimas Comparações
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <canvas id="comparisonChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recent Comparisons Table -->
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">
+                                <i class="fas fa-list"></i>
+                                Comparações Recentes
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>Previsão</th>
+                                            <th>Projeto</th>
+                                            <th>Data</th>
+                                            <th>Previsto (sem)</th>
+                                            <th>Real (sem)</th>
+                                            <th>Erro</th>
+                                            <th>Ações</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="comparisons-table-body">
+                                        <!-- Populated by JavaScript -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Register Actual Modal -->
+    <div class="modal fade" id="registerActualModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="fas fa-plus-circle"></i>
+                        Registrar Resultado Real
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="registerActualForm">
+                        <div class="mb-3">
+                            <label for="select-forecast" class="form-label">Selecione a Previsão</label>
+                            <select class="form-select" id="select-forecast" required>
+                                <option value="">Carregando previsões...</option>
+                            </select>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="actual-completion-date" class="form-label">Data de Conclusão Real</label>
+                                <input type="text" class="form-control" id="actual-completion-date"
+                                       placeholder="DD/MM/YYYY" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="actual-weeks-taken" class="form-label">
+                                    Semanas Reais <small class="text-muted">(opcional)</small>
+                                </label>
+                                <input type="number" step="0.1" class="form-control" id="actual-weeks-taken">
+                                <small class="text-muted">Será calculado automaticamente se vazio</small>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="actual-items-completed" class="form-label">
+                                    Itens Completados <small class="text-muted">(opcional)</small>
+                                </label>
+                                <input type="number" class="form-control" id="actual-items-completed">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="actual-scope-pct" class="form-label">
+                                    % de Escopo Entregue <small class="text-muted">(opcional)</small>
+                                </label>
+                                <input type="number" step="0.1" class="form-control" id="actual-scope-pct">
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="actual-notes" class="form-label">Observações <small class="text-muted">(opcional)</small></label>
+                            <textarea class="form-control" id="actual-notes" rows="3"
+                                      placeholder="Notas sobre este resultado..."></textarea>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="recorded-by" class="form-label">Registrado por <small class="text-muted">(opcional)</small></label>
+                            <input type="text" class="form-control" id="recorded-by" placeholder="Seu nome">
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-primary" id="btn-save-actual">
+                        <span id="save-spinner" class="spinner-border spinner-border-sm me-2" style="display:none;"></span>
+                        Salvar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+    <script src="{{ url_for('static', filename='js/forecast-vs-actual.js') }}"></script>
+</body>
+</html>
