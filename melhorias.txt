@@ -269,7 +269,8 @@ Melhorias Sugeridas
   2) vender créditos de simulação 
     Aceitar pagamentos via pix e paypal
   
-  3) estas funcionalidades ficarão separadas em outro menu, que será a base do meu dourtorado P.R.I.O.R.I.S, que vai envolver telemetria e arqueologia de processos usando process mining e machine Learning
+  3) estas funcionalidades ficarão separadas em outro menu, que será a base do meu dourtorado P.R.I.O.R.I.S., que vai envolver telemetria e arqueologia de processos usando 
+  process mining e machine Learning
 
   6. Integração com Azure DevOps e GitHub ⭐⭐⭐⭐
 
@@ -278,6 +279,7 @@ Melhorias Sugeridas
   - Conector GitHub (Issues, PRs, Projects)
   - Análise de velocity por repositório
   - Import de métricas de código (commits, PRs)
+  - usar process mining e telemetria para recuperar features de processo para usar em machine learning
 
   Complexidade: 🔴 AltaImpacto: 🔥 AltoArquivos: integrations/azure_connector.py, integrations/github_connector.py
 

@@ -3,9 +3,8 @@ Trend Analysis Module for Flow Forecaster
 Automatic detection of trends, seasonality, anomalies, and performance degradation
 """
 import numpy as np
-from typing import List, Dict, Optional, Tuple
+from typing import List, Dict, Optional, Tuple, Any
 from dataclasses import dataclass
-from datetime import datetime, timedelta
 from scipy import stats
 from scipy.signal import find_peaks
 
@@ -17,6 +16,8 @@ class TrendAnalysis:
     trend_strength: float  # 0-1, how strong is the trend
     trend_coefficient: float  # Slope of the trend line
     trend_pvalue: float  # Statistical significance
+    mann_kendall_tau: Optional[float]  # Non-parametric trend strength
+    mann_kendall_pvalue: Optional[float]
 
     recent_avg: float  # Average of recent period
     historical_avg: float  # Average of historical period
@@ -24,6 +25,8 @@ class TrendAnalysis:
 
     is_significant: bool  # Is the change statistically significant?
     confidence_level: float  # 0-1
+    slope_confidence_interval: Tuple[float, float]
+    volatility: float  # Recent standard deviation
 
     # Visual data for plotting
     trend_line: List[float]  # Fitted trend line values
@@ -34,11 +37,15 @@ class TrendAnalysis:
             'trend_strength': round(self.trend_strength, 3),
             'trend_coefficient': round(self.trend_coefficient, 4),
             'trend_pvalue': round(self.trend_pvalue, 4),
+            'mann_kendall_tau': round(self.mann_kendall_tau, 4) if self.mann_kendall_tau is not None else None,
+            'mann_kendall_pvalue': round(self.mann_kendall_pvalue, 4) if self.mann_kendall_pvalue is not None else None,
             'recent_avg': round(self.recent_avg, 2),
             'historical_avg': round(self.historical_avg, 2),
             'change_pct': round(self.change_pct, 2),
             'is_significant': self.is_significant,
             'confidence_level': round(self.confidence_level, 3),
+            'slope_confidence_interval': [round(v, 4) for v in self.slope_confidence_interval],
+            'volatility': round(self.volatility, 3),
             'trend_line': [round(v, 2) for v in self.trend_line]
         }
 
@@ -49,17 +56,25 @@ class SeasonalityAnalysis:
     has_seasonality: bool
     period: Optional[int]  # Detected period (e.g., 4 for quarterly)
     seasonal_strength: float  # 0-1
+    seasonality_confidence: float  # 0-1 combined confidence
+    dominant_periods: List[int]
+    peak_indices: List[int]
+    trough_indices: List[int]
     seasonal_pattern: List[float]  # The repeating pattern
     deseasonalized_data: List[float]  # Data with seasonality removed
 
     # Specific patterns detected
-    patterns: Dict[str, any]  # e.g., {'end_of_sprint_drop': True}
+    patterns: Dict[str, Any]  # e.g., {'end_of_sprint_drop': True}
 
     def to_dict(self) -> Dict:
         return {
             'has_seasonality': self.has_seasonality,
             'period': self.period,
             'seasonal_strength': round(self.seasonal_strength, 3),
+            'seasonality_confidence': round(self.seasonality_confidence, 3),
+            'dominant_periods': self.dominant_periods,
+            'peak_indices': self.peak_indices,
+            'trough_indices': self.trough_indices,
             'seasonal_pattern': [round(v, 2) for v in self.seasonal_pattern] if self.seasonal_pattern else [],
             'deseasonalized_data': [round(v, 2) for v in self.deseasonalized_data],
             'patterns': self.patterns
@@ -80,6 +95,8 @@ class AnomalyDetection:
     # Context
     upper_bound: float
     lower_bound: float
+    recent_anomaly: bool
+    latest_anomaly_score: Optional[float]
 
     def to_dict(self) -> Dict:
         return {
@@ -90,7 +107,9 @@ class AnomalyDetection:
             'method_used': self.method_used,
             'threshold': round(self.threshold, 3),
             'upper_bound': round(self.upper_bound, 2),
-            'lower_bound': round(self.lower_bound, 2)
+            'lower_bound': round(self.lower_bound, 2),
+            'recent_anomaly': self.recent_anomaly,
+            'latest_anomaly_score': round(self.latest_anomaly_score, 3) if self.latest_anomaly_score is not None else None
         }
 
 
@@ -105,6 +124,7 @@ class ImprovementProjection:
     # Confidence
     lower_bound: List[float]
     upper_bound: List[float]
+    notes: Optional[str] = None
 
     def to_dict(self) -> Dict:
         return {
@@ -113,7 +133,8 @@ class ImprovementProjection:
             'projected_values': [round(v, 2) for v in self.projected_values],
             'time_to_target': self.time_to_target,
             'lower_bound': [round(v, 2) for v in self.lower_bound],
-            'upper_bound': [round(v, 2) for v in self.upper_bound]
+            'upper_bound': [round(v, 2) for v in self.upper_bound],
+            'notes': self.notes
         }
 
 
@@ -144,6 +165,49 @@ class PerformanceAlert:
         }
 
 
+def _mann_kendall_test(data: np.ndarray) -> Tuple[Optional[float], Optional[float]]:
+    """Run a Mann-Kendall trend test returning tau and p-value."""
+    if len(data) < 3:
+        return None, None
+
+    try:
+        tau, p_value = stats.kendalltau(np.arange(len(data)), data)
+    except Exception:
+        return None, None
+
+    if tau is not None and np.isnan(tau):
+        tau = None
+    if p_value is not None and np.isnan(p_value):
+        p_value = None
+
+    return (float(tau) if tau is not None else None, float(p_value) if p_value is not None else None)
+
+
+def _slope_confidence_interval(
+    slope: float,
+    std_err: float,
+    n: int,
+    significance_level: float
+) -> Tuple[float, float]:
+    """Compute a confidence interval for the regression slope."""
+    if n <= 2 or std_err is None or np.isnan(std_err):
+        return float(slope), float(slope)
+
+    try:
+        t_value = stats.t.ppf(1 - significance_level / 2, n - 2)
+    except Exception:
+        t_value = 0
+
+    if np.isnan(t_value):
+        t_value = 0
+
+    margin = t_value * std_err
+    if np.isnan(margin):
+        margin = 0
+
+    return float(slope - margin), float(slope + margin)
+
+
 def detect_trend(
     data: List[float],
     significance_level: float = 0.05
@@ -168,12 +232,16 @@ def detect_trend(
     # Linear regression
     slope, intercept, r_value, p_value, std_err = stats.linregress(x, data_array)
     trend_line = slope * x + intercept
+    tau, mann_kendall_pvalue = _mann_kendall_test(data_array)
 
     # Determine trend direction and strength
-    r_squared = r_value ** 2
-    trend_strength = abs(r_squared)  # How well the trend fits the data
+    r_strength = abs(r_value)
+    tau_strength = abs(tau) if tau is not None else 0.0
+    trend_strength = float(np.clip(0.7 * (r_strength ** 2) + 0.3 * tau_strength, 0, 1))
 
-    if abs(slope) < 0.01:  # Very small slope
+    if tau is not None and abs(tau) >= 0.2:
+        trend_direction = 'improving' if tau > 0 else 'declining'
+    elif abs(slope) < 0.01:  # Very small slope
         trend_direction = 'stable'
     elif slope > 0:
         trend_direction = 'improving'
@@ -188,19 +256,26 @@ def detect_trend(
     change_pct = ((recent_avg - historical_avg) / historical_avg * 100) if historical_avg > 0 else 0
 
     # Statistical significance
-    is_significant = p_value < significance_level
-    confidence_level = 1 - p_value
+    combined_pvalue = min(p_value, mann_kendall_pvalue) if mann_kendall_pvalue is not None else p_value
+    is_significant = (p_value < significance_level) or (mann_kendall_pvalue is not None and mann_kendall_pvalue < significance_level)
+    confidence_level = float(np.clip(1 - combined_pvalue, 0, 1))
+    slope_confidence_interval = _slope_confidence_interval(slope, std_err, n, significance_level)
+    volatility = float(np.std(data_array[-min(6, n):])) if n > 1 else 0.0
 
     return TrendAnalysis(
         trend_direction=trend_direction,
         trend_strength=trend_strength,
         trend_coefficient=slope,
         trend_pvalue=p_value,
+        mann_kendall_tau=tau,
+        mann_kendall_pvalue=mann_kendall_pvalue,
         recent_avg=recent_avg,
         historical_avg=historical_avg,
         change_pct=change_pct,
         is_significant=is_significant,
         confidence_level=confidence_level,
+        slope_confidence_interval=slope_confidence_interval,
+        volatility=volatility,
         trend_line=trend_line.tolist()
     )
 
@@ -225,6 +300,10 @@ def analyze_seasonality(
             has_seasonality=False,
             period=None,
             seasonal_strength=0.0,
+            seasonality_confidence=0.0,
+            dominant_periods=[],
+            peak_indices=[],
+            trough_indices=[],
             seasonal_pattern=[],
             deseasonalized_data=data,
             patterns={}
@@ -251,8 +330,11 @@ def analyze_seasonality(
     seasonal_strength = best_autocorr if has_seasonality else 0.0
 
     # Extract seasonal pattern
-    seasonal_pattern = []
+    seasonal_pattern: List[float] = []
     deseasonalized_data = data_array.tolist()
+    dominant_periods: List[int] = []
+    peak_indices: List[int] = []
+    trough_indices: List[int] = []
 
     if has_seasonality and best_period:
         # Calculate average for each position in the cycle
@@ -267,6 +349,27 @@ def analyze_seasonality(
         adjustments = [seasonal_pattern[idx] - overall_mean for idx in seasonal_indices]
         deseasonalized_data = (data_array - adjustments).tolist()
 
+        # Extract dominant periods using FFT
+        demeaned = data_array - np.mean(data_array)
+        fft = np.fft.rfft(demeaned)
+        power = np.abs(fft)
+        power_nonzero = power[1:] if len(power) > 1 else np.array([])
+        freqs = np.fft.rfftfreq(n, d=1)
+
+        if len(power_nonzero) > 0:
+            sorted_indices = np.argsort(power_nonzero)[-3:] + 1  # Ignore zero frequency
+            for idx in reversed(sorted_indices):
+                freq = freqs[idx]
+                if freq <= 0:
+                    continue
+                period_estimate = int(round(1 / freq))
+                if period_estimate >= 2 and period_estimate <= max(n // 2, max_period) and period_estimate not in dominant_periods:
+                    dominant_periods.append(period_estimate)
+
+        # Detect peaks and troughs for pattern insights
+        peak_indices, _ = find_peaks(data_array)
+        trough_indices, _ = find_peaks(-data_array)
+
     # Detect specific patterns
     patterns = {}
     if len(data) >= 4:
@@ -276,10 +379,35 @@ def analyze_seasonality(
         if np.mean(last_quarter) < np.mean(rest) * 0.8:
             patterns['end_period_drop'] = True
 
+    if has_seasonality and best_period:
+        patterns['dominant_period'] = best_period
+        patterns['peak_count'] = len(peak_indices)
+        patterns['trough_count'] = len(trough_indices)
+        if best_period in (2, 4):
+            patterns['sprint_cycle_candidate'] = True
+
+    # Combine confidence metrics
+    if has_seasonality:
+        if 'power_nonzero' in locals() and len(power_nonzero) > 0:
+            power_total = float(np.sum(power_nonzero))
+            top_power = float(np.max(power_nonzero))
+        else:
+            fft_vals = np.abs(np.fft.rfft(data_array))[1:]
+            power_total = float(np.sum(fft_vals))
+            top_power = float(np.max(fft_vals)) if len(fft_vals) else 0.0
+        freq_confidence = (top_power / power_total) if power_total > 0 else 0.0
+        seasonality_confidence = float(np.clip((seasonal_strength + freq_confidence) / 2, 0, 1))
+    else:
+        seasonality_confidence = 0.0
+
     return SeasonalityAnalysis(
         has_seasonality=has_seasonality,
         period=best_period,
         seasonal_strength=seasonal_strength,
+        seasonality_confidence=seasonality_confidence,
+        dominant_periods=dominant_periods,
+        peak_indices=peak_indices,
+        trough_indices=trough_indices,
         seasonal_pattern=seasonal_pattern,
         deseasonalized_data=deseasonalized_data,
         patterns=patterns
@@ -289,15 +417,17 @@ def analyze_seasonality(
 def detect_anomalies(
     data: List[float],
     method: str = 'iqr',
-    sensitivity: float = 1.5
+    sensitivity: float = 1.5,
+    rolling_window: int = 5
 ) -> AnomalyDetection:
     """
     Detect anomalies/outliers in data.
 
     Args:
         data: Time series data
-        method: Detection method ('iqr', 'zscore', 'mad')
+        method: Detection method ('iqr', 'zscore', 'mad', 'rolling_zscore')
         sensitivity: Sensitivity parameter (higher = more strict)
+        rolling_window: Window size for rolling z-score method
 
     Returns:
         AnomalyDetection object
@@ -311,7 +441,9 @@ def detect_anomalies(
             method_used=method,
             threshold=sensitivity,
             upper_bound=float(np.max(data)),
-            lower_bound=float(np.min(data))
+            lower_bound=float(np.min(data)),
+            recent_anomaly=False,
+            latest_anomaly_score=None
         )
 
     data_array = np.array(data, dtype=float)
@@ -319,6 +451,8 @@ def detect_anomalies(
 
     anomaly_indices = []
     anomaly_scores = []
+    upper_bound = float(np.max(data_array))
+    lower_bound = float(np.min(data_array))
 
     if method == 'iqr':
         # Interquartile Range method
@@ -375,10 +509,44 @@ def detect_anomalies(
                 anomaly_indices.append(i)
                 anomaly_scores.append(min(1.0, modified_z / (threshold * 2)))
 
+    elif method == 'rolling_zscore':
+        window = max(3, int(rolling_window))
+        dynamic_lowers = []
+        dynamic_uppers = []
+        threshold = max(1.5, sensitivity * 1.5)
+
+        for i, value in enumerate(data_array):
+            start = max(0, i - window + 1)
+            window_slice = data_array[start:i + 1]
+            mean = np.mean(window_slice)
+            std = np.std(window_slice)
+            if std == 0:
+                std = 1e-6
+
+            bound_margin = sensitivity * std
+            dynamic_lowers.append(mean - bound_margin)
+            dynamic_uppers.append(mean + bound_margin)
+
+            if i >= window - 1:
+                z_score = abs((value - mean) / std)
+                if z_score > threshold:
+                    anomaly_indices.append(i)
+                    anomaly_scores.append(min(1.0, z_score / (threshold * 2)))
+
+        if dynamic_lowers:
+            lower_bound = float(min(dynamic_lowers))
+        if dynamic_uppers:
+            upper_bound = float(max(dynamic_uppers))
+
     else:
         raise ValueError(f"Unknown method: {method}")
 
     anomaly_values = [data_array[i] for i in anomaly_indices]
+    recent_anomaly = len(data_array) - 1 in anomaly_indices
+    latest_anomaly_score = None
+    if recent_anomaly:
+        last_idx = anomaly_indices.index(len(data_array) - 1)
+        latest_anomaly_score = anomaly_scores[last_idx] if last_idx < len(anomaly_scores) else None
 
     return AnomalyDetection(
         anomalies_count=len(anomaly_indices),
@@ -388,7 +556,9 @@ def detect_anomalies(
         method_used=method,
         threshold=sensitivity,
         upper_bound=upper_bound,
-        lower_bound=lower_bound
+        lower_bound=lower_bound,
+        recent_anomaly=recent_anomaly,
+        latest_anomaly_score=latest_anomaly_score
     )
 
 
@@ -453,13 +623,26 @@ def project_improvement(
                     time_to_target = i + 1
                     break
 
+        if rate == 10:
+            notes = 'Cenário padrão: melhoria de 10% por sprint/prazo.'
+        elif rate < 10:
+            notes = f'Cenário conservador com crescimento de {rate}% por período.'
+        elif rate > 10:
+            notes = f'Hipótese agressiva com melhoria de {rate}% por período.'
+        else:
+            notes = None
+
+        if target_value and time_to_target:
+            notes = (notes + f' Atinge a meta ({target_value:.2f}) em {time_to_target} períodos.') if notes else f'Atinge a meta ({target_value:.2f}) em {time_to_target} períodos.'
+
         projections.append(ImprovementProjection(
             scenario_name=scenario_name,
             improvement_rate=rate,
             projected_values=projected,
             time_to_target=time_to_target,
             lower_bound=lower_bound,
-            upper_bound=upper_bound
+            upper_bound=upper_bound,
+            notes=notes
         ))
 
     return projections
@@ -469,6 +652,7 @@ def generate_performance_alerts(
     data: List[float],
     trend: TrendAnalysis,
     anomalies: AnomalyDetection,
+    seasonality: Optional[SeasonalityAnalysis] = None,
     metric_name: str = 'throughput'
 ) -> List[PerformanceAlert]:
     """
@@ -478,6 +662,7 @@ def generate_performance_alerts(
         data: Time series data
         trend: TrendAnalysis results
         anomalies: AnomalyDetection results
+        seasonality: Optional seasonality analysis for contextual alerts
         metric_name: Name of the metric being analyzed
 
     Returns:
@@ -520,9 +705,9 @@ def generate_performance_alerts(
         ))
 
     # Alert 3: Recent anomaly
-    if anomalies.anomalies_count > 0 and len(data) - 1 in anomalies.anomaly_indices:
-        severity = 'critical' if anomalies.anomaly_scores[anomalies.anomaly_indices.index(len(data) - 1)] > 0.8 else 'high'
-
+    if anomalies.recent_anomaly:
+        score = anomalies.latest_anomaly_score or 0
+        severity = 'critical' if score > 0.8 else 'high'
         alerts.append(PerformanceAlert(
             severity=severity,
             alert_type='anomaly',
@@ -532,6 +717,20 @@ def generate_performance_alerts(
             expected_value=expected_value,
             deviation_pct=((current_value - expected_value) / expected_value * 100) if expected_value > 0 else 0,
             recommendation='Valor atípico detectado. Verifique se foi um evento pontual ou indica mudança no processo.'
+        ))
+
+    # Alert 4: Excess volatility
+    if trend.volatility > max(0.01, trend.recent_avg) * 0.3:
+        volatility_pct = (trend.volatility / trend.recent_avg * 100) if trend.recent_avg > 0 else trend.volatility * 100
+        alerts.append(PerformanceAlert(
+            severity='medium',
+            alert_type='volatility',
+            message=f'Volatilidade elevada: desvios recentes representam {volatility_pct:.1f}% do valor médio.',
+            metric=metric_name,
+            current_value=current_value,
+            expected_value=expected_value,
+            deviation_pct=volatility_pct,
+            recommendation='Reforce políticas de entrada, fatie histórias grandes e estabilize cadência de entregas.'
         ))
 
     # Alert 4: Stagnation (no improvement)
@@ -550,7 +749,20 @@ def generate_performance_alerts(
                 recommendation='Considere iniciativas de melhoria: retrospectivas focadas, experimentos de processo, treinamento do time.'
             ))
 
-    # Alert 5: Positive trend (not an alert, but recognition)
+    # Alert 5: Seasonality driven degradation
+    if seasonality and seasonality.has_seasonality and seasonality.patterns.get('end_period_drop'):
+        alerts.append(PerformanceAlert(
+            severity='medium',
+            alert_type='seasonality',
+            message='Queda recorrente ao final do ciclo detectada. Ajuste previsões para absorver esse comportamento.',
+            metric=metric_name,
+            current_value=current_value,
+            expected_value=expected_value,
+            deviation_pct=((current_value - expected_value) / expected_value * 100) if expected_value > 0 else 0,
+            recommendation='Planeje capacidade extra para o final do ciclo ou distribua melhor as entregas ao longo do período.'
+        ))
+
+    # Alert 6: Positive trend (recognition)
     if trend.trend_direction == 'improving' and trend.is_significant and trend.change_pct > 15:
         alerts.append(PerformanceAlert(
             severity='low',
@@ -602,7 +814,13 @@ def comprehensive_trend_analysis(
     if project_future:
         projections = project_improvement(data, improvement_rates=[5, 10, 15])
 
-    alerts = generate_performance_alerts(data, trend, anomalies, metric_name)
+    alerts = generate_performance_alerts(
+        data,
+        trend,
+        anomalies,
+        seasonality=seasonality,
+        metric_name=metric_name
+    )
 
     return {
         'metric_name': metric_name,
