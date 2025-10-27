@@ -2,7 +2,7 @@
 Database initialization and session management for Flow Forecaster
 """
 import os
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import sessionmaker, scoped_session
 from models import Base, Project, Forecast, Actual
 
@@ -19,6 +19,37 @@ def init_db():
     """Initialize database, create all tables"""
     Base.metadata.create_all(engine)
     print(f"Database initialized at {DB_PATH}")
+
+
+def ensure_schema():
+    """Ensure existing databases include the latest columns"""
+    inspector = inspect(engine)
+    if 'projects' not in inspector.get_table_names():
+        return
+
+    existing_columns = {col['name'] for col in inspector.get_columns('projects')}
+
+    project_columns = [
+        ('status', "ALTER TABLE projects ADD COLUMN status VARCHAR(50) DEFAULT 'active'", "UPDATE projects SET status = 'active' WHERE status IS NULL"),
+        ('priority', "ALTER TABLE projects ADD COLUMN priority INTEGER DEFAULT 3", "UPDATE projects SET priority = 3 WHERE priority IS NULL"),
+        ('business_value', "ALTER TABLE projects ADD COLUMN business_value INTEGER DEFAULT 50", "UPDATE projects SET business_value = 50 WHERE business_value IS NULL"),
+        ('risk_level', "ALTER TABLE projects ADD COLUMN risk_level VARCHAR(20) DEFAULT 'medium'", "UPDATE projects SET risk_level = 'medium' WHERE risk_level IS NULL"),
+        ('capacity_allocated', "ALTER TABLE projects ADD COLUMN capacity_allocated FLOAT DEFAULT 1.0", "UPDATE projects SET capacity_allocated = 1.0 WHERE capacity_allocated IS NULL"),
+        ('strategic_importance', "ALTER TABLE projects ADD COLUMN strategic_importance VARCHAR(20) DEFAULT 'medium'", "UPDATE projects SET strategic_importance = 'medium' WHERE strategic_importance IS NULL"),
+        ('start_date', "ALTER TABLE projects ADD COLUMN start_date VARCHAR(20)", None),
+        ('target_end_date', "ALTER TABLE projects ADD COLUMN target_end_date VARCHAR(20)", None),
+        ('owner', "ALTER TABLE projects ADD COLUMN owner VARCHAR(200)", None),
+        ('stakeholder', "ALTER TABLE projects ADD COLUMN stakeholder VARCHAR(200)", None),
+        ('tags', "ALTER TABLE projects ADD COLUMN tags TEXT", "UPDATE projects SET tags = '[]' WHERE tags IS NULL"),
+    ]
+
+    with engine.begin() as connection:
+        for column_name, ddl, hydration in project_columns:
+            if column_name not in existing_columns:
+                connection.execute(text(ddl))
+                existing_columns.add(column_name)
+                if hydration:
+                    connection.execute(text(hydration))
 
 
 def get_session():
@@ -41,3 +72,5 @@ def reset_db():
 # Initialize database on import
 if not os.path.exists('forecaster.db') or os.path.getsize('forecaster.db') == 0:
     init_db()
+
+ensure_schema()

@@ -268,4 +268,38 @@ Melhorias Sugeridas
   1) acesso via google oauth2
   2) vender créditos de simulação 
     Aceitar pagamentos via pix e paypal
-  3)
+  
+  3) estas funcionalidades ficarão separadas em outro menu, que será a base do meu dourtorado P.R.I.O.R.I.S, que vai envolver telemetria e arqueologia de processos usando process mining e machine Learning
+
+  6. Integração com Azure DevOps e GitHub ⭐⭐⭐⭐
+
+  O que implementar:
+  - Conector Azure DevOps (Work Items)
+  - Conector GitHub (Issues, PRs, Projects)
+  - Análise de velocity por repositório
+  - Import de métricas de código (commits, PRs)
+
+  Complexidade: 🔴 AltaImpacto: 🔥 AltoArquivos: integrations/azure_connector.py, integrations/github_connector.py
+
+  ---
+  7. Wizards e Onboarding ⭐⭐⭐
+
+  O que implementar:
+  - Wizard guiado para primeira análise (step-by-step)
+  - Templates por tipo de projeto (Scrum, Kanban, SAFe)
+  - Tutorial interativo
+  - Samples de dados para teste
+
+  Complexidade: 🟡 MédiaImpacto: 🔥 MédioArquivos: templates/onboarding.html, static/js/wizard.js
+
+  ---
+  FASE 4 - Enterprise Features (8+ semanas) 🏢
+
+  8. Features Específicas Avançadas
+
+  - Forecast de defeitos/bugs baseado em histórico
+  - Análise de technical debt impact
+  - Forecast de capacidade vs demanda
+  - Rolling wave planning
+  - Correlação entre riscos
+  - Probabilistic roadmaps
