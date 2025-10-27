@@ -1,200 +1,86 @@
-# 🚀 Guia de Deploy - Project Forecaster
+# 🚀 Guia de Deploy - Flow Forecaster no Fly.io
 
-## ✅ Arquivos Preparados
+Este guia consolida os passos necessários para publicar a aplicação diretamente no Fly.io, que é o provedor oficial usado no projeto.
 
-O projeto está pronto para deploy com os seguintes arquivos:
+## ✅ Arquivos e estrutura prontos para o Fly.io
 
-- ✅ **Procfile** - Configuração do servidor Gunicorn
-- ✅ **requirements.txt** - Dependências Python (incluindo gunicorn)
-- ✅ **render.yaml** - Configuração automática do Render
-- ✅ **runtime.txt** - Versão Python 3.11
-- ✅ **.gitignore** - Arquivos a ignorar no Git
-- ✅ **README.md** - Documentação completa
+- ✅ **fly.toml** – Configuração da aplicação `flow-forecaster`
+- ✅ **Dockerfile** – Build otimizado para a plataforma
+- ✅ **requirements.txt** e **runtime.txt** – Dependências e versão do Python
+- ✅ **Procfile** – Comando de execução com Gunicorn (referência local)
+- ✅ **DEPLOY_SETUP.md / DEPLOY_MANUAL.md / FLY_DEPLOY.md** – Guias complementares específicos do Fly.io
+- ✅ **Monta** `/data` com volume persistente (`flow_forecaster_data`) para o banco SQLite
 
-## 📝 Passo 1: Criar Repositório no GitHub
+## 📝 Passo 1 – Preparar repositório no GitHub
 
-### 1.1. Acesse GitHub
-Vá para: https://github.com/new
-
-### 1.2. Preencha os dados
-- **Repository name**: `project-forecaster-py`
-- **Description**: `Previsão probabilística de projetos usando Machine Learning e Monte Carlo`
-- **Visibilidade**: ✅ Public (necessário para Render gratuito)
-- **NÃO marque**: README, .gitignore ou license (já temos)
-
-### 1.3. Clique em "Create repository"
-
-## 🔗 Passo 2: Conectar e Fazer Push
-
-Abra o terminal e execute:
+1. Crie um repositório vazio em <https://github.com/new>.
+2. Execute os comandos abaixo substituindo pelo caminho local do projeto e seu usuário GitHub:
 
 ```bash
-# Navegue até o diretório do projeto
-cd '/Users/rodrigoalmeidadeoliveira/Library/CloudStorage/GoogleDrive-rodrigoalmeidadeoliveira@gmail.com/Outros computadores/Notebook/__Kanban/metricas/Fontes-Forecaster/project-forecaster-py'
-
-# Adicione o remote do GitHub (SUBSTITUA rodrigoalmeidadeoliveira pelo seu username)
-git remote add origin https://github.com/rodrigoalmeidadeoliveira/project-forecaster-py.git
-
-# Renomeie a branch para main
+cd '/Users/rodrigoalmeidadeoliveira/Library/CloudStorage/GoogleDrive-rodrigoalmeidadeoliveira@gmail.com/Outros computadores/Notebook/__Kanban/metricas/Fontes-Forecaster/flow-forecaster'
+git init
+git remote add origin https://github.com/SEU-USUARIO/flow-forecaster.git
 git branch -M main
-
-# Faça o push
+git add .
+git commit -m "Initial import"
 git push -u origin main
 ```
 
-### Verificação
-Acesse `https://github.com/SEU-USUARIO/project-forecaster-py` e verifique se todos os arquivos estão lá.
+> Se o repositório já existe, garanta apenas que a branch `main` esteja sincronizada.
 
-## 🌐 Passo 3: Deploy no Render
+## 🛠️ Passo 2 – Configurar o Fly CLI localmente
 
-### 3.1. Criar Conta no Render
-1. Acesse: https://render.com/
-2. Clique em "Get Started"
-3. Faça login com GitHub (recomendado)
+1. Instale a CLI: `curl -L https://fly.io/install.sh | sh`
+2. Faça login: `fly auth login`
+3. Valide o arquivo `fly.toml` (app `flow-forecaster`, região `gru`, volume `flow_forecaster_data`). Ajuste o nome se estiver usando outra conta.
 
-### 3.2. Criar Novo Web Service
-1. No dashboard do Render, clique em **"New +"**
-2. Selecione **"Web Service"**
+## ☁️ Passo 3 – Provisionar a aplicação
 
-### 3.3. Conectar Repositório
-1. Clique em **"Connect a repository"**
-2. Autorize o Render a acessar seus repositórios
-3. Encontre e selecione **project-forecaster-py**
-
-### 3.4. Configurar o Deploy
-
-O Render detectará automaticamente o `render.yaml`, mas você pode configurar manualmente:
-
-**Configurações:**
-- **Name**: `project-forecaster` (ou qualquer nome)
-- **Region**: Escolha o mais próximo (ex: Oregon para EUA)
-- **Branch**: `main`
-- **Root Directory**: deixe em branco
-- **Runtime**: `Python 3`
-- **Build Command**: `pip install -r requirements.txt`
-- **Start Command**: `gunicorn app:app --timeout 120 --workers 2`
-- **Plan**: `Free` (0 GB RAM, 750h/mês grátis)
-
-### 3.5. Variáveis de Ambiente (Opcional)
-Adicione se necessário:
-- `PYTHON_VERSION`: `3.11.0`
-- `PORT`: será definido automaticamente pelo Render
-
-### 3.6. Deploy
-1. Clique em **"Create Web Service"**
-2. Aguarde o build (5-10 minutos na primeira vez)
-3. Acompanhe os logs em tempo real
-
-## ✨ Passo 4: Aplicação Online!
-
-Após o deploy bem-sucedido:
-
-### URL da Aplicação
-Sua aplicação estará disponível em:
-```
-https://project-forecaster.onrender.com
-```
-(ou o nome que você escolheu)
-
-### Funcionalidades Disponíveis
-- ✅ **Página Principal**: `/`
-  - Monte Carlo tradicional
-
-- ✅ **Forecast Avançado**: `/advanced`
-  - ML + Monte Carlo combinado
-
-### APIs REST
-- `POST /api/simulate` - Monte Carlo
-- `POST /api/ml-forecast` - ML Forecast
-- `POST /api/mc-throughput` - MC Throughput
-- `POST /api/combined-forecast` - Combinado
-
-## 🔄 Atualizações Futuras
-
-### Deploy Automático
-Qualquer push para a branch `main` no GitHub irá automaticamente:
-1. Trigger um novo build no Render
-2. Executar testes (se houver)
-3. Deploy da nova versão
-4. Zero downtime
-
-### Como Atualizar
 ```bash
-# Faça suas modificações
-# ...
+# Criar app se ainda não existir
+fly apps create flow-forecaster
 
-# Commit e push
-git add .
-git commit -m "Sua mensagem de commit"
-git push origin main
-
-# Render fará o deploy automaticamente!
+# Criar volume persistente para o banco SQLite
+fly volumes create flow_forecaster_data --size 1 --region gru
 ```
 
-## ⚠️ Limitações do Plano Free
+Se a app já existir, garanta que o volume esteja associado ao mesmo nome configurado em `fly.toml`.
 
-- **Sleep após 15 min de inatividade**: Primeira requisição após sleep demora 30-60s
-- **750 horas/mês**: Suficiente se não usado 24/7
-- **512 MB RAM**: Suficiente para esta aplicação
-- **Disco limitado**: Sem persistência de dados
+## 🚀 Passo 4 – Deploy manual
 
-### Solução para Sleep
-Se quiser evitar o sleep, use um serviço como:
-- **UptimeRobot**: Pinga sua aplicação a cada 5 minutos (grátis)
-- URL: https://uptimerobot.com/
+```bash
+fly deploy --remote-only
+```
 
-## 📊 Monitoramento
+O processo utiliza o Dockerfile do repositório, aplica as variáveis definidas em `[env]` e monta `/data` para persistir o `forecaster.db`. Ao final, verifique a URL pública exibida pela CLI.
 
-### Logs em Tempo Real
-No dashboard do Render:
-1. Clique no seu serviço
-2. Vá em **"Logs"**
-3. Veja logs em tempo real
+### Testes pós-deploy
 
-### Métricas
-- CPU usage
-- Memory usage
-- Request count
-- Response times
+- Acesse `https://flow-forecaster.fly.dev/health` para confirmar status `200`.
+- Use `/register` para criar o primeiro usuário (ou importe um banco existente para `/data/forecaster.db`).
 
-## 🐛 Troubleshooting
+## 🔄 Passo 5 – Deploy contínuo com GitHub Actions (opcional)
 
-### Build Falha
-**Erro**: `Failed to install requirements`
-- Verifique `requirements.txt`
-- Certifique-se que todas as versões são compatíveis
+O workflow em `.github/workflows/fly-deploy.yml` usa o token Fly.io salvo em `FLY_API_TOKEN`. Para reativar:
 
-### Aplicação não Inicia
-**Erro**: `Web service failed to start`
-- Verifique o `Procfile`
-- Teste localmente: `gunicorn app:app`
+1. Gere um token com `fly auth token`.
+2. No GitHub, adicione em *Settings → Secrets and variables → Actions → New secret* o valor `FLY_API_TOKEN`.
+3. Cada push na `main` executará automaticamente `fly deploy --remote-only`.
 
-### Timeout Errors
-**Erro**: `Request timeout`
-- Aumente timeout no `Procfile`: `--timeout 180`
-- Reduza `numberOfSimulations` nas requisições
+## 🧰 Troubleshooting no Fly.io
 
-### Memory Issues
-**Erro**: `Out of memory`
-- Reduza `--workers` para 1
-- Otimize código para usar menos memória
-- Considere upgrade de plano
+- **Build falhou:** rode `fly deploy --remote-only --build-only` para inspecionar a imagem.
+- **Banco vazio após reboot:** confirme se o volume `flow_forecaster_data` está `attached` e se `DATABASE_URL` aponta para `sqlite:////data/forecaster.db`.
+- **Erro de memória:** ajuste `[[vm]]` em `fly.toml` (ex.: `memory = "2gb"`) e redeploy.
+- **Aplicação off:** use `fly status`, `fly apps restart flow-forecaster` ou `fly logs -a flow-forecaster` para investigar.
 
-## 🎉 Pronto!
+## ✅ Checklist final
 
-Sua aplicação está online e acessível mundialmente!
+- [ ] Repositório atualizado no GitHub
+- [ ] Token do Fly configurado (local e/ou GitHub Actions)
+- [ ] App e volume criados na conta correta
+- [ ] Deploy concluído com `fly deploy`
+- [ ] Endpoint `/health` respondendo `200`
+- [ ] Primeiro usuário registrado ou banco importado
 
-### Próximos Passos
-1. ✅ Compartilhe a URL com usuários
-2. ✅ Adicione a URL ao README do GitHub
-3. ✅ Configure domínio customizado (opcional)
-4. ✅ Monitore uso e performance
-
-### Suporte
-- **Render Docs**: https://render.com/docs
-- **GitHub Issues**: Para bugs e sugestões
-- **Community**: Render Community Forum
-
----
-
-**Criado com** ❤️ **usando Claude Code**
+> Para detalhes adicionais (automações, tokens e operações diárias), consulte `FLY_DEPLOY.md`, `DEPLOY_SETUP.md` e `DEPLOY_MANUAL.md`.
