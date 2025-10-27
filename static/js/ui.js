@@ -2557,6 +2557,8 @@ ${generateProgressBar(p50Items, backlog, 'P50 (arriscado)  ', Math.round((p50Ite
         '#advanced-forecast',
         '#demand-forecast',
         '#deadline-analysis',
+        '#deadline-results-summary',
+        '#deadline-start-window',
         '#historical-charts',
         '#cost-analysis',
         '#trend-analysis',
@@ -2567,7 +2569,8 @@ ${generateProgressBar(p50Items, backlog, 'P50 (arriscado)  ', Math.round((p50Ite
         '#executive-dashboard',
         '#dashboard',
         '#portfolio-dashboard',
-        '#portfolio'
+        '#portfolio',
+        '#tpsamples'
     ]);
 
     function loadDataFromUrl() {
@@ -2668,13 +2671,21 @@ ${generateProgressBar(p50Items, backlog, 'P50 (arriscado)  ', Math.round((p50Ite
 
         if (location.hash && location.hash.trim().length > 1) {
             loadDataFromUrl();
+        } else {
+            currentlyLoadedHash = location.hash || '';
         }
 
-        window.onhashchange = function () {
-            if (currentlyLoadedHash != location.hash) {
-                location.reload();
+        window.addEventListener('hashchange', function () {
+            const normalizedHash = (location.hash || '').trim();
+            if (!normalizedHash || TAB_HASHES.has(normalizedHash.toLowerCase())) {
+                currentlyLoadedHash = normalizedHash;
+                return;
             }
-        };
+
+            if (!loadDataFromUrl()) {
+                currentlyLoadedHash = normalizedHash;
+            }
+        });
 
         // Risk summary update triggers
         let riskSummaryTimeout;

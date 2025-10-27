@@ -2642,6 +2642,16 @@ a probabilidade de todas serem entregues no prazo é de <strong>1 em 2^n</strong
 
             function handleHashChange() {
                 const currentHash = normalizeHash(window.location.hash);
+
+                if (!currentHash) {
+                    showTab(DEFAULT_TAB, { suppressHash: true });
+                    return;
+                }
+
+                if (!Object.prototype.hasOwnProperty.call(TAB_MAP, currentHash)) {
+                    return;
+                }
+
                 if (!showTab(currentHash, { suppressHash: true })) {
                     showTab(DEFAULT_TAB, { suppressHash: true });
                 }
