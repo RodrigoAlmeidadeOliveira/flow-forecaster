@@ -2566,6 +2566,7 @@ ${generateProgressBar(p50Items, backlog, 'P50 (arriscado)  ', Math.round((p50Ite
     window.runSimulation = runSimulation;
     window.share = share;
     window.markHistoricalChartsDirty = markHistoricalChartsDirty;
+    window.runDeadlineAnalysis = runDeadlineAnalysis;
     }); // Close $(window).on("load")
 
     // Initialize UI when DOM is ready
