@@ -3,13 +3,23 @@ Project Forecaster - Flask Application
 Monte Carlo simulation for project forecasting
 """
 
-from flask import Flask, render_template, request, jsonify, redirect, url_for
+import os
 import json
 import base64
 import numpy as np
 import re
 from datetime import datetime, timedelta
 from typing import Optional
+from flask import Flask, render_template, request, jsonify, redirect, url_for, flash
+from flask_login import (
+    LoginManager,
+    login_user,
+    logout_user,
+    login_required,
+    current_user
+)
+from sqlalchemy.exc import IntegrityError
+from urllib.parse import urlparse, urljoin
 from monte_carlo_unified import (
     run_monte_carlo_simulation,
     simulate_throughput_forecast,
@@ -30,7 +40,7 @@ from cost_pert_beta import (
     calculate_effort_based_cost_with_percentiles
 )
 from database import get_session, close_session, init_db
-from models import Project, Forecast, Actual
+from models import Project, Forecast, Actual, User
 from accuracy_metrics import (
     calculate_accuracy_metrics,
     calculate_time_series_metrics,
@@ -52,9 +62,50 @@ from portfolio_analyzer import (
 from trend_analysis import comprehensive_trend_analysis
 
 app = Flask(__name__)
+app.config['SECRET_KEY'] = os.environ.get('FLOW_FORECASTER_SECRET_KEY') or os.environ.get('SECRET_KEY') or 'change-me-in-production'
+
+login_manager = LoginManager(app)
+login_manager.login_view = 'login'
+login_manager.login_message_category = 'info'
 
 # Initialize database
 init_db()
+
+
+@login_manager.user_loader
+def load_user(user_id):
+    """Load user for Flask-Login session management."""
+    if not user_id:
+        return None
+
+    try:
+        user_id = int(user_id)
+    except (TypeError, ValueError):
+        return None
+
+    session = get_session()
+    try:
+        user = session.get(User, user_id)
+        if user:
+            session.expunge(user)
+        return user
+    finally:
+        session.close()
+
+
+@app.teardown_appcontext
+def remove_session(exception=None):
+    """Ensure scoped sessions are properly removed at request end."""
+    close_session()
+
+
+@app.context_processor
+def inject_auth_context():
+    """Expose auth helpers to Jinja templates."""
+    return {
+        'is_admin_user': current_user_is_admin(),
+        'ADMIN_ROLES': ADMIN_ROLES
+    }
 
 # Debugging: Print routes at startup
 import sys
@@ -65,6 +116,9 @@ print(f"Template folder: {app.template_folder}", flush=True)
 print(f"Root path: {app.root_path}", flush=True)
 print("="*60, flush=True)
 sys.stdout.flush()
+
+EMAIL_REGEX = re.compile(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
+ADMIN_ROLES = {'admin', 'instructor'}
 
 
 def convert_to_native_types(obj):
@@ -83,6 +137,61 @@ def convert_to_native_types(obj):
         return [convert_to_native_types(item) for item in obj]
     else:
         return obj
+
+
+def is_safe_redirect_url(target: Optional[str]) -> bool:
+    """Ensure redirect targets stay within the same host to avoid open redirects."""
+    if not target:
+        return False
+
+    ref_url = urlparse(request.host_url)
+    test_url = urlparse(urljoin(request.host_url, target))
+    return (
+        test_url.scheme in ('http', 'https') and
+        ref_url.netloc == test_url.netloc
+    )
+
+
+def current_user_is_admin() -> bool:
+    """Determine if the logged-in user has elevated privileges."""
+    if not getattr(current_user, 'is_authenticated', False):
+        return False
+
+    role = getattr(current_user, 'role', None)
+    return isinstance(role, str) and role.lower() in ADMIN_ROLES
+
+
+def scoped_project_query(session):
+    """Return a Project query scoped to the current user when needed."""
+    query = session.query(Project)
+    if current_user_is_admin():
+        return query
+    return query.filter(Project.user_id == current_user.id)
+
+
+def scoped_forecast_query(session):
+    """Return a Forecast query scoped to the current user when needed."""
+    query = session.query(Forecast)
+    if current_user_is_admin():
+        return query
+    return query.filter(Forecast.user_id == current_user.id)
+
+
+def scoped_actual_query(session):
+    """Return an Actual query scoped to the current user."""
+    query = session.query(Actual)
+    if current_user_is_admin():
+        return query
+    return query.join(Forecast).filter(Forecast.user_id == current_user.id)
+
+
+def has_record_access(record, attr='user_id') -> bool:
+    """Check whether the logged-in user can access the given record."""
+    if record is None:
+        return False
+    if current_user_is_admin():
+        return True
+    return getattr(record, attr, None) == current_user.id
 
 
 def parse_flexible_date(date_str: str) -> datetime:
@@ -115,6 +224,130 @@ def add_no_cache_headers(response):
     return response
 
 
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    """Allow students/instructors to create an account."""
+    if current_user.is_authenticated:
+        return redirect(url_for('index'))
+
+    errors = []
+    form_data = {
+        'name': '',
+        'email': ''
+    }
+
+    if request.method == 'POST':
+        name = (request.form.get('name') or '').strip()
+        email_raw = (request.form.get('email') or '').strip()
+        email = email_raw.lower()
+        password = request.form.get('password') or ''
+        confirm_password = request.form.get('confirm_password') or ''
+
+        form_data['name'] = name
+        form_data['email'] = email_raw
+
+        if not name:
+            errors.append('Informe seu nome completo.')
+
+        if not email or not EMAIL_REGEX.match(email):
+            errors.append('Informe um e-mail válido.')
+
+        if len(password) < 8:
+            errors.append('A senha deve ter pelo menos 8 caracteres.')
+
+        if password != confirm_password:
+            errors.append('As senhas informadas não coincidem.')
+
+        session = None
+        new_user = None
+
+        if not errors:
+            session = get_session()
+            try:
+                is_first_user = session.query(User.id).first() is None
+                role = 'admin' if is_first_user else 'student'
+
+                new_user = User(
+                    email=email,
+                    name=name,
+                    role=role,
+                )
+                new_user.set_password(password)
+
+                session.add(new_user)
+                session.commit()
+                session.refresh(new_user)
+                session.expunge(new_user)
+
+                login_user(new_user)
+                flash('Conta criada com sucesso! Bem-vindo ao Flow Forecaster.', 'success')
+                return redirect(url_for('index'))
+            except IntegrityError:
+                if session:
+                    session.rollback()
+                errors.append('Este e-mail já está cadastrado. Faça login ou escolha outro e-mail.')
+            finally:
+                if session:
+                    session.close()
+
+    return render_template('auth/register.html', errors=errors, form_data=form_data)
+
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    """Authenticate an existing user."""
+    if current_user.is_authenticated:
+        return redirect(url_for('index'))
+
+    errors = []
+    form_data = {
+        'email': ''
+    }
+
+    next_url = request.args.get('next') if request.method == 'GET' else request.form.get('next')
+
+    if request.method == 'POST':
+        email_raw = (request.form.get('email') or '').strip()
+        email = email_raw.lower()
+        password = request.form.get('password') or ''
+        remember = bool(request.form.get('remember'))
+
+        form_data['email'] = email_raw
+
+        session = get_session()
+        try:
+            user = session.query(User).filter(User.email == email).first()
+            if not user or not user.check_password(password):
+                errors.append('E-mail ou senha inválidos. Verifique e tente novamente.')
+            elif not user.is_active:
+                errors.append('Sua conta está desativada. Entre em contato com o instrutor.')
+            else:
+                user.last_login = datetime.utcnow()
+                session.commit()
+                session.refresh(user)
+                session.expunge(user)
+
+                login_user(user, remember=remember)
+                flash(f'Bem-vindo de volta, {user.name}!', 'success')
+
+                if next_url and is_safe_redirect_url(next_url):
+                    return redirect(next_url)
+                return redirect(url_for('index'))
+        finally:
+            session.close()
+
+    return render_template('auth/login.html', errors=errors, form_data=form_data, next=next_url)
+
+
+@app.route('/logout')
+@login_required
+def logout():
+    """Terminate the current user session."""
+    logout_user()
+    flash('Você saiu da aplicação com segurança.', 'info')
+    return redirect(url_for('login'))
+
+
 @app.route('/health')
 def health():
     """Health check endpoint."""
@@ -122,6 +355,7 @@ def health():
 
 
 @app.route('/')
+@login_required
 def index():
     """Render the main page."""
     try:
@@ -141,12 +375,14 @@ def index():
 
 
 @app.route('/advanced')
+@login_required
 def advanced():
     """Redirect to the unified advanced forecasting section."""
     return redirect(url_for('index') + '#advanced-forecast')
 
 
 @app.route('/dependency-analysis')
+@login_required
 def dependency_analysis_page():
     """Render the dependency analysis page."""
     try:
@@ -187,6 +423,7 @@ def docs_redirect():
 
 
 @app.route('/api/simulate', methods=['POST'])
+@login_required
 def simulate():
     """
     Execute Monte Carlo simulation based on provided data.
@@ -317,6 +554,7 @@ def simulate():
 
 
 @app.route('/api/encode', methods=['POST'])
+@login_required
 def encode_data():
     """
     Encode simulation data to base64 for URL sharing.
@@ -334,6 +572,7 @@ def encode_data():
 
 
 @app.route('/api/decode', methods=['POST'])
+@login_required
 def decode_data():
     """
     Decode base64 simulation data from URL.
@@ -351,6 +590,7 @@ def decode_data():
 
 
 @app.route('/api/ml-forecast', methods=['POST'])
+@login_required
 def ml_forecast():
     """
     Execute ML-based forecast.
@@ -430,6 +670,7 @@ def ml_forecast():
 
 
 @app.route('/api/demand/forecast', methods=['POST'])
+@login_required
 def demand_forecast():
     """
     Execute demand forecasting based on arrival dates provided by the user.
@@ -508,6 +749,7 @@ def demand_forecast():
 
 
 @app.route('/api/mc-throughput', methods=['POST'])
+@login_required
 def mc_throughput():
     """
     Execute Monte Carlo throughput-based forecast.
@@ -563,6 +805,7 @@ def mc_throughput():
 
 
 @app.route('/api/combined-forecast', methods=['POST'])
+@login_required
 def combined_forecast():
     """
     Execute combined ML + Monte Carlo forecast.
@@ -657,6 +900,7 @@ def deadline_analysis_page():
 
 
 @app.route('/api/deadline-analysis', methods=['POST'])
+@login_required
 def api_deadline_analysis():
     """
     Execute deadline analysis using both Monte Carlo and Machine Learning.
@@ -1141,6 +1385,7 @@ def api_deadline_analysis():
 
 
 @app.route('/api/forecast-how-many', methods=['POST'])
+@login_required
 def api_forecast_how_many():
     """
     Forecast how many items in a time period (both MC and ML).
@@ -1220,6 +1465,7 @@ def api_forecast_how_many():
 
 
 @app.route('/api/forecast-when', methods=['POST'])
+@login_required
 def api_forecast_when():
     """
     Forecast when backlog will be completed (both MC and ML).
@@ -1296,6 +1542,7 @@ def api_forecast_when():
 
 
 @app.route('/api/cost-analysis', methods=['POST'])
+@login_required
 def api_cost_analysis():
     """
     Execute cost analysis using PERT-Beta distribution.
@@ -1395,6 +1642,7 @@ def api_cost_analysis():
 print("="*60, flush=True)
 print(f"Total routes registered: {len(list(app.url_map.iter_rules()))}", flush=True)
 @app.route('/api/dependency-analysis', methods=['POST'])
+@login_required
 def dependency_analysis():
     """
     Analyze dependencies and their impact on project delivery.
@@ -1462,6 +1710,7 @@ def dependency_analysis():
 
 
 @app.route('/api/visualize-dependencies', methods=['POST'])
+@login_required
 def visualize_dependencies():
     """
     Generate visualization for dependency analysis results.
@@ -1503,6 +1752,7 @@ def visualize_dependencies():
 
 
 @app.route('/api/risk-summary', methods=['POST'])
+@login_required
 def api_risk_summary():
     """
     Calculate risk summary with expected impact and ranking.
@@ -1558,6 +1808,7 @@ def api_risk_summary():
 
 
 @app.route('/api/trend-analysis', methods=['POST'])
+@login_required
 def api_trend_analysis():
     """
     Execute automatic trend analysis for throughput and optional lead time data.
@@ -1690,23 +1941,37 @@ def api_trend_analysis():
 # ============================================================================
 
 @app.route('/api/projects', methods=['GET', 'POST'])
+@login_required
 def handle_projects():
     """List all projects or create a new one"""
     session = get_session()
     try:
         if request.method == 'GET':
-            projects = session.query(Project).all()
+            projects = scoped_project_query(session).order_by(Project.created_at.desc()).all()
             return jsonify([p.to_dict() for p in projects])
 
         elif request.method == 'POST':
-            data = request.json
+            data = request.json or {}
+            name = data.get('name')
+            if not name:
+                return jsonify({'error': 'Project name is required'}), 400
+
+            owner_id = current_user.id
+            if current_user_is_admin() and data.get('user_id'):
+                owner_user = session.get(User, data['user_id'])
+                if not owner_user:
+                    return jsonify({'error': 'Referenced user not found'}), 404
+                owner_id = owner_user.id
+
             project = Project(
-                name=data['name'],
+                name=name,
                 description=data.get('description'),
-                team_size=data.get('team_size', 1)
+                team_size=data.get('team_size', 1),
+                user_id=owner_id
             )
             session.add(project)
             session.commit()
+            session.refresh(project)
             return jsonify(project.to_dict()), 201
 
     except Exception as e:
@@ -1717,11 +1982,12 @@ def handle_projects():
 
 
 @app.route('/api/projects/<int:project_id>', methods=['GET', 'PUT', 'DELETE'])
+@login_required
 def handle_project(project_id):
     """Get, update, or delete a specific project"""
     session = get_session()
     try:
-        project = session.query(Project).get(project_id)
+        project = scoped_project_query(session).filter(Project.id == project_id).one_or_none()
         if not project:
             return jsonify({'error': 'Project not found'}), 404
 
@@ -1729,13 +1995,35 @@ def handle_project(project_id):
             return jsonify(project.to_dict())
 
         elif request.method == 'PUT':
-            data = request.json
+            data = request.json or {}
             if 'name' in data:
                 project.name = data['name']
             if 'description' in data:
                 project.description = data['description']
             if 'team_size' in data:
                 project.team_size = data['team_size']
+            if 'status' in data:
+                project.status = data['status']
+            if 'priority' in data:
+                project.priority = data['priority']
+            if 'business_value' in data:
+                project.business_value = data['business_value']
+            if 'risk_level' in data:
+                project.risk_level = data['risk_level']
+            if 'capacity_allocated' in data:
+                project.capacity_allocated = data['capacity_allocated']
+            if 'strategic_importance' in data:
+                project.strategic_importance = data['strategic_importance']
+            if 'start_date' in data:
+                project.start_date = data['start_date']
+            if 'target_end_date' in data:
+                project.target_end_date = data['target_end_date']
+            if 'owner' in data:
+                project.owner = data['owner']
+            if 'stakeholder' in data:
+                project.stakeholder = data['stakeholder']
+            if 'tags' in data:
+                project.tags = json.dumps(data['tags']) if isinstance(data['tags'], list) else data['tags']
             project.updated_at = datetime.utcnow()
             session.commit()
             return jsonify(project.to_dict())
@@ -1753,6 +2041,7 @@ def handle_project(project_id):
 
 
 @app.route('/api/forecasts', methods=['GET', 'POST'])
+@login_required
 def handle_forecasts():
     """List forecasts or save a new forecast"""
     session = get_session()
@@ -1760,21 +2049,38 @@ def handle_forecasts():
         if request.method == 'GET':
             # Optional filter by project_id
             project_id = request.args.get('project_id', type=int)
-            query = session.query(Forecast)
+            query = scoped_forecast_query(session).order_by(Forecast.created_at.desc())
             if project_id:
-                query = query.filter_by(project_id=project_id)
+                query = query.filter(Forecast.project_id == project_id)
 
-            forecasts = query.order_by(Forecast.created_at.desc()).all()
+            forecasts = query.all()
             return jsonify([f.to_summary() for f in forecasts])
 
         elif request.method == 'POST':
-            data = request.json
+            data = request.json or {}
 
             # Create or get project
             project_id = data.get('project_id')
-            if not project_id:
-                # Create default project if not specified
-                project = Project(name=data.get('project_name', 'Unnamed Project'))
+
+            project = None
+            if project_id:
+                project = scoped_project_query(session).filter(Project.id == project_id).one_or_none()
+                if not project:
+                    return jsonify({'error': 'Project not found'}), 404
+            else:
+                owner_id = current_user.id
+                if current_user_is_admin() and data.get('user_id'):
+                    owner_user = session.get(User, data['user_id'])
+                    if not owner_user:
+                        return jsonify({'error': 'Referenced user not found'}), 404
+                    owner_id = owner_user.id
+
+                project = Project(
+                    name=data.get('project_name', 'Unnamed Project'),
+                    description=data.get('project_description'),
+                    team_size=data.get('team_size', 1),
+                    user_id=owner_id
+                )
                 session.add(project)
                 session.flush()
                 project_id = project.id
@@ -1794,11 +2100,13 @@ def handle_forecasts():
                 projected_weeks_p85=data.get('projected_weeks_p85'),
                 can_meet_deadline=data.get('can_meet_deadline'),
                 scope_completion_pct=data.get('scope_completion_pct'),
-                created_by=data.get('created_by')
+                created_by=current_user.email if getattr(current_user, 'email', None) else data.get('created_by'),
+                user_id=project.user_id if project else current_user.id
             )
 
             session.add(forecast)
             session.commit()
+            session.refresh(forecast)
             return jsonify(forecast.to_dict()), 201
 
     except Exception as e:
@@ -1813,11 +2121,12 @@ def handle_forecasts():
 
 
 @app.route('/api/forecasts/<int:forecast_id>', methods=['GET', 'DELETE'])
+@login_required
 def handle_forecast(forecast_id):
     """Get or delete a specific forecast"""
     session = get_session()
     try:
-        forecast = session.query(Forecast).get(forecast_id)
+        forecast = scoped_forecast_query(session).filter(Forecast.id == forecast_id).one_or_none()
         if not forecast:
             return jsonify({'error': 'Forecast not found'}), 404
 
@@ -1837,11 +2146,12 @@ def handle_forecast(forecast_id):
 
 
 @app.route('/api/forecasts/<int:forecast_id>/export', methods=['GET'])
+@login_required
 def export_forecast(forecast_id):
     """Export a forecast as JSON file"""
     session = get_session()
     try:
-        forecast = session.query(Forecast).get(forecast_id)
+        forecast = scoped_forecast_query(session).filter(Forecast.id == forecast_id).one_or_none()
         if not forecast:
             return jsonify({'error': 'Forecast not found'}), 404
 
@@ -1859,16 +2169,34 @@ def export_forecast(forecast_id):
 
 
 @app.route('/api/forecasts/import', methods=['POST'])
+@login_required
 def import_forecast():
     """Import a forecast from JSON"""
     session = get_session()
     try:
-        data = request.json
+        data = request.json or {}
 
         # Create or get project
         project_id = data.get('project_id')
-        if not project_id:
-            project = Project(name=data.get('project_name', 'Imported Project'))
+        project = None
+        if project_id:
+            project = scoped_project_query(session).filter(Project.id == project_id).one_or_none()
+            if not project:
+                return jsonify({'error': 'Project not found'}), 404
+        else:
+            owner_id = current_user.id
+            if current_user_is_admin() and data.get('user_id'):
+                owner_user = session.get(User, data['user_id'])
+                if not owner_user:
+                    return jsonify({'error': 'Referenced user not found'}), 404
+                owner_id = owner_user.id
+
+            project = Project(
+                name=data.get('project_name', 'Imported Project'),
+                description=data.get('project_description'),
+                team_size=data.get('team_size', 1),
+                user_id=owner_id
+            )
             session.add(project)
             session.flush()
             project_id = project.id
@@ -1887,11 +2215,14 @@ def import_forecast():
             weeks_to_deadline=data.get('weeks_to_deadline'),
             projected_weeks_p85=data.get('projected_weeks_p85'),
             can_meet_deadline=data.get('can_meet_deadline'),
-            scope_completion_pct=data.get('scope_completion_pct')
+            scope_completion_pct=data.get('scope_completion_pct'),
+            created_by=current_user.email if getattr(current_user, 'email', None) else data.get('created_by'),
+            user_id=project.user_id if project else current_user.id
         )
 
         session.add(forecast)
         session.commit()
+        session.refresh(forecast)
         return jsonify(forecast.to_dict()), 201
 
     except Exception as e:
@@ -1910,6 +2241,7 @@ def import_forecast():
 # ============================================================================
 
 @app.route('/forecast-vs-actual')
+@login_required
 def forecast_vs_actual_page():
     """Render the Forecast vs Actual dashboard page"""
     try:
@@ -1927,6 +2259,7 @@ def forecast_vs_actual_page():
 
 
 @app.route('/api/actuals', methods=['GET', 'POST'])
+@login_required
 def handle_actuals():
     """List actuals or create a new actual record"""
     session = get_session()
@@ -1934,23 +2267,23 @@ def handle_actuals():
         if request.method == 'GET':
             # Optional filter by forecast_id
             forecast_id = request.args.get('forecast_id', type=int)
-            query = session.query(Actual)
+            query = scoped_actual_query(session).order_by(Actual.recorded_at.desc())
 
             if forecast_id:
-                query = query.filter_by(forecast_id=forecast_id)
+                query = query.filter(Actual.forecast_id == forecast_id)
 
-            actuals = query.order_by(Actual.recorded_at.desc()).all()
+            actuals = query.all()
             return jsonify([a.to_dict() for a in actuals])
 
         elif request.method == 'POST':
-            data = request.json
+            data = request.json or {}
 
             # Validate forecast exists
             forecast_id = data.get('forecast_id')
             if not forecast_id:
                 return jsonify({'error': 'forecast_id is required'}), 400
 
-            forecast = session.query(Forecast).get(forecast_id)
+            forecast = scoped_forecast_query(session).filter(Forecast.id == forecast_id).one_or_none()
             if not forecast:
                 return jsonify({'error': 'Forecast not found'}), 404
 
@@ -1992,11 +2325,12 @@ def handle_actuals():
                 weeks_error_pct=weeks_error_pct,
                 scope_error_pct=scope_error_pct,
                 notes=data.get('notes'),
-                recorded_by=data.get('recorded_by')
+                recorded_by=data.get('recorded_by') or getattr(current_user, 'name', None)
             )
 
             session.add(actual)
             session.commit()
+            session.refresh(actual)
             return jsonify(actual.to_dict()), 201
 
     except Exception as e:
@@ -2011,11 +2345,12 @@ def handle_actuals():
 
 
 @app.route('/api/actuals/<int:actual_id>', methods=['GET', 'PUT', 'DELETE'])
+@login_required
 def handle_actual(actual_id):
     """Get, update, or delete a specific actual record"""
     session = get_session()
     try:
-        actual = session.query(Actual).get(actual_id)
+        actual = scoped_actual_query(session).filter(Actual.id == actual_id).one_or_none()
         if not actual:
             return jsonify({'error': 'Actual not found'}), 404
 
@@ -2060,6 +2395,7 @@ def handle_actual(actual_id):
 
 
 @app.route('/api/accuracy-analysis', methods=['GET'])
+@login_required
 def accuracy_analysis():
     """
     Calculate accuracy metrics for forecasts vs actuals.
@@ -2079,6 +2415,9 @@ def accuracy_analysis():
         query = session.query(Forecast, Actual).join(
             Actual, Forecast.id == Actual.forecast_id
         )
+
+        if not current_user_is_admin():
+            query = query.filter(Forecast.user_id == current_user.id)
 
         if forecast_id:
             query = query.filter(Forecast.id == forecast_id)
@@ -2190,6 +2529,7 @@ def accuracy_analysis():
 
 
 @app.route('/api/forecast-vs-actual/dashboard', methods=['GET'])
+@login_required
 def forecast_vs_actual_dashboard_data():
     """
     Get comprehensive dashboard data for forecast vs actual analysis.
@@ -2198,9 +2538,14 @@ def forecast_vs_actual_dashboard_data():
     session = get_session()
     try:
         # Get all forecast-actual pairs
-        records = session.query(Forecast, Actual).join(
+        query = session.query(Forecast, Actual).join(
             Actual, Forecast.id == Actual.forecast_id
-        ).order_by(Forecast.created_at.desc()).limit(100).all()
+        )
+
+        if not current_user_is_admin():
+            query = query.filter(Forecast.user_id == current_user.id)
+
+        records = query.order_by(Forecast.created_at.desc()).limit(100).all()
 
         if not records:
             return jsonify({
@@ -2297,6 +2642,7 @@ def forecast_vs_actual_dashboard_data():
 
 
 @app.route('/api/backtest', methods=['POST'])
+@login_required
 def api_backtest():
     """
     Run backtesting on historical throughput data.
@@ -2402,6 +2748,7 @@ def api_backtest():
 # ============================================================================
 
 @app.route('/api/portfolio/dashboard', methods=['GET'])
+@login_required
 def portfolio_dashboard():
     """
     Get comprehensive portfolio dashboard data.
@@ -2410,7 +2757,7 @@ def portfolio_dashboard():
     session = get_session()
     try:
         # Get all projects
-        projects = session.query(Project).all()
+        projects = scoped_project_query(session).all()
 
         if not projects:
             return jsonify({
@@ -2419,7 +2766,7 @@ def portfolio_dashboard():
             })
 
         # Get forecasts for each project
-        all_forecasts = session.query(Forecast).all()
+        all_forecasts = scoped_forecast_query(session).all()
         forecasts_by_project = {}
         for forecast in all_forecasts:
             if forecast.project_id not in forecasts_by_project:
@@ -2427,7 +2774,7 @@ def portfolio_dashboard():
             forecasts_by_project[forecast.project_id].append(forecast)
 
         # Get actuals mapped by forecast_id
-        all_actuals = session.query(Actual).all()
+        all_actuals = scoped_actual_query(session).all()
         actuals_map = {}
         for actual in all_actuals:
             if actual.forecast_id not in actuals_map:
@@ -2487,22 +2834,24 @@ def portfolio_dashboard():
 
 
 @app.route('/api/portfolio/health/<int:project_id>', methods=['GET'])
+@login_required
 def project_health_details(project_id):
     """Get detailed health analysis for a specific project."""
     session = get_session()
     try:
-        project = session.query(Project).get(project_id)
+        project = scoped_project_query(session).filter(Project.id == project_id).one_or_none()
         if not project:
             return jsonify({'error': 'Project not found'}), 404
 
         # Get forecasts and actuals
-        forecasts = session.query(Forecast).filter_by(project_id=project_id).all()
+        forecasts = scoped_forecast_query(session).filter(Forecast.project_id == project_id).all()
 
         actuals_map = {}
-        for forecast in forecasts:
-            actuals = session.query(Actual).filter_by(forecast_id=forecast.id).all()
-            if actuals:
-                actuals_map[forecast.id] = actuals
+        forecast_ids = [f.id for f in forecasts]
+        if forecast_ids:
+            actuals = scoped_actual_query(session).filter(Actual.forecast_id.in_(forecast_ids)).all()
+            for actual in actuals:
+                actuals_map.setdefault(actual.forecast_id, []).append(actual)
 
         # Calculate health score
         health_score = calculate_project_health_score(project, forecasts, actuals_map)
@@ -2521,11 +2870,12 @@ def project_health_details(project_id):
 
 
 @app.route('/api/portfolio/capacity', methods=['GET'])
+@login_required
 def portfolio_capacity():
     """Get portfolio capacity analysis."""
     session = get_session()
     try:
-        projects = session.query(Project).all()
+        projects = scoped_project_query(session).all()
 
         # Get total capacity from query params (optional)
         total_capacity = request.args.get('total_capacity', type=float)
@@ -2541,72 +2891,17 @@ def portfolio_capacity():
 
 
 @app.route('/api/portfolio/prioritization', methods=['GET'])
+@login_required
 def portfolio_prioritization():
     """Get prioritization matrix for portfolio."""
     session = get_session()
     try:
-        projects = session.query(Project).all()
+        projects = scoped_project_query(session).all()
         prioritization_matrix = create_prioritization_matrix(projects)
 
         return jsonify(prioritization_matrix.to_dict())
 
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
-    finally:
-        session.close()
-
-
-@app.route('/api/projects/<int:project_id>', methods=['PUT'])
-def update_project_details(project_id):
-    """Update project details (extended version with portfolio fields)."""
-    session = get_session()
-    try:
-        project = session.query(Project).get(project_id)
-        if not project:
-            return jsonify({'error': 'Project not found'}), 404
-
-        data = request.json
-
-        # Update basic fields
-        if 'name' in data:
-            project.name = data['name']
-        if 'description' in data:
-            project.description = data['description']
-        if 'team_size' in data:
-            project.team_size = data['team_size']
-
-        # Update portfolio fields
-        if 'status' in data:
-            project.status = data['status']
-        if 'priority' in data:
-            project.priority = data['priority']
-        if 'business_value' in data:
-            project.business_value = data['business_value']
-        if 'risk_level' in data:
-            project.risk_level = data['risk_level']
-        if 'capacity_allocated' in data:
-            project.capacity_allocated = data['capacity_allocated']
-        if 'strategic_importance' in data:
-            project.strategic_importance = data['strategic_importance']
-        if 'start_date' in data:
-            project.start_date = data['start_date']
-        if 'target_end_date' in data:
-            project.target_end_date = data['target_end_date']
-        if 'owner' in data:
-            project.owner = data['owner']
-        if 'stakeholder' in data:
-            project.stakeholder = data['stakeholder']
-        if 'tags' in data:
-            import json
-            project.tags = json.dumps(data['tags']) if isinstance(data['tags'], list) else data['tags']
-
-        project.updated_at = datetime.utcnow()
-        session.commit()
-
-        return jsonify(project.to_dict())
-
-    except Exception as e:
-        session.rollback()
         return jsonify({'error': str(e)}), 500
     finally:
         session.close()

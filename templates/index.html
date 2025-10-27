@@ -150,6 +150,12 @@
                 min-height: 900px;
             }
         }
+        .user-menu .btn {
+            border-radius: 20px;
+        }
+        .user-menu .dropdown-menu {
+            min-width: 220px;
+        }
     </style>
 </head>
 <body>
@@ -177,14 +183,51 @@
 </a>
 </li>
 </ul>
-<div class="language-selector">
+<div class="ml-auto d-flex align-items-center user-menu">
+<div class="language-selector mr-3">
 <button class="language-btn" data-lang="pt" onclick="changeLanguage('pt')">PT</button>
 <button class="language-btn" data-lang="en" onclick="changeLanguage('en')">EN</button>
 <button class="language-btn" data-lang="es" onclick="changeLanguage('es')">ES</button>
 </div>
+<div class="dropdown">
+<button aria-expanded="false" aria-haspopup="true" class="btn btn-outline-light btn-sm dropdown-toggle" data-toggle="dropdown" id="userMenuDropdown" type="button">
+<i class="fas fa-user-circle mr-2"></i>{{ current_user.name }}
+</button>
+<div aria-labelledby="userMenuDropdown" class="dropdown-menu dropdown-menu-right">
+<span class="dropdown-item-text text-muted small d-block">{{ current_user.email }}</span>
+<span class="dropdown-item-text text-muted small">Perfil: {{ (current_user.role or 'student')|capitalize }}</span>
+{% if is_admin_user %}
+<div class="dropdown-divider"></div>
+<a class="dropdown-item disabled" href="#" title="Em breve">
+<i class="fas fa-gauge-high mr-2"></i> Painel do instrutor (em breve)
+</a>
+{% endif %}
+<div class="dropdown-divider"></div>
+<a class="dropdown-item" href="{{ url_for('logout') }}">
+<i class="fas fa-sign-out-alt mr-2"></i> Sair
+</a>
+</div>
+</div>
+</div>
 </div>
 </nav>
 <main class="container" role="main">
+{% with messages = get_flashed_messages(with_categories=true) %}
+{% if messages %}
+<div class="row justify-content-center mt-4">
+<div class="col-lg-8">
+{% for category, message in messages %}
+<div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+{{ message }}
+<button aria-label="Fechar" class="close" data-dismiss="alert" type="button">
+<span aria-hidden="true">&times;</span>
+</button>
+</div>
+{% endfor %}
+</div>
+</div>
+{% endif %}
+{% endwith %}
 <br/><br/><br/>
 <div class="container text-center">
 <h1 data-i18n="site_name">Flow Forecasting</h1>

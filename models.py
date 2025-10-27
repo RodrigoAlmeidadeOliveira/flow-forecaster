@@ -6,9 +6,50 @@ from datetime import datetime
 from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, Text, ForeignKey, Boolean
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, sessionmaker
+from flask_login import UserMixin
+from werkzeug.security import generate_password_hash, check_password_hash
 import json
 
 Base = declarative_base()
+
+
+class User(Base, UserMixin):
+    """User entity for authentication and multi-tenancy"""
+    __tablename__ = 'users'
+
+    id = Column(Integer, primary_key=True)
+    email = Column(String(200), unique=True, nullable=False, index=True)
+    password_hash = Column(String(200), nullable=False)
+    name = Column(String(200), nullable=False)
+    role = Column(String(20), default='student')  # student, instructor, admin
+    is_active = Column(Boolean, default=True)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    last_login = Column(DateTime, nullable=True)
+
+    # Relationships
+    projects = relationship('Project', back_populates='user', cascade='all, delete-orphan')
+    forecasts = relationship('Forecast', back_populates='user', cascade='all, delete-orphan')
+
+    def set_password(self, password):
+        """Hash and set password"""
+        self.password_hash = generate_password_hash(password)
+
+    def check_password(self, password):
+        """Check if password matches hash"""
+        return check_password_hash(self.password_hash, password)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'email': self.email,
+            'name': self.name,
+            'role': self.role,
+            'is_active': self.is_active,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'last_login': self.last_login.isoformat() if self.last_login else None
+        }
 
 
 class Project(Base):
@@ -16,6 +57,7 @@ class Project(Base):
     __tablename__ = 'projects'
 
     id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=True, index=True)  # Owner of the project
     name = Column(String(200), nullable=False)
     description = Column(Text, nullable=True)
     team_size = Column(Integer, default=1)
@@ -43,6 +85,7 @@ class Project(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     # Relationships
+    user = relationship('User', back_populates='projects')
     forecasts = relationship('Forecast', back_populates='project', cascade='all, delete-orphan')
 
     def to_dict(self):
@@ -73,6 +116,7 @@ class Forecast(Base):
     __tablename__ = 'forecasts'
 
     id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=True, index=True)  # Owner of the forecast
     project_id = Column(Integer, ForeignKey('projects.id'), nullable=False)
     name = Column(String(200), nullable=False)
     description = Column(Text, nullable=True)
@@ -99,6 +143,7 @@ class Forecast(Base):
     parent_forecast_id = Column(Integer, ForeignKey('forecasts.id'), nullable=True)
 
     # Relationships
+    user = relationship('User', back_populates='forecasts')
     project = relationship('Project', back_populates='forecasts')
     actuals = relationship('Actual', back_populates='forecast', cascade='all, delete-orphan')
     parent = relationship('Forecast', remote_side=[id], backref='versions')

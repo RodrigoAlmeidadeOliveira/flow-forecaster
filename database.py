@@ -4,7 +4,7 @@ Database initialization and session management for Flow Forecaster
 import os
 from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import sessionmaker, scoped_session
-from models import Base, Project, Forecast, Actual
+from models import Base, Project, Forecast, Actual, User
 
 # Database configuration
 DB_PATH = os.environ.get('DATABASE_URL', 'sqlite:///forecaster.db')
@@ -24,10 +24,11 @@ def init_db():
 def ensure_schema():
     """Ensure existing databases include the latest columns"""
     inspector = inspect(engine)
-    if 'projects' not in inspector.get_table_names():
+    table_names = set(inspector.get_table_names())
+    if 'projects' not in table_names:
         return
 
-    existing_columns = {col['name'] for col in inspector.get_columns('projects')}
+    existing_project_columns = {col['name'] for col in inspector.get_columns('projects')}
 
     project_columns = [
         ('status', "ALTER TABLE projects ADD COLUMN status VARCHAR(50) DEFAULT 'active'", "UPDATE projects SET status = 'active' WHERE status IS NULL"),
@@ -41,15 +42,28 @@ def ensure_schema():
         ('owner', "ALTER TABLE projects ADD COLUMN owner VARCHAR(200)", None),
         ('stakeholder', "ALTER TABLE projects ADD COLUMN stakeholder VARCHAR(200)", None),
         ('tags', "ALTER TABLE projects ADD COLUMN tags TEXT", "UPDATE projects SET tags = '[]' WHERE tags IS NULL"),
+        ('user_id', "ALTER TABLE projects ADD COLUMN user_id INTEGER", None),
     ]
 
     with engine.begin() as connection:
         for column_name, ddl, hydration in project_columns:
-            if column_name not in existing_columns:
+            if column_name not in existing_project_columns:
                 connection.execute(text(ddl))
-                existing_columns.add(column_name)
+                existing_project_columns.add(column_name)
                 if hydration:
                     connection.execute(text(hydration))
+
+        if 'forecasts' in table_names:
+            existing_forecast_columns = {col['name'] for col in inspector.get_columns('forecasts')}
+            forecast_columns = [
+                ('user_id', "ALTER TABLE forecasts ADD COLUMN user_id INTEGER", None),
+            ]
+            for column_name, ddl, hydration in forecast_columns:
+                if column_name not in existing_forecast_columns:
+                    connection.execute(text(ddl))
+                    existing_forecast_columns.add(column_name)
+                    if hydration:
+                        connection.execute(text(hydration))
 
 
 def get_session():
