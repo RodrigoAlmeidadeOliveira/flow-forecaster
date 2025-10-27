@@ -763,10 +763,12 @@ def api_deadline_analysis():
 
         # "Quantos?" - How many items can be completed in the deadline period?
         # This answers: "If I have this much time, how many items can I complete?"
-        work_by_deadline = forecast_how_many(tp_samples, start_date, deadline_date, n_simulations, focus_factor=team_focus_value)
-        items_possible_p95 = work_by_deadline.get('items_p95', 0)
-        items_possible_p85 = work_by_deadline.get('items_p85', 0)
-        items_possible_p50 = work_by_deadline.get('items_p50', 0)
+        # Calculate using the same complex simulation to ensure consistency
+        # If it takes projected_weeks_pXX to complete backlog items, then in weeks_to_deadline we can complete:
+        # (weeks_to_deadline / projected_weeks_pXX) * backlog
+        items_possible_p95 = int(round((weeks_to_deadline / projected_weeks_p95) * backlog)) if projected_weeks_p95 > 0 else 0
+        items_possible_p85 = int(round((weeks_to_deadline / projected_weeks_p85) * backlog)) if projected_weeks_p85 > 0 else 0
+        items_possible_p50 = int(round((weeks_to_deadline / projected_weeks_p50) * backlog)) if projected_weeks_p50 > 0 else 0
 
         # Additional 30-day forecast to power probability report
         items_forecast_30_days = None
