@@ -2183,7 +2183,288 @@ Histograma mostrando a distribuição de probabilidade do esforço estimado usan
 </div>
 <div aria-labelledby="tab-forecast-vs-actual" class="tab-pane fade" id="forecast-vs-actual-tab" role="tabpanel">
     <div class="pt-4 pb-5">
-        <iframe src="/forecast-vs-actual" title="Forecast vs Actual" class="tab-iframe"></iframe>
+        <!-- Header -->
+        <div class="container-fluid">
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="d-flex justify-content-between align-items-center flex-wrap">
+                        <div class="mb-3 mb-md-0">
+                            <h2 class="mb-2">
+                                <i class="fas fa-balance-scale text-primary"></i>
+                                Forecast vs Actual
+                            </h2>
+                            <p class="text-muted">
+                                Compare suas previsões com os resultados reais e avalie a acurácia do modelo
+                            </p>
+                        </div>
+                        <div>
+                            <button class="btn btn-primary" data-toggle="modal" data-target="#registerActualModal">
+                                <i class="fas fa-plus"></i> Registrar Resultado Real
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Loading State -->
+            <div id="fva-loading-state" class="text-center" style="display: none;">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="sr-only">Carregando...</span>
+                </div>
+                <p class="mt-2 text-muted">Carregando dados...</p>
+            </div>
+
+            <!-- Empty State -->
+            <div id="fva-empty-state" class="card" style="display: none;">
+                <div class="card-body text-center py-5">
+                    <i class="fas fa-chart-bar fa-4x text-muted mb-3"></i>
+                    <h3>Nenhum dado disponível</h3>
+                    <p class="text-muted mb-4">
+                        Comece registrando resultados reais das suas previsões para visualizar métricas de acurácia.
+                    </p>
+                    <button class="btn btn-primary" data-toggle="modal" data-target="#registerActualModal">
+                        <i class="fas fa-plus"></i> Registrar Primeiro Resultado
+                    </button>
+                </div>
+            </div>
+
+            <!-- Dashboard Content -->
+            <div id="fva-dashboard-content" style="display: none;">
+                <!-- Summary Metrics -->
+                <div class="row mb-4">
+                    <div class="col-md-3 mb-3">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h6 class="text-muted text-uppercase mb-2">MAPE</h6>
+                                <h2 class="text-primary mb-2" id="fva-metric-mape">-</h2>
+                                <span class="badge" id="fva-badge-mape">-</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h6 class="text-muted text-uppercase mb-2">Taxa de Acurácia</h6>
+                                <h2 class="text-success mb-2" id="fva-metric-accuracy">-</h2>
+                                <span class="badge" id="fva-badge-accuracy">-</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h6 class="text-muted text-uppercase mb-2">R² (Correlação)</h6>
+                                <h2 class="text-info mb-2" id="fva-metric-r-squared">-</h2>
+                                <span class="badge" id="fva-badge-r-squared">-</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h6 class="text-muted text-uppercase mb-2">Qualidade Geral</h6>
+                                <h2 class="mb-2" id="fva-metric-overall">-</h2>
+                                <span class="badge" id="fva-badge-overall">-</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Additional Stats -->
+                <div class="row mb-4">
+                    <div class="col-md-4 mb-3">
+                        <div class="card">
+                            <div class="card-body">
+                                <h6 class="card-subtitle mb-2 text-muted">Total de Comparações</h6>
+                                <h3 id="fva-total-comparisons">-</h3>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <div class="card">
+                            <div class="card-body">
+                                <h6 class="card-subtitle mb-2 text-muted">Viés de Previsão</h6>
+                                <h3 id="fva-bias-direction">-</h3>
+                                <small class="text-muted" id="fva-bias-count">-</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <div class="card">
+                            <div class="card-body">
+                                <h6 class="card-subtitle mb-2 text-muted">Erro Médio</h6>
+                                <h3 id="fva-mean-error">-</h3>
+                                <small class="text-muted">MAE (semanas)</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Issues and Recommendations -->
+                <div class="row mb-4">
+                    <div class="col-md-6 mb-3">
+                        <div class="card">
+                            <div class="card-header bg-warning">
+                                <h5 class="mb-0">
+                                    <i class="fas fa-exclamation-triangle"></i>
+                                    Alertas de Qualidade
+                                </h5>
+                            </div>
+                            <div class="card-body" id="fva-issues-container">
+                                <p class="text-muted">Nenhum alerta detectado.</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <div class="card">
+                            <div class="card-header bg-info text-white">
+                                <h5 class="mb-0">
+                                    <i class="fas fa-lightbulb"></i>
+                                    Recomendações
+                                </h5>
+                            </div>
+                            <div class="card-body" id="fva-recommendations-container">
+                                <p class="text-muted">Nenhuma recomendação disponível.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Comparison Chart -->
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="mb-0">
+                                    <i class="fas fa-chart-line"></i>
+                                    Forecast vs Actual - Últimas Comparações
+                                </h5>
+                            </div>
+                            <div class="card-body">
+                                <canvas id="fva-comparisonChart" style="max-height: 400px;"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recent Comparisons Table -->
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="mb-0">
+                                    <i class="fas fa-list"></i>
+                                    Comparações Recentes
+                                </h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="table-responsive">
+                                    <table class="table table-hover">
+                                        <thead>
+                                            <tr>
+                                                <th>Previsão</th>
+                                                <th>Projeto</th>
+                                                <th>Data</th>
+                                                <th>Previsto (sem)</th>
+                                                <th>Real (sem)</th>
+                                                <th>Erro</th>
+                                                <th>Ações</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="fva-comparisons-table-body">
+                                            <!-- Populated by JavaScript -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Register Actual Modal -->
+        <div class="modal fade" id="registerActualModal" tabindex="-1" role="dialog">
+            <div class="modal-dialog modal-lg" role="document">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">
+                            <i class="fas fa-plus-circle"></i>
+                            Registrar Resultado Real
+                        </h5>
+                        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="fva-registerActualForm">
+                            <div class="form-group">
+                                <label for="fva-select-forecast">Selecione a Previsão</label>
+                                <select class="form-control" id="fva-select-forecast" required>
+                                    <option value="">Carregando previsões...</option>
+                                </select>
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label for="fva-actual-completion-date">Data de Conclusão Real</label>
+                                        <input type="text" class="form-control" id="fva-actual-completion-date"
+                                               placeholder="DD/MM/YYYY" required>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label for="fva-actual-weeks-taken">
+                                            Semanas Reais <small class="text-muted">(opcional)</small>
+                                        </label>
+                                        <input type="number" step="0.1" class="form-control" id="fva-actual-weeks-taken">
+                                        <small class="form-text text-muted">Será calculado automaticamente se vazio</small>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label for="fva-actual-items-completed">
+                                            Itens Completados <small class="text-muted">(opcional)</small>
+                                        </label>
+                                        <input type="number" class="form-control" id="fva-actual-items-completed">
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label for="fva-actual-scope-pct">
+                                            % de Escopo Entregue <small class="text-muted">(opcional)</small>
+                                        </label>
+                                        <input type="number" step="0.1" class="form-control" id="fva-actual-scope-pct">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="fva-actual-notes">Observações <small class="text-muted">(opcional)</small></label>
+                                <textarea class="form-control" id="fva-actual-notes" rows="3"
+                                          placeholder="Notas sobre este resultado..."></textarea>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="fva-recorded-by">Registrado por <small class="text-muted">(opcional)</small></label>
+                                <input type="text" class="form-control" id="fva-recorded-by" placeholder="Seu nome">
+                            </div>
+                        </form>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
+                        <button type="button" class="btn btn-primary" id="fva-btn-save-actual">
+                            <span id="fva-save-spinner" class="spinner-border spinner-border-sm mr-2" style="display:none;"></span>
+                            Salvar
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
                 <div aria-labelledby="dependency-tab-link" class="tab-pane fade" id="dependency-analysis-tab" role="tabpanel">
@@ -2687,5 +2968,6 @@ a probabilidade de todas serem entregues no prazo é de <strong>1 em 2^n</strong
         });
     </script>
     <script src="{{ url_for('static', filename='js/portfolio.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/forecast-vs-actual.js') }}"></script>
 </body>
 </html>

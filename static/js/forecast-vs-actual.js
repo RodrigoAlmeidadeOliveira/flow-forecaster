@@ -4,35 +4,46 @@
  */
 
 let comparisonChartInstance = null;
+let fvaInitialized = false;
 
-// Load dashboard on page load
+// Initialize when tab is shown
 $(document).ready(function() {
-    loadDashboard();
+    // Load when tab is activated
+    $('#tab-forecast-vs-actual').on('shown.bs.tab', function() {
+        if (!fvaInitialized) {
+            fvaInitialized = true;
+            initForecastVsActual();
+        }
+        loadDashboard();
+    });
+});
+
+function initForecastVsActual() {
     loadForecasts();
 
     // Event handlers
-    $('#btn-save-actual').click(saveActual);
+    $('#fva-btn-save-actual').click(saveActual);
     $('#registerActualModal').on('hidden.bs.modal', function() {
-        $('#registerActualForm')[0].reset();
+        $('#fva-registerActualForm')[0].reset();
     });
-});
+}
 
 /**
  * Load dashboard data and populate UI
  */
 async function loadDashboard() {
     try {
-        $('#loading-state').show();
-        $('#empty-state').hide();
-        $('#dashboard-content').hide();
+        $('#fva-loading-state').show();
+        $('#fva-empty-state').hide();
+        $('#fva-dashboard-content').hide();
 
         const response = await fetch('/api/forecast-vs-actual/dashboard');
         const data = await response.json();
 
-        $('#loading-state').hide();
+        $('#fva-loading-state').hide();
 
         if (!data.has_data) {
-            $('#empty-state').show();
+            $('#fva-empty-state').show();
             return;
         }
 
@@ -48,11 +59,11 @@ async function loadDashboard() {
         // Populate table
         populateComparisonsTable(data.recent_comparisons);
 
-        $('#dashboard-content').show();
+        $('#fva-dashboard-content').show();
 
     } catch (error) {
         console.error('Error loading dashboard:', error);
-        $('#loading-state').hide();
+        $('#fva-loading-state').hide();
         showError('Erro ao carregar dashboard: ' + error.message);
     }
 }
@@ -65,33 +76,33 @@ function populateMetrics(data) {
     const ratings = data.quality_ratings;
 
     // MAPE
-    $('#metric-mape').text(metrics.mape.toFixed(1) + '%');
-    $('#badge-mape').text(ratings.mape).removeClass().addClass('quality-badge quality-' + getRatingClass(ratings.mape));
+    $('#fva-metric-mape').text(metrics.mape.toFixed(1) + '%');
+    $('#fva-badge-mape').text(ratings.mape).removeClass().addClass('badge badge-' + getBadgeClass(ratings.mape));
 
     // Accuracy Rate
-    $('#metric-accuracy').text(metrics.accuracy_rate.toFixed(1) + '%');
-    $('#badge-accuracy').text(ratings.accuracy_rate).removeClass().addClass('quality-badge quality-' + getRatingClass(ratings.accuracy_rate));
+    $('#fva-metric-accuracy').text(metrics.accuracy_rate.toFixed(1) + '%');
+    $('#fva-badge-accuracy').text(ratings.accuracy_rate).removeClass().addClass('badge badge-' + getBadgeClass(ratings.accuracy_rate));
 
     // R²
-    $('#metric-r-squared').text(metrics.r_squared.toFixed(3));
-    $('#badge-r-squared').text(ratings.r_squared).removeClass().addClass('quality-badge quality-' + getRatingClass(ratings.r_squared));
+    $('#fva-metric-r-squared').text(metrics.r_squared.toFixed(3));
+    $('#fva-badge-r-squared').text(ratings.r_squared).removeClass().addClass('badge badge-' + getBadgeClass(ratings.r_squared));
 
     // Overall
-    $('#metric-overall').text(ratings.overall);
-    $('#badge-overall').text(ratings.overall).removeClass().addClass('quality-badge quality-' + getRatingClass(ratings.overall));
+    $('#fva-metric-overall').text(ratings.overall);
+    $('#fva-badge-overall').text(ratings.overall).removeClass().addClass('badge badge-' + getBadgeClass(ratings.overall));
 
     // Additional stats
-    $('#total-comparisons').text(data.summary.total_comparisons);
+    $('#fva-total-comparisons').text(data.summary.total_comparisons);
 
     // Bias
     const biasText = metrics.bias_direction === 'overforecasting' ? 'Superestimativa' :
                      metrics.bias_direction === 'underforecasting' ? 'Subestimativa' :
                      'Balanceado';
-    $('#bias-direction').text(biasText);
-    $('#bias-count').text(`${metrics.overforecast_count} over / ${metrics.underforecast_count} under`);
+    $('#fva-bias-direction').text(biasText);
+    $('#fva-bias-count').text(`${metrics.overforecast_count} over / ${metrics.underforecast_count} under`);
 
     // Mean error
-    $('#mean-error').text(metrics.mae.toFixed(1) + ' sem');
+    $('#fva-mean-error').text(metrics.mae.toFixed(1) + ' sem');
 }
 
 /**
@@ -103,17 +114,18 @@ async function loadDetailedAnalysis() {
         const data = await response.json();
 
         // Populate issues
-        const issuesContainer = $('#issues-container');
+        const issuesContainer = $('#fva-issues-container');
         if (data.issues && data.issues.length > 0) {
             issuesContainer.empty();
             data.issues.forEach(issue => {
-                const issueClass = 'issue-' + issue.severity;
+                const badgeClass = issue.severity === 'high' ? 'danger' :
+                                  issue.severity === 'medium' ? 'warning' : 'info';
                 const iconClass = issue.severity === 'high' ? 'fa-exclamation-circle' :
                                  issue.severity === 'medium' ? 'fa-exclamation-triangle' :
                                  'fa-info-circle';
 
                 issuesContainer.append(`
-                    <div class="issue-card ${issueClass}">
+                    <div class="alert alert-${badgeClass} mb-2">
                         <strong><i class="fas ${iconClass}"></i> ${capitalizeFirst(issue.severity)}</strong><br>
                         ${issue.message}
                     </div>
@@ -124,7 +136,7 @@ async function loadDetailedAnalysis() {
         }
 
         // Populate recommendations
-        const recsContainer = $('#recommendations-container');
+        const recsContainer = $('#fva-recommendations-container');
         if (data.recommendations && data.recommendations.length > 0) {
             recsContainer.empty();
             const recsList = $('<ul class="mb-0"></ul>');
@@ -145,7 +157,7 @@ async function loadDetailedAnalysis() {
  * Render comparison chart
  */
 function renderComparisonChart(comparisons) {
-    const ctx = document.getElementById('comparisonChart').getContext('2d');
+    const ctx = document.getElementById('fva-comparisonChart').getContext('2d');
 
     // Destroy previous chart if exists
     if (comparisonChartInstance) {
@@ -216,7 +228,7 @@ function renderComparisonChart(comparisons) {
  * Populate comparisons table
  */
 function populateComparisonsTable(comparisons) {
-    const tbody = $('#comparisons-table-body');
+    const tbody = $('#fva-comparisons-table-body');
     tbody.empty();
 
     if (!comparisons || comparisons.length === 0) {
@@ -225,7 +237,7 @@ function populateComparisonsTable(comparisons) {
     }
 
     comparisons.forEach(c => {
-        const errorClass = c.error_pct > 0 ? 'error-positive' : 'error-negative';
+        const errorClass = c.error_pct > 0 ? 'text-danger' : 'text-success';
         const errorSign = c.error_pct > 0 ? '+' : '';
         const date = new Date(c.created_at).toLocaleDateString('pt-BR');
 
@@ -257,7 +269,7 @@ async function loadForecasts() {
         const response = await fetch('/api/forecasts');
         const forecasts = await response.json();
 
-        const select = $('#select-forecast');
+        const select = $('#fva-select-forecast');
         select.empty();
 
         if (forecasts.length === 0) {
@@ -284,31 +296,31 @@ async function loadForecasts() {
  */
 async function saveActual() {
     try {
-        const forecastId = $('#select-forecast').val();
+        const forecastId = $('#fva-select-forecast').val();
         if (!forecastId) {
-            showError('Selecione uma previsão');
+            alert('Selecione uma previsão');
             return;
         }
 
-        const actualCompletionDate = $('#actual-completion-date').val();
+        const actualCompletionDate = $('#fva-actual-completion-date').val();
         if (!actualCompletionDate) {
-            showError('Informe a data de conclusão real');
+            alert('Informe a data de conclusão real');
             return;
         }
 
         const data = {
             forecast_id: parseInt(forecastId),
             actual_completion_date: actualCompletionDate,
-            actual_weeks_taken: parseFloat($('#actual-weeks-taken').val()) || null,
-            actual_items_completed: parseInt($('#actual-items-completed').val()) || null,
-            actual_scope_delivered_pct: parseFloat($('#actual-scope-pct').val()) || null,
-            notes: $('#actual-notes').val() || null,
-            recorded_by: $('#recorded-by').val() || null
+            actual_weeks_taken: parseFloat($('#fva-actual-weeks-taken').val()) || null,
+            actual_items_completed: parseInt($('#fva-actual-items-completed').val()) || null,
+            actual_scope_delivered_pct: parseFloat($('#fva-actual-scope-pct').val()) || null,
+            notes: $('#fva-actual-notes').val() || null,
+            recorded_by: $('#fva-recorded-by').val() || null
         };
 
         // Show loading
-        $('#save-spinner').show();
-        $('#btn-save-actual').prop('disabled', true);
+        $('#fva-save-spinner').show();
+        $('#fva-btn-save-actual').prop('disabled', true);
 
         const response = await fetch('/api/actuals', {
             method: 'POST',
@@ -324,23 +336,23 @@ async function saveActual() {
         }
 
         // Success
-        showSuccess('Resultado real registrado com sucesso!');
+        alert('Resultado real registrado com sucesso!');
 
         // Close modal
-        const modal = bootstrap.Modal.getInstance(document.getElementById('registerActualModal'));
-        modal.hide();
+        $('#registerActualModal').modal('hide');
 
         // Reload dashboard
         setTimeout(() => {
             loadDashboard();
+            loadForecasts();
         }, 500);
 
     } catch (error) {
         console.error('Error saving actual:', error);
-        showError('Erro ao salvar: ' + error.message);
+        alert('Erro ao salvar: ' + error.message);
     } finally {
-        $('#save-spinner').hide();
-        $('#btn-save-actual').prop('disabled', false);
+        $('#fva-save-spinner').hide();
+        $('#fva-btn-save-actual').prop('disabled', false);
     }
 }
 
@@ -357,6 +369,16 @@ function viewForecastDetails(forecastId) {
  * Helper Functions
  */
 
+function getBadgeClass(rating) {
+    switch(rating.toLowerCase()) {
+        case 'excelente': return 'success';
+        case 'bom': return 'info';
+        case 'aceitável': return 'warning';
+        case 'ruim': return 'danger';
+        default: return 'secondary';
+    }
+}
+
 function getRatingClass(rating) {
     switch(rating.toLowerCase()) {
         case 'excelente': return 'excellent';
@@ -369,43 +391,4 @@ function getRatingClass(rating) {
 
 function capitalizeFirst(str) {
     return str.charAt(0).toUpperCase() + str.slice(1);
-}
-
-function showSuccess(message) {
-    showToast(message, 'success');
-}
-
-function showError(message) {
-    showToast(message, 'danger');
-}
-
-function showInfo(message) {
-    showToast(message, 'info');
-}
-
-function showToast(message, type) {
-    // Create toast element
-    const toastId = 'toast-' + Date.now();
-    const toastHtml = `
-        <div class="position-fixed bottom-0 end-0 p-3" style="z-index: 11000">
-            <div id="${toastId}" class="toast align-items-center text-white bg-${type} border-0" role="alert">
-                <div class="d-flex">
-                    <div class="toast-body">
-                        ${message}
-                    </div>
-                    <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
-                </div>
-            </div>
-        </div>
-    `;
-
-    $('body').append(toastHtml);
-    const toastElement = document.getElementById(toastId);
-    const toast = new bootstrap.Toast(toastElement, { delay: 4000 });
-    toast.show();
-
-    // Remove after hiding
-    toastElement.addEventListener('hidden.bs.toast', function() {
-        $(this).parent().remove();
-    });
 }
