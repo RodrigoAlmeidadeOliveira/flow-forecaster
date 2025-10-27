@@ -2551,10 +2551,32 @@ ${generateProgressBar(p50Items, backlog, 'P50 (arriscado)  ', Math.round((p50Ite
         return arr[lower] * (1 - weight) + arr[upper] * weight;
     }
 
+    const TAB_HASHES = new Set([
+        '',
+        '#mc-forecast',
+        '#advanced-forecast',
+        '#demand-forecast',
+        '#deadline-analysis',
+        '#historical-charts',
+        '#cost-analysis',
+        '#trend-analysis',
+        '#dependency-analysis-tab',
+        '#dependency-analysis',
+        '#executive-dashboard',
+        '#dashboard',
+        '#portfolio-dashboard',
+        '#portfolio'
+    ]);
+
     function loadDataFromUrl() {
         try {
             currentlyLoadedHash = location.hash;
-            const encoded = location.hash.trim().substring(1);
+            const normalizedHash = (location.hash || '').trim();
+            if (!normalizedHash || TAB_HASHES.has(normalizedHash.toLowerCase())) {
+                return false;
+            }
+
+            const encoded = normalizedHash.substring(1);
             if (!encoded) return false;
 
             $.ajax({
