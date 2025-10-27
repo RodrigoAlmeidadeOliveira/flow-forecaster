@@ -240,6 +240,9 @@
 <li class="nav-item">
                         <a aria-controls="dependency-analysis-tab" aria-selected="false" class="nav-link" data-toggle="tab" href="#dependency-analysis-tab" id="dependency-tab-link" role="tab" data-i18n="dependency_analysis_tab">Análise de Dependências</a>
 </li>
+<li class="nav-item">
+<a aria-controls="executive-dashboard" aria-selected="false" class="nav-link" data-toggle="tab" href="#executive-dashboard" id="tab-dashboard-link" role="tab">Dashboard Executivo</a>
+</li>
 </ul>
 <div class="tab-content" id="forecastTabsContent">
 <div aria-labelledby="tab-mc-link" class="tab-pane fade show active" id="mc-forecast" role="tabpanel">
@@ -2050,6 +2053,137 @@ a probabilidade de todas serem entregues no prazo é de <strong>1 em 2^n</strong
 </div>
 </div>
 </div>
+
+<!-- Executive Dashboard Tab -->
+<div aria-labelledby="tab-dashboard-link" class="tab-pane fade" id="executive-dashboard" role="tabpanel">
+<div class="pt-4 pb-5">
+<div class="container text-center mb-4">
+<h2><i class="fas fa-chart-line"></i> Dashboard Executivo</h2>
+<p class="text-muted">Visão consolidada dos principais indicadores e métricas do projeto</p>
+<button class="btn btn-primary btn-sm" onclick="refreshDashboard()"><i class="fas fa-sync-alt"></i> Atualizar Dashboard</button>
+</div>
+
+<!-- KPI Cards -->
+<div class="container-fluid mb-4">
+<div class="row">
+<!-- Current Analysis KPIs -->
+<div class="col-md-3 mb-3">
+<div class="card border-primary">
+<div class="card-body text-center">
+<h6 class="card-title text-muted">Throughput Médio</h6>
+<h2 class="text-primary"><span id="kpi-throughput">-</span></h2>
+<small class="text-muted">itens/semana</small>
+</div>
+</div>
+</div>
+
+<div class="col-md-3 mb-3">
+<div class="card border-success">
+<div class="card-body text-center">
+<h6 class="card-title text-muted">Prob. Sucesso no Prazo</h6>
+<h2 class="text-success"><span id="kpi-deadline-prob">-</span></h2>
+<small class="text-muted">chance de sucesso</small>
+</div>
+</div>
+</div>
+
+<div class="col-md-3 mb-3">
+<div class="card border-warning">
+<div class="card-body text-center">
+<h6 class="card-title text-muted">Backlog Atual</h6>
+<h2 class="text-warning"><span id="kpi-backlog">-</span></h2>
+<small class="text-muted">itens pendentes</small>
+</div>
+</div>
+</div>
+
+<div class="col-md-3 mb-3">
+<div class="card border-info">
+<div class="card-body text-center">
+<h6 class="card-title text-muted">Tempo Projetado (P85)</h6>
+<h2 class="text-info"><span id="kpi-duration">-</span></h2>
+<small class="text-muted">semanas</small>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+<!-- Historical Metrics -->
+<div class="container-fluid mb-4">
+<div class="row">
+<div class="col-md-6 mb-3">
+<div class="card">
+<div class="card-header bg-dark text-white">
+<h5 class="mb-0"><i class="fas fa-history"></i> Análises Históricas</h5>
+</div>
+<div class="card-body">
+<div id="dashboard-loading" class="text-center" style="display:none;">
+<div class="spinner-border text-primary" role="status">
+<span class="sr-only">Carregando...</span>
+</div>
+</div>
+<div id="dashboard-historical-list">
+<p class="text-muted">Nenhuma análise salva ainda.</p>
+</div>
+</div>
+</div>
+</div>
+
+<div class="col-md-6 mb-3">
+<div class="card">
+<div class="card-header bg-dark text-white">
+<h5 class="mb-0"><i class="fas fa-chart-bar"></i> Tendência de Throughput</h5>
+</div>
+<div class="card-body">
+<canvas id="dashboard-throughput-chart" height="200"></canvas>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+<!-- Project Health Summary -->
+<div class="container-fluid">
+<div class="card">
+<div class="card-header bg-dark text-white">
+<h5 class="mb-0"><i class="fas fa-heartbeat"></i> Saúde do Projeto</h5>
+</div>
+<div class="card-body">
+<div class="row">
+<div class="col-md-4 text-center mb-3">
+<div id="health-capacity" class="alert alert-secondary">
+<h6>Capacidade</h6>
+<div class="progress" style="height: 30px;">
+<div class="progress-bar" id="health-capacity-bar" role="progressbar" style="width: 0%">0%</div>
+</div>
+<small class="text-muted mt-2 d-block">Carga de trabalho atual</small>
+</div>
+</div>
+
+<div class="col-md-4 text-center mb-3">
+<div id="health-risk" class="alert alert-secondary">
+<h6>Nível de Risco</h6>
+<h3><span id="health-risk-level">Baixo</span></h3>
+<small class="text-muted">Riscos identificados: <span id="health-risk-count">0</span></small>
+</div>
+</div>
+
+<div class="col-md-4 text-center mb-3">
+<div id="health-confidence" class="alert alert-secondary">
+<h6>Confiança na Previsão</h6>
+<h3><span id="health-confidence-level">Alta</span></h3>
+<small class="text-muted">Baseado em <span id="health-samples-count">0</span> amostras</small>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+</div>
+</div>
+
 <br/><br/>
 </main>
 
@@ -2163,12 +2297,13 @@ a probabilidade de todas serem entregues no prazo é de <strong>1 em 2^n</strong
 <!-- Internationalization -->
 <script src="{{ url_for('static', filename='js/i18n.js') }}"></script>
 <!-- Custom JS -->
-<script src="{{ url_for('static', filename='js/ui.js') }}?v=1761530000"></script>
+<script src="{{ url_for('static', filename='js/ui.js') }}?v=1761530200"></script>
 <script src="{{ url_for('static', filename='js/advanced_forecast.js') }}"></script>
 <script src="{{ url_for('static', filename='js/demand_forecast.js') }}"></script>
 <script src="{{ url_for('static', filename='js/charts.js') }}"></script>
 <script src="{{ url_for('static', filename='js/cost_analysis.js') }}"></script>
 <script src="{{ url_for('static', filename='js/forecast-persistence.js') }}"></script>
+<script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
 <script>
         $(function () {
             // Initialize Bootstrap tooltips
@@ -2206,7 +2341,7 @@ a probabilidade de todas serem entregues no prazo é de <strong>1 em 2^n</strong
 
             $('a[data-toggle="tab"]').on('shown.bs.tab', function (e) {
                 const target = $(e.target).attr('href');
-                if (target === '#advanced-forecast' || target === '#demand-forecast' || target === '#mc-forecast' || target === '#deadline-analysis' || target === '#historical-charts') {
+                if (target === '#advanced-forecast' || target === '#demand-forecast' || target === '#mc-forecast' || target === '#deadline-analysis' || target === '#historical-charts' || target === '#executive-dashboard') {
                     history.replaceState(null, null, target);
                 }
             });
