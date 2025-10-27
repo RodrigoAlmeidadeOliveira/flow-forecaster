@@ -819,10 +819,10 @@ def api_deadline_analysis():
         projected_work_p50 = min(items_possible_p50, backlog)
 
         # Get completion dates for each percentile ("Quando?")
-        completion_forecast = forecast_when(tp_samples, backlog, start_date, n_simulations, focus_factor=team_focus_value)
-        completion_date_p95 = completion_forecast.get('date_p95', '')
-        completion_date_p85 = completion_forecast.get('date_p85', '')
-        completion_date_p50 = completion_forecast.get('date_p50', '')
+        # Calculate dates directly from projected weeks to ensure consistency with deadline analysis
+        completion_date_p95 = (start_dt + timedelta(weeks=projected_weeks_p95)).strftime('%d/%m/%Y')
+        completion_date_p85 = (start_dt + timedelta(weeks=projected_weeks_p85)).strftime('%d/%m/%Y')
+        completion_date_p50 = (start_dt + timedelta(weeks=projected_weeks_p50)).strftime('%d/%m/%Y')
 
         # Calculate percentages - DON'T limit to 100% to show real values
         # scope_completion_pct = how much of the BACKLOG will be completed by the deadline
