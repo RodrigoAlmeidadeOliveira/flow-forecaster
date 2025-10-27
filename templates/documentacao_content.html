@@ -2,8 +2,8 @@
 <blockquote>
 <p>Guia completo para uso do Flow Forecaster: previsões probabilísticas de projetos com Machine Learning e Monte Carlo</p>
 </blockquote>
-<p><strong>Versão</strong>: 2.1
-<strong>Última atualização</strong>: Novembro 2025
+<p><strong>Versão</strong>: 2.2
+<strong>Última atualização</strong>: Dezembro 2025
 <strong>Acesso</strong>: https://flow-forecaster.fly.dev/</p>
 <hr />
 <h2 id="indice">📋 Índice</h2>
@@ -11,6 +11,7 @@
 <li><a href="#introdução">Introdução</a></li>
 <li><a href="#conceitos-fundamentais">Conceitos Fundamentais</a></li>
 <li><a href="#primeiros-passos">Primeiros Passos</a></li>
+<li><a href="#gestao-de-usuarios-e-seguranca">Gestão de Usuários &amp; Segurança</a></li>
 <li><a href="#funcionalidades-principais">Funcionalidades Principais</a>
 <ul>
 <li><a href="#1-simulacao-monte-carlo">Simulação Monte Carlo</a></li>
@@ -40,6 +41,7 @@
 <li><strong>Análise de Custos</strong>: Estimativas baseadas em esforço e distribuição PERT-Beta</li>
 <li><strong>Análise de Deadline</strong>: Verificação de prazos assumindo throughput Monte Carlo e ML</li>
 </ul>
+<p><strong>Novo na versão 2.2</strong>: autenticação por usuário, isolamento de dados por conta e menu administrativo para instrutores acompanharem turmas.</p>
 <h3 id="por-que-usar-previsoes-probabilisticas">Por que usar previsões probabilísticas?</h3>
 <p>Em vez de trabalhar com estimativas únicas ("o projeto termina em 10 semanas"), trabalhamos com <strong>distribuições de probabilidade</strong>:</p>
 <ul>
@@ -138,6 +140,15 @@ Desvio Padrão = (b - a) / 6
 <h2 id="primeiros-passos">🚀 Primeiros Passos</h2>
 <h3 id="1-acessando-o-sistema">1. Acessando o Sistema</h3>
 <p>Acesse: <strong>https://flow-forecaster.fly.dev/</strong></p>
+<p>O acesso é autenticado. Ao abrir a aplicação você verá a tela de login:</p>
+<ul>
+<li><strong>Já possui conta?</strong> Informe e-mail e senha para entrar.</li>
+<li><strong>Primeira vez?</strong> Clique em “Criar conta agora” para realizar o cadastro.</li>
+<li><strong>Primeiro usuário</strong>: o primeiro cadastro da instância recebe automaticamente o papel <em>admin</em> e consegue visualizar todos os dados existentes.</li>
+</ul>
+<blockquote>
+<p>Dica: compartilhe o link de cadastro com seus alunos e peça que utilizem o e-mail informado na turma para facilitar a identificação.</p>
+</blockquote>
 <h3 id="2-preparando-seus-dados">2. Preparando seus Dados</h3>
 <p>Antes de usar a ferramenta, colete:</p>
 <p><strong>Dados Obrigatórios</strong>:
@@ -162,6 +173,31 @@ Desvio Padrão = (b - a) / 6
 <li><strong>Análise de Custos</strong>: Estimativas de custo baseadas em esforço e demanda</li>
 <li><strong>Análise de Dependências</strong>: Impacto probabilístico de bloqueios externos</li>
 </ol>
+<p><strong>Menu do usuário</strong>: no canto superior direito você encontra o seletor de idioma e o menu com seu nome. Ali é possível verificar o e-mail logado, conferir o papel (estudante/instrutor) e sair da aplicação com segurança.</p>
+<hr />
+<h2 id="gestao-de-usuarios-e-seguranca">🔐 Gestão de Usuários &amp; Segurança</h2>
+<h3 id="fluxo-de-cadastro-e-login">Fluxo de cadastro e login</h3>
+<ol>
+<li><strong>Cadastro</strong>: informe nome completo, e-mail e uma senha com no mínimo 8 caracteres. Um e-mail só pode ser utilizado uma vez.</li>
+<li><strong>Login</strong>: após o cadastro, use o mesmo e-mail/senha na tela inicial. O botão “Manter-me conectado” mantém a sessão ativa no navegador atual.</li>
+<li><strong>Logout</strong>: utilize a opção <em>Sair</em> no menu do usuário para encerrar a sessão com segurança, especialmente em equipamentos compartilhados.</li>
+</ol>
+<blockquote>
+<p><strong>Observação:</strong> a primeira conta criada na instância recebe o papel de <em>admin</em>. Utilize essa conta para cadastrar turmas, criar projetos de referência e acompanhar o progresso dos alunos.</p>
+</blockquote>
+<h3 id="papeis-e-permissoes">Papéis e permissões</h3>
+<ul>
+<li><strong>Student</strong>: visualiza, cria e edita apenas os projetos, forecasts e análises que ele mesmo cadastrou.</li>
+<li><strong>Instructor/Admin</strong>: acessa todos os dados da instância (incluindo itens criados antes do lançamento do login), pode remover registros indevidos e apoiar os alunos.</li>
+</ul>
+<p>Projetos, forecasts e registros antigos sem proprietário ficam automaticamente sob a visão dos <em>admins</em>. Caso queira atribuí-los a um aluno específico, atualize o campo <code>user_id</code> diretamente no banco ou recrie o item já autenticado.</p>
+<h3 id="boas-praticas-de-seguranca">Boas práticas de segurança</h3>
+<ul>
+<li><strong>Segredo da aplicação</strong>: defina a variável <code>FLOW_FORECASTER_SECRET_KEY</code> (ou <code>SECRET_KEY</code>) no ambiente de produção antes de liberar o acesso.</li>
+<li><strong>Separação por turmas</strong>: crie contas distintas para cada aluno/turma e evite compartilhar credenciais.</li>
+<li><strong>Revisão de acessos</strong>: periodicamente verifique o menu de usuários (Admin → exportação em breve) para garantir que somente pessoas autorizadas possuem conta ativa.</li>
+<li><strong>Backup</strong>: inclua o arquivo <code>forecaster.db</code> ou a base gerenciada no seu fluxo de backup regular.</li>
+</ul>
 <hr />
 <h2 id="funcionalidades-principais">🎲 Funcionalidades Principais</h2>
 <h3 id="1-simulacao-monte-carlo">1️⃣ Simulação Monte Carlo</h3>
@@ -1148,6 +1184,21 @@ Total mensal:         R$ 22,000
 - Documente premissas e contexto</p>
 <hr />
 <h2 id="solucao-de-problemas">🔧 Solução de Problemas</h2>
+<h3 id="problema-login">Problema 0: "Não consigo entrar"</h3>
+<p><strong>Sintomas</strong>:
+- Mensagem “E-mail ou senha inválidos”
+- Loop retornando à tela de login após autenticar
+- Conta desativada pelo instrutor</p>
+<p><strong>Soluções</strong>:</p>
+<ol>
+<li><strong>Verifique o cadastro</strong>: confirme se a conta foi criada (você deve ter recebido confirmação na tela). Caso contrário, utilize “Criar conta agora”.</li>
+<li><strong>Respeite caixa baixa</strong>: o e-mail é normalizado em minúsculas, mas a senha diferencia maiúsculas/minúsculas.</li>
+<li><strong>Conta desativada</strong>: peça ao instrutor/admin para conferir o status <code>is_active</code>.</li>
+<li><strong>Limpe cookies</strong>: em navegadores compartilhados, limpe cookies/cache ou use janela anônima.</li>
+</ol>
+<blockquote>
+<p>A plataforma ainda não possui fluxo de “Esqueci a senha”. Instrutores podem gerar uma nova senha diretamente no banco ou recriar a conta do aluno, se necessário.</p>
+</blockquote>
 <h3 id="problema-1-resultados-parecem-irrealistas">Problema 1: "Resultados parecem irrealistas"</h3>
 <p><strong>Sintomas</strong>:
 - Previsões muito otimistas ou muito pessimistas
