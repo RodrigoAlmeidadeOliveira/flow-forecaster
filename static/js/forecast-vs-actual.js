@@ -23,6 +23,12 @@ function initForecastVsActual() {
 
     // Event handlers
     $('#fva-btn-save-actual').click(saveActual);
+
+    // Reload forecasts when modal is shown
+    $('#registerActualModal').on('show.bs.modal', function() {
+        loadForecasts();
+    });
+
     $('#registerActualModal').on('hidden.bs.modal', function() {
         $('#fva-registerActualForm')[0].reset();
     });
