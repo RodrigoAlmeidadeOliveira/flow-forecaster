@@ -210,6 +210,7 @@
         updateBacklogSummary(state);
         return state;
     }
+    window.recalculateBacklog = recalculateBacklog;
 
     function clampFocusPercent(value) {
         const num = parseFloat(value);
@@ -1076,6 +1077,7 @@ $(window).on("load", function () {
         $row.find("input[name='impactRank']").val('-');
         return $row;
     }
+    window.addRisk = addRisk;
 
     function fillRisk(risk, $row) {
         $row.find("input[name='likelihood']").val(risk.likelihood);
@@ -1243,6 +1245,7 @@ $(window).on("load", function () {
         $row.insertBefore($('#add-dependency-row'));
         return $row;
     }
+    window.addDependency = addDependency;
 
     function fillDependency(dep, $row) {
         $row.find("input[name='dependency_name']").val(dep.name);
@@ -1285,6 +1288,7 @@ $(window).on("load", function () {
             });
         }
     }
+    window.share = share;
 
     let currentlyLoadedHash = null;
 
@@ -1638,6 +1642,7 @@ $(window).on("load", function () {
             $('#dependencyTabEmpty').show();
         }
     }
+    window.runSimulation = runSimulation;
 
     function displayDependencyTab(depAnalysis, simulationData) {
         // Populate the dependency analysis tab
