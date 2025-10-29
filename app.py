@@ -267,10 +267,13 @@ def register():
                 is_first_user = session.query(User.id).first() is None
                 role = 'admin' if is_first_user else 'student'
 
+                registration_date = datetime.utcnow()
                 new_user = User(
                     email=email,
                     name=name,
                     role=role,
+                    registration_date=registration_date,
+                    access_expires_at=registration_date + timedelta(days=365),
                 )
                 new_user.set_password(password)
 
@@ -321,6 +324,8 @@ def login():
                 errors.append('E-mail ou senha inválidos. Verifique e tente novamente.')
             elif not user.is_active:
                 errors.append('Sua conta está desativada. Entre em contato com o instrutor.')
+            elif user.access_expires_at and datetime.utcnow() > user.access_expires_at:
+                errors.append('Seu acesso expirou. Entre em contato com o instrutor para renovação.')
             else:
                 user.last_login = datetime.utcnow()
                 session.commit()

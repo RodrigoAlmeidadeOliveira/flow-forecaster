@@ -65,6 +65,32 @@ def ensure_schema():
                     if hydration:
                         connection.execute(text(hydration))
 
+        if 'users' in table_names:
+            existing_user_columns = {col['name'] for col in inspector.get_columns('users')}
+            user_columns = [
+                (
+                    'registration_date',
+                    "ALTER TABLE users ADD COLUMN registration_date DATETIME",
+                    "UPDATE users SET registration_date = COALESCE(created_at, CURRENT_TIMESTAMP) WHERE registration_date IS NULL"
+                ),
+                (
+                    'access_expires_at',
+                    "ALTER TABLE users ADD COLUMN access_expires_at DATETIME",
+                    (
+                        "UPDATE users "
+                        "SET access_expires_at = DATETIME("
+                        "COALESCE(registration_date, created_at, CURRENT_TIMESTAMP), '+365 days') "
+                        "WHERE access_expires_at IS NULL"
+                    )
+                ),
+            ]
+            for column_name, ddl, hydration in user_columns:
+                if column_name not in existing_user_columns:
+                    connection.execute(text(ddl))
+                    existing_user_columns.add(column_name)
+                    if hydration:
+                        connection.execute(text(hydration))
+
 
 def get_session():
     """Get a new database session"""

@@ -2,7 +2,7 @@
 Database models for Flow Forecaster
 SQLAlchemy models for persisting forecasts, projects, and actuals
 """
-from datetime import datetime
+from datetime import datetime, timedelta
 from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, Text, ForeignKey, Boolean
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, sessionmaker
@@ -27,6 +27,12 @@ class User(Base, UserMixin):
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     last_login = Column(DateTime, nullable=True)
+    registration_date = Column(DateTime, default=datetime.utcnow)
+    access_expires_at = Column(
+        DateTime,
+        nullable=False,
+        default=lambda: datetime.utcnow() + timedelta(days=365)
+    )
 
     # Relationships
     projects = relationship('Project', back_populates='user', cascade='all, delete-orphan')
@@ -48,7 +54,9 @@ class User(Base, UserMixin):
             'role': self.role,
             'is_active': self.is_active,
             'created_at': self.created_at.isoformat() if self.created_at else None,
-            'last_login': self.last_login.isoformat() if self.last_login else None
+            'last_login': self.last_login.isoformat() if self.last_login else None,
+            'registration_date': self.registration_date.isoformat() if self.registration_date else None,
+            'access_expires_at': self.access_expires_at.isoformat() if self.access_expires_at else None,
         }
 
 
