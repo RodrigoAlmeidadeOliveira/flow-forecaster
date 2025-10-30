@@ -336,7 +336,7 @@
         const leadTimeSamples = parseSamplesFrom('#ltSamples');
 
         if (throughputSamples.length < 3 && leadTimeSamples.length < 3) {
-            showFeedback('Informe pelo menos 3 amostras de throughput ou de tempo de lead para detectar tendências.');
+            showFeedback('Informe pelo menos 3 amostras de throughput ou de lead time para detectar tendências.');
             $('#trend-analysis-results').addClass('d-none');
             return;
         }

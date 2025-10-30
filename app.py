@@ -1885,7 +1885,7 @@ def api_trend_analysis():
 
         if lead_time_samples:
             if len(lead_time_samples) < 3:
-                warnings.append('Pelo menos 3 amostras de tempo de lead são necessárias para analisar tendências.')
+                warnings.append('Pelo menos 3 amostras de lead time são necessárias para analisar tendências.')
             else:
                 lead_time_result = comprehensive_trend_analysis(
                     lead_time_samples,
@@ -1893,13 +1893,13 @@ def api_trend_analysis():
                     higher_is_better=False
                 )
                 lead_time_result['metric_key'] = 'lead_time'
-                lead_time_result['display_name'] = 'Tempo de Lead'
+                lead_time_result['display_name'] = 'Lead Time'
                 metrics_results.append(lead_time_result)
         elif lt_samples_raw not in (None, []):
-            warnings.append('Pelo menos 3 amostras de tempo de lead são necessárias para analisar tendências.')
+            warnings.append('Pelo menos 3 amostras de lead time são necessárias para analisar tendências.')
 
         if not metrics_results:
-            message = 'Forneça pelo menos 3 amostras de throughput ou tempo de lead para calcular tendências.'
+            message = 'Forneça pelo menos 3 amostras de throughput ou lead time para calcular tendências.'
             return jsonify({'error': message, 'warnings': warnings}), 400
 
         response_payload = {

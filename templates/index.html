@@ -1440,7 +1440,7 @@
 <div aria-labelledby="tab-historical-link" class="tab-pane fade" id="historical-charts" role="tabpanel">
 <div class="pt-4 pb-5">
 <div class="container text-center">
-<h2 data-i18n="historical_throughput_lead">Gráficos Históricos de Throughput e Tempo de Lead</h2>
+<h2 data-i18n="historical_throughput_lead">Gráficos Históricos de Throughput e Lead Time</h2>
 <p class="mb-4" data-i18n="visualize_distribution">Visualize a distribuição e estabilidade das amostras fornecidas. Atualize os campos acima para atualizar esses gráficos.</p>
 </div>
 <div class="container-fluid">
@@ -1480,11 +1480,11 @@ Forneça amostras de throughput para visualizar o gráfico de controle.
 <div class="col-lg-6 mb-4">
 <div class="card h-100">
 <div class="card-header bg-success text-white">
-<h5 class="mb-0" data-i18n="lead_time_histogram_title">Histograma de Tempo de Lead</h5>
+<h5 class="mb-0" data-i18n="lead_time_histogram_title">Histograma de Lead Time</h5>
 </div>
 <div class="card-body">
 <div class="alert alert-info" id="lt-histogram-empty" role="alert" style="display:none;" data-i18n="min_3_samples_lt_histogram">
-Forneça ao menos 3 amostras de tempo de lead para gerar o histograma.
+Forneça ao menos 3 amostras de lead time para gerar o histograma.
 </div>
 <div class="chart-container" id="lt-histogram-container">
 <canvas id="lt-histogram-chart"></canvas>
@@ -1495,11 +1495,11 @@ Forneça ao menos 3 amostras de tempo de lead para gerar o histograma.
 <div class="col-lg-6 mb-4">
 <div class="card h-100">
 <div class="card-header bg-dark text-white">
-<h5 class="mb-0" data-i18n="lead_time_control_title">Gráfico de Controle de Tempo de Lead</h5>
+<h5 class="mb-0" data-i18n="lead_time_control_title">Gráfico de Controle de Lead Time</h5>
 </div>
 <div class="card-body">
 <div class="alert alert-info" id="lt-control-empty" role="alert" style="display:none;" data-i18n="min_samples_lt_control">
-Forneça amostras de tempo de lead para visualizar o gráfico de controle.
+Forneça amostras de lead time para visualizar o gráfico de controle.
 </div>
 <div class="chart-container" id="lt-control-container">
 <canvas id="lt-control-chart"></canvas>
@@ -2117,7 +2117,7 @@ Histograma mostrando a distribuição de probabilidade do esforço estimado usan
 
     <div class="mt-5 d-none" id="lead-time-metric-section">
         <div class="mb-4">
-            <h4 class="mb-1"><i class="fas fa-stopwatch text-info"></i> Resumo - Tempo de Lead</h4>
+            <h4 class="mb-1"><i class="fas fa-stopwatch text-info"></i> Resumo - Lead Time</h4>
             <small class="text-muted d-block">Valores menores indicam melhoria</small>
         </div>
         <div class="row">

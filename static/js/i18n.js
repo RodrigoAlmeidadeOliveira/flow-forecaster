@@ -71,7 +71,7 @@
             weekly_throughput_note: 'As amostras de throughput semanais são definidas na seção compartilhada acima.',
             task_lead_times: 'Tempos de lead de tarefas',
             project_split_rates: 'Taxas de divisão de projetos',
-            lead_time_placeholder: 'Opcionalmente cole seus dados históricos de tempo de lead de tarefas',
+            lead_time_placeholder: 'Opcionalmente cole seus dados históricos de lead time de tarefas',
             split_rate_placeholder: 'Opcionalmente cole seus dados históricos de taxas de divisão de projetos',
 
             // Riscos
@@ -152,16 +152,16 @@
             running_simulations: 'Executando simulações de prazo...',
 
             // Gráficos históricos
-            historical_charts_title: 'Gráficos Históricos de Throughput e Tempo de Lead',
+            historical_charts_title: 'Gráficos Históricos de Throughput e Lead Time',
             historical_charts_desc: 'Visualize a distribuição e estabilidade das amostras fornecidas. Atualize os campos acima para atualizar esses gráficos.',
             throughput_histogram: 'Histograma de Throughput',
             throughput_control: 'Gráfico de Controle de Throughput',
-            lead_time_histogram: 'Histograma de Tempo de Lead',
-            lead_time_control: 'Gráfico de Controle de Tempo de Lead',
+            lead_time_histogram: 'Histograma de Lead Time',
+            lead_time_control: 'Gráfico de Controle de Lead Time',
             min_3_samples_histogram: 'Forneça pelo menos 3 amostras de throughput para gerar o histograma.',
             min_samples_control: 'Forneça amostras de throughput para visualizar o gráfico de controle.',
-            min_3_samples_lt_histogram: 'Forneça pelo menos 3 amostras de tempo de lead para gerar o histograma.',
-            min_samples_lt_control: 'Forneça amostras de tempo de lead para visualizar o gráfico de controle.',
+            min_3_samples_lt_histogram: 'Forneça pelo menos 3 amostras de lead time para gerar o histograma.',
+            min_samples_lt_control: 'Forneça amostras de lead time para visualizar o gráfico de controle.',
 
             // Análise de custos
             cost_analysis_title: 'Análise de Custos com PERT-Beta',
@@ -246,12 +246,12 @@
             walk_forward_validation: 'Validação Walk-forward',
 
             // Historical Charts - extra
-            historical_throughput_lead: 'Gráficos Históricos de Throughput e Tempo de Lead',
+            historical_throughput_lead: 'Gráficos Históricos de Throughput e Lead Time',
             visualize_distribution: 'Visualize a distribuição e estabilidade das amostras fornecidas. Atualize os campos acima para atualizar esses gráficos.',
             throughput_histogram_title: 'Histograma de Throughput',
             throughput_control_title: 'Gráfico de Controle de Throughput',
-            lead_time_histogram_title: 'Histograma de Tempo de Lead',
-            lead_time_control_title: 'Gráfico de Controle de Tempo de Lead',
+            lead_time_histogram_title: 'Histograma de Lead Time',
+            lead_time_control_title: 'Gráfico de Controle de Lead Time',
 
             // Additional fields
             task_lead_times: 'Tempos de lead de tarefas',
