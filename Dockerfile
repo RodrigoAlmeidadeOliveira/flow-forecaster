@@ -23,4 +23,4 @@ COPY . .
 EXPOSE 8080
 
 # Run the application with increased timeout for ML processing
-CMD ["gunicorn", "wsgi:application", "--bind", "0.0.0.0:8080", "--timeout", "300", "--workers", "2", "--worker-class", "sync", "--max-requests", "1000", "--max-requests-jitter", "100"]
+CMD ["sh", "-c", "exec gunicorn wsgi:application --bind 0.0.0.0:${PORT:-8080} --timeout 300 --workers 2 --worker-class sync --max-requests 1000 --max-requests-jitter 100"]
