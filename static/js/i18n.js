@@ -69,7 +69,7 @@
             // Dados históricos
             historical_data: 'Dados históricos',
             weekly_throughput_note: 'As amostras de throughput semanais são definidas na seção compartilhada acima.',
-            task_lead_times: 'Tempos de lead de tarefas',
+            task_lead_times: 'Lead Time de entregas',
             project_split_rates: 'Taxas de divisão de projetos',
             lead_time_placeholder: 'Opcionalmente cole seus dados históricos de lead time de tarefas',
             split_rate_placeholder: 'Opcionalmente cole seus dados históricos de taxas de divisão de projetos',
@@ -254,7 +254,7 @@
             lead_time_control_title: 'Gráfico de Controle de Lead Time',
 
             // Additional fields
-            task_lead_times: 'Tempos de lead de tarefas',
+            task_lead_times: 'Lead Time de entregas',
             projects_split_rates: 'Taxas de divisão de projetos',
             risks_optional: 'Riscos (opcional)',
             risks_description: 'Modele riscos discretos para adicionar buffer probabilístico à sua previsão.',
