@@ -89,7 +89,7 @@ Throughput semanal: 8, 6, 10, 7, 9, 8, 5, 11, 7, 9, 8, 10 items/semana
   ```
   Nome do Projeto: Migração Cloud FinTech
   Backlog: 120
-  Throughput: 8, 6, 10, 7, 9, 8, 5, 11, 7, 9, 8, 10
+  Throughput: 8, 6, 10, 7, 9, 8, 5, 11, 7, 9, 8, 10, 7, 5, 9
   Número de Simulações: 10000
   Tamanho da Equipe: 8
   ```
