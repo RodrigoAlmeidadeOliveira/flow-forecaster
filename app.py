@@ -617,9 +617,15 @@ def ml_forecast():
         model_name = data.get('model', 'ensemble')
         start_date = data.get('startDate')
 
-        if not tp_samples or len(tp_samples) < 8:
+        # Validate minimum samples for reliable ML
+        if not tp_samples or len(tp_samples) < 15:
             return jsonify({
-                'error': 'Need at least 8 historical throughput samples for ML forecasting'
+                'error': 'insufficient_data',
+                'message': f'Machine Learning requires at least 15 samples for reliable results. You provided {len(tp_samples)} samples.',
+                'recommendation': 'Use Monte Carlo simulation instead, which works well with 5+ samples.',
+                'min_required': 15,
+                'provided': len(tp_samples),
+                'use_monte_carlo': True
             }), 400
 
         # Convert to numpy array
@@ -834,9 +840,15 @@ def combined_forecast():
         n_simulations = data.get('nSimulations', 10000)
         start_date = data.get('startDate')
 
-        if not tp_samples or len(tp_samples) < 8:
+        # Validate minimum samples for reliable ML
+        if not tp_samples or len(tp_samples) < 15:
             return jsonify({
-                'error': 'Need at least 8 historical throughput samples'
+                'error': 'insufficient_data',
+                'message': f'Machine Learning requires at least 15 samples for reliable results. You provided {len(tp_samples)} samples.',
+                'recommendation': 'Use Monte Carlo simulation instead, which works well with 5+ samples.',
+                'min_required': 15,
+                'provided': len(tp_samples),
+                'use_monte_carlo': True
             }), 400
 
         tp_data = np.array(tp_samples, dtype=float)
