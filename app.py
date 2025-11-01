@@ -911,7 +911,7 @@ def combined_forecast():
                 'walk_forward': walk_forward_charts
             }
         }
-        return jsonify(response_data)
+        return jsonify(convert_to_native_types(response_data))
 
     except Exception as e:
         import traceback
