@@ -109,6 +109,7 @@ def inject_auth_context():
 
 # Debugging: Print routes at startup
 import sys
+import math
 print("="*60, flush=True)
 print("Flask app created successfully!", flush=True)
 print(f"App name: {app.name}", flush=True)
@@ -124,13 +125,20 @@ ADMIN_ROLES = {'admin', 'instructor'}
 def convert_to_native_types(obj):
     """Convert numpy types to native Python types for JSON serialization."""
     if isinstance(obj, np.ndarray):
-        return obj.tolist()
+        return [convert_to_native_types(item) for item in obj.tolist()]
     elif isinstance(obj, np.integer):
         return int(obj)
     elif isinstance(obj, np.floating):
-        return float(obj)
+        value = float(obj)
+        if math.isnan(value) or math.isinf(value):
+            return None
+        return value
     elif isinstance(obj, np.bool_):
         return bool(obj)
+    elif isinstance(obj, float):
+        if math.isnan(obj) or math.isinf(obj):
+            return None
+        return obj
     elif isinstance(obj, dict):
         return {key: convert_to_native_types(value) for key, value in obj.items()}
     elif isinstance(obj, list):
