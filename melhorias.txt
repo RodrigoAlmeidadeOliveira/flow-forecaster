@@ -1,5 +1,7 @@
 Melhorias Sugeridas
 
+- [ ] Adicionar suporte a `fold_stride` no backtesting walk-forward para permitir previsões de janelas longas com nova origem a cada cadência definida (ex.: horizonte de 30 dias com atualizações semanais).
+
 
 > sobre o escopo de forecasting tratado neste projeto, o que mais falta implementar? 
 
@@ -305,3 +307,8 @@ Melhorias Sugeridas
   - Rolling wave planning
   - Correlação entre riscos
   - Probabilistic roadmaps
+
+
+
+
+- implementar process behavior charts 
