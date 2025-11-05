@@ -191,7 +191,7 @@ def scoped_project_query(session):
 
 def scoped_forecast_query(session):
     """Return a Forecast query scoped to the current user when needed."""
-    query = session.query(Forecast)
+    query = session.query(Forecast).outerjoin(Project, Forecast.project_id == Project.id)
     if current_user_is_admin():
         return query
     user_id = getattr(current_user, 'id', None)
@@ -209,7 +209,7 @@ def scoped_forecast_query(session):
         # No authenticated user context; return no records
         return query.filter(Forecast.id == -1)
 
-    return query.join(Project, Forecast.project_id == Project.id).filter(or_(*filters))
+    return query.filter(or_(*filters))
 
 
 def scoped_actual_query(session):
