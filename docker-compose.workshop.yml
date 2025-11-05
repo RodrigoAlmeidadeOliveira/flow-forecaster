@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  flow-forecaster:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: flow-forecaster-workshop
+    ports:
+      - "8080:8080"
+    environment:
+      # Database
+      - DATABASE_URL=sqlite:////data/forecaster.db
+
+      # Flask config
+      - SECRET_KEY=workshop-secret-change-me
+      - FLASK_ENV=development
+      - FLASK_DEBUG=0
+
+      # Performance tuning for workshops
+      - WORKERS=4
+      - WORKER_CLASS=sync
+      - WORKER_TIMEOUT=120
+      - WORKER_CONNECTIONS=1000
+      - MAX_REQUESTS=1000
+      - MAX_REQUESTS_JITTER=100
+
+    volumes:
+      # Persist database between restarts
+      - workshop_data:/data
+
+    restart: unless-stopped
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+volumes:
+  workshop_data:
+    driver: local
+
+# Network configuration
+networks:
+  default:
+    driver: bridge

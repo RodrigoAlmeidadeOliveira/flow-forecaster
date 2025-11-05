@@ -18,6 +18,7 @@ from flask_login import (
     login_required,
     current_user
 )
+from flask_compress import Compress
 from sqlalchemy import or_
 from sqlalchemy.exc import IntegrityError
 from urllib.parse import urlparse, urljoin
@@ -32,6 +33,7 @@ from monte_carlo_unified import (
 )
 from ml_forecaster import MLForecaster
 from ml_deadline_forecaster import ml_analyze_deadline, ml_forecast_how_many, ml_forecast_when
+from cod_forecaster import CoDForecaster, generate_sample_cod_data
 from visualization import ForecastVisualizer
 from demand_forecasting import DemandForecastService
 from cost_pert_beta import (
@@ -64,6 +66,15 @@ from trend_analysis import comprehensive_trend_analysis
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('FLOW_FORECASTER_SECRET_KEY') or os.environ.get('SECRET_KEY') or 'change-me-in-production'
+
+# Enable GZIP compression for better performance over slow networks
+app.config['COMPRESS_MIMETYPES'] = [
+    'text/html', 'text/css', 'text/xml', 'application/json',
+    'application/javascript', 'text/javascript'
+]
+app.config['COMPRESS_LEVEL'] = 6  # Balance between speed and compression (1-9)
+app.config['COMPRESS_MIN_SIZE'] = 500  # Only compress responses > 500 bytes
+Compress(app)
 
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
@@ -2946,6 +2957,132 @@ def portfolio_prioritization():
         return jsonify({'error': str(e)}), 500
     finally:
         session.close()
+
+
+# ============================================================================
+# Cost of Delay (CoD) API Endpoints
+# ============================================================================
+
+# Global CoD forecaster instance (lazy loading)
+_cod_forecaster = None
+
+def get_cod_forecaster():
+    """Get or initialize the CoD forecaster."""
+    global _cod_forecaster
+    if _cod_forecaster is None:
+        _cod_forecaster = CoDForecaster()
+        # Try to auto-train with sample data if no real data available
+        try:
+            sample_data = generate_sample_cod_data(n_samples=100)
+            _cod_forecaster.train_models(sample_data)
+            print("CoD Forecaster initialized with sample data", flush=True)
+        except Exception as e:
+            print(f"Warning: Could not initialize CoD forecaster: {e}", flush=True)
+    return _cod_forecaster
+
+
+@app.route('/api/cod/predict', methods=['POST'])
+@login_required
+def predict_cod():
+    """Predict Cost of Delay for a project."""
+    try:
+        data = request.json
+
+        # Validate required fields
+        required = ['budget_millions', 'duration_weeks', 'team_size',
+                   'num_stakeholders', 'business_value', 'complexity']
+        for field in required:
+            if field not in data:
+                return jsonify({'error': f'Missing required field: {field}'}), 400
+
+        # Get forecaster
+        forecaster = get_cod_forecaster()
+
+        if not forecaster.trained:
+            return jsonify({'error': 'CoD model not trained yet'}), 503
+
+        # Predict
+        result = forecaster.predict_cod(data)
+
+        return jsonify(result)
+
+    except Exception as e:
+        import traceback
+        return jsonify({'error': str(e), 'trace': traceback.format_exc()}), 500
+
+
+@app.route('/api/cod/calculate_total', methods=['POST'])
+@login_required
+def calculate_total_cod():
+    """Calculate total CoD for a given delay."""
+    try:
+        data = request.json
+
+        cod_weekly = float(data['cod_weekly'])
+        delay_weeks = float(data['delay_weeks'])
+
+        forecaster = get_cod_forecaster()
+        result = forecaster.calculate_total_cod(cod_weekly, delay_weeks)
+
+        return jsonify(result)
+
+    except Exception as e:
+        import traceback
+        return jsonify({'error': str(e), 'trace': traceback.format_exc()}), 500
+
+
+@app.route('/api/cod/feature_importance', methods=['GET'])
+@login_required
+def cod_feature_importance():
+    """Get feature importance for CoD model."""
+    try:
+        forecaster = get_cod_forecaster()
+
+        if not forecaster.trained:
+            return jsonify({'error': 'CoD model not trained yet'}), 503
+
+        importance_df = forecaster.get_feature_importance()
+
+        if importance_df is None:
+            return jsonify({'error': 'Feature importance not available'}), 404
+
+        return jsonify({
+            'features': importance_df.to_dict('records')
+        })
+
+    except Exception as e:
+        import traceback
+        return jsonify({'error': str(e), 'trace': traceback.format_exc()}), 500
+
+
+@app.route('/api/cod/model_info', methods=['GET'])
+@login_required
+def cod_model_info():
+    """Get information about the trained CoD model."""
+    try:
+        forecaster = get_cod_forecaster()
+
+        if not forecaster.trained:
+            return jsonify({'trained': False, 'error': 'Model not trained yet'}), 200
+
+        models_info = {}
+        for name, data in forecaster.models.items():
+            models_info[name] = {
+                'mae': float(data['mae']),
+                'rmse': float(data['rmse']),
+                'r2': float(data['r2']),
+                'mape': float(data['mape'])
+            }
+
+        return jsonify({
+            'trained': True,
+            'models': models_info,
+            'features': forecaster.feature_names
+        })
+
+    except Exception as e:
+        import traceback
+        return jsonify({'error': str(e), 'trace': traceback.format_exc()}), 500
 
 
 for rule in app.url_map.iter_rules():

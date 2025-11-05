@@ -2714,6 +2714,33 @@ ${generateProgressBar(p50Items, backlog, 'P50 (arriscado)  ', Math.round((p50Ite
         $('#share').on('click', share);
         $('#run').on('click', runSimulation);
         $('#runDeadlineAnalysis').on('click', runDeadlineAnalysis);
+
+        // Workshop Mode Toggle - Fast simulations for demos and multiple concurrent users
+        $('#workshopMode').on('change', function() {
+            const $nSimulations = $('#nSimulations');
+            const currentValue = parseInt($nSimulations.val()) || 10000;
+
+            if ($(this).is(':checked')) {
+                // Enable workshop mode: reduce to 2000 simulations
+                if (currentValue > 2000) {
+                    $nSimulations.data('previous-value', currentValue);
+                    $nSimulations.val(2000);
+                    console.log('[Workshop Mode] Enabled - Simulations reduced to 2000 for better performance');
+                }
+            } else {
+                // Disable workshop mode: restore previous value or default to 10000
+                const previousValue = $nSimulations.data('previous-value') || 10000;
+                $nSimulations.val(previousValue);
+                console.log('[Workshop Mode] Disabled - Simulations restored to ' + previousValue);
+            }
+        });
+
+        // Auto-enable workshop mode if query parameter is present (?workshop=1)
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('workshop') === '1') {
+            $('#workshopMode').prop('checked', true).trigger('change');
+            console.log('[Workshop Mode] Auto-enabled via URL parameter');
+        }
     }); // Close $(window).on("load")
 
     // Export functions to global scope for inline onclick handlers
