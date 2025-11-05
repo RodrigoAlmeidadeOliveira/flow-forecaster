@@ -82,6 +82,7 @@ async function saveForecast() {
             headers: {
                 'Content-Type': 'application/json'
             },
+            credentials: 'include',
             body: JSON.stringify(payload)
         });
 
@@ -110,7 +111,7 @@ async function loadForecasts() {
         $('#loadingForecasts').show();
         $('#forecastsList').empty();
 
-        const response = await fetch('/api/forecasts');
+        const response = await fetch('/api/forecasts', { credentials: 'include' });
         if (!response.ok) {
             throw new Error('Erro ao carregar análises');
         }
@@ -172,7 +173,7 @@ async function loadForecasts() {
 // Load a specific forecast
 async function loadForecast(id) {
     try {
-        const response = await fetch(`/api/forecasts/${id}`);
+        const response = await fetch(`/api/forecasts/${id}`, { credentials: 'include' });
         if (!response.ok) {
             throw new Error('Erro ao carregar análise');
         }
@@ -288,7 +289,8 @@ async function deleteForecast(id) {
 
     try {
         const response = await fetch(`/api/forecasts/${id}`, {
-            method: 'DELETE'
+            method: 'DELETE',
+            credentials: 'include'
         });
 
         if (!response.ok) {
@@ -413,6 +415,7 @@ async function importForecastFromFile() {
             headers: {
                 'Content-Type': 'application/json'
             },
+            credentials: 'include',
             body: JSON.stringify(data)
         });
 

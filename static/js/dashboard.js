@@ -82,7 +82,7 @@ async function loadHistoricalMetrics() {
     try {
         $('#dashboard-loading').show();
 
-        const response = await fetch('/api/forecasts');
+        const response = await fetch('/api/forecasts', { credentials: 'include' });
         if (!response.ok) throw new Error('Erro ao carregar análises');
 
         const forecasts = await response.json();
