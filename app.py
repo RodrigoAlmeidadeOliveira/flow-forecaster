@@ -18,7 +18,7 @@ from flask_login import (
     login_required,
     current_user
 )
-from sqlalchemy import and_, or_
+from sqlalchemy import and_, or_, false
 from sqlalchemy.exc import IntegrityError
 from urllib.parse import urlparse, urljoin
 from monte_carlo_unified import (
@@ -183,15 +183,26 @@ def scoped_forecast_query(session):
     query = session.query(Forecast)
     if current_user_is_admin():
         return query
-    return query.filter(
-        or_(
-            Forecast.user_id == current_user.id,
+    conditions = []
+    user_id = getattr(current_user, 'id', None)
+    user_email = getattr(current_user, 'email', None)
+
+    if user_id is not None:
+        conditions.append(Forecast.user_id == user_id)
+        conditions.append(
             and_(
                 Forecast.user_id.is_(None),
-                Forecast.project.has(Project.user_id == current_user.id)
+                Forecast.project.has(Project.user_id == user_id)
             )
         )
-    )
+
+    if user_email:
+        conditions.append(Forecast.created_by == user_email)
+
+    if not conditions:
+        return query.filter(false())  # Should not happen, keeps query safe
+
+    return query.filter(or_(*conditions))
 
 
 def scoped_actual_query(session):
