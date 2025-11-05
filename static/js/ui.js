@@ -1399,7 +1399,16 @@
         return simulationData;
     }
 
+    // Prevent multiple simultaneous simulations
+    let isSimulationRunning = false;
+
     function runSimulation() {
+        // Prevent multiple simultaneous calls
+        if (isSimulationRunning) {
+            console.warn('[Simulation] Already running, ignoring duplicate request');
+            return;
+        }
+
         const simulationData = readSimulationData();
         if (!simulationData) return;
 
@@ -1408,6 +1417,15 @@
         }
 
         window.lastSimulationData = simulationData;
+
+        // Mark simulation as running
+        isSimulationRunning = true;
+
+        // Disable run buttons to prevent duplicate clicks
+        const $runButton = $('#run');
+        const $runDeadlineButton = $('#runDeadlineAnalysis');
+        $runButton.prop('disabled', true).addClass('disabled');
+        $runDeadlineButton.prop('disabled', true).addClass('disabled');
 
         $('#results-main').show();
         const $results = $('#results');
@@ -1427,18 +1445,43 @@
         delete payload.actualRemainingLabels;
         delete payload.actualRemainingRaw;
 
-        // Call backend API
+        // Call backend API with increased timeout
         $.ajax({
             url: '/api/simulate',
             method: 'POST',
             contentType: 'application/json',
             data: JSON.stringify(payload),
+            timeout: 180000, // 3 minutes timeout (increased from default 30s)
             success: function(result) {
                 displayResults(result, simulationData);
             },
-            error: function(xhr) {
-                alert('Error running simulation: ' + (xhr.responseJSON?.error || 'Unknown error'));
+            error: function(xhr, textStatus, errorThrown) {
+                // Enhanced error handling
+                let errorMsg = 'Error running simulation: ';
+
+                if (textStatus === 'timeout') {
+                    errorMsg += 'Request timed out. Try enabling Workshop Mode for faster simulations.';
+                } else if (xhr.status === 0) {
+                    errorMsg += 'Connection lost. Please check your network and try again.';
+                } else {
+                    errorMsg += (xhr.responseJSON?.error || errorThrown || 'Unknown error');
+                }
+
+                console.error('[Simulation Error]', {
+                    status: xhr.status,
+                    textStatus: textStatus,
+                    errorThrown: errorThrown,
+                    response: xhr.responseJSON
+                });
+
+                alert(errorMsg);
                 $('#res-effort').val('Error');
+            },
+            complete: function() {
+                // Re-enable buttons and reset flag
+                isSimulationRunning = false;
+                $runButton.prop('disabled', false).removeClass('disabled');
+                $runDeadlineButton.prop('disabled', false).removeClass('disabled');
             }
         });
     }
@@ -1458,8 +1501,6 @@
         const effort = Math.round(percentile(effortValues, reportPercentile));
         const duration = Math.round(percentile(durationValues, reportPercentile));
         const backlogSummary = result.backlog_summary || {};
-
-        console.log('Monte Carlo Simulation Results:', { effort, duration, effortValues, durationValues, confidenceLevel });
 
         const durationP50 = percentile(durationValues, 0.5);
         const durationP85 = percentile(durationValues, 0.85);
@@ -1507,14 +1548,6 @@
         } else if (simulationData.deadlineDate) {
             endDate = simulationData.deadlineDate;
         }
-
-        console.log('Setting Monte Carlo Results:', {
-            effort,
-            duration,
-            endDate,
-            startDate: simulationData.startDate,
-            deadlineDate: simulationData.deadlineDate
-        });
 
         $('#res-effort').val(effort);
         $('#res-duration').val(duration);
@@ -1666,16 +1699,10 @@
         }
 
         // Display dependency analysis if available
-        console.log('[DEBUG] Checking for dependency_analysis in result:', result.dependency_analysis);
-        console.log('[DEBUG] simulationData.dependencies:', simulationData.dependencies);
-        console.log('[DEBUG] result keys:', Object.keys(result));
-
         if (result.dependency_analysis) {
-            console.log('[DEBUG] dependency_analysis found, displaying results');
             displayDependencyResults(result.dependency_analysis);
             displayDependencyTab(result.dependency_analysis, simulationData);
         } else {
-            console.log('[DEBUG] No dependency_analysis in result');
             // Show empty state in tab
             $('#dependencyTabResults').hide();
             $('#dependencyTabEmpty').show();

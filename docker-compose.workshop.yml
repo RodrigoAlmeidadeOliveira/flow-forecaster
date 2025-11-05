@@ -20,10 +20,11 @@ services:
       # Performance tuning for workshops
       - WORKERS=4
       - WORKER_CLASS=sync
-      - WORKER_TIMEOUT=120
+      - WORKER_TIMEOUT=300
       - WORKER_CONNECTIONS=1000
       - MAX_REQUESTS=1000
       - MAX_REQUESTS_JITTER=100
+      - GRACEFUL_TIMEOUT=30
 
     volumes:
       # Persist database between restarts
