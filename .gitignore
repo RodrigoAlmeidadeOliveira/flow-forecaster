@@ -74,3 +74,16 @@ Desktop.ini
 tmp/
 temp/
 *.tmp
+
+# Microsoft Office
+*.pptx
+*.docx
+*.xlsx
+*.ppt
+*.doc
+*.xls
+~$*
+*.tmp
+
+# PDF generated files (keep source, ignore compiled)
+# workshop/*.pdf
