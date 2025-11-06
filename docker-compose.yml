@@ -1,0 +1,114 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: forecaster_postgres
+    environment:
+      POSTGRES_DB: forecaster
+      POSTGRES_USER: forecaster
+      POSTGRES_PASSWORD: forecaster123
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U forecaster"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - forecaster_network
+
+  # Redis (Message Broker & Result Backend)
+  redis:
+    image: redis:7-alpine
+    container_name: forecaster_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - forecaster_network
+
+  # Celery Worker (Background Jobs)
+  celery_worker:
+    build: .
+    container_name: forecaster_celery_worker
+    command: celery -A celery_app worker --loglevel=info --concurrency=4
+    environment:
+      DATABASE_URL: postgresql://forecaster:forecaster123@postgres:5432/forecaster
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+      FLOW_FORECASTER_SECRET_KEY: ${FLOW_FORECASTER_SECRET_KEY:-dev-secret-key-change-in-production}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - .:/app
+    working_dir: /app
+    networks:
+      - forecaster_network
+    restart: unless-stopped
+
+  # Flower (Celery Monitoring UI)
+  flower:
+    build: .
+    container_name: forecaster_flower
+    command: celery -A celery_app flower --port=5555
+    ports:
+      - "5555:5555"
+    environment:
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+    depends_on:
+      - redis
+      - celery_worker
+    volumes:
+      - .:/app
+    working_dir: /app
+    networks:
+      - forecaster_network
+    restart: unless-stopped
+
+  # Flask Web Application
+  web:
+    build: .
+    container_name: forecaster_web
+    command: gunicorn --bind 0.0.0.0:5000 --workers 4 --timeout 120 wsgi:app
+    ports:
+      - "5000:5000"
+    environment:
+      DATABASE_URL: postgresql://forecaster:forecaster123@postgres:5432/forecaster
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+      FLOW_FORECASTER_SECRET_KEY: ${FLOW_FORECASTER_SECRET_KEY:-dev-secret-key-change-in-production}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - .:/app
+    working_dir: /app
+    networks:
+      - forecaster_network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  forecaster_network:
+    driver: bridge

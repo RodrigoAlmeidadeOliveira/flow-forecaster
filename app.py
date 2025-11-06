@@ -3106,6 +3106,20 @@ def cod_model_info():
         return jsonify({'error': str(e), 'trace': traceback.format_exc()}), 500
 
 
+# ============================================================================
+# Register Async Endpoints (Celery Background Tasks)
+# ============================================================================
+try:
+    from app_async_endpoints import register_async_endpoints
+    register_async_endpoints(app)
+    print("[INFO] Async endpoints registered successfully", flush=True)
+except ImportError as e:
+    print(f"[WARNING] Celery/Async endpoints not available: {e}", flush=True)
+    print("[WARNING] Application will run in synchronous mode only", flush=True)
+
+# ============================================================================
+# Print all registered routes
+# ============================================================================
 for rule in app.url_map.iter_rules():
     print(f"  {rule.endpoint:30s} {rule.rule}", flush=True)
 print("="*60, flush=True)
