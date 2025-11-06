@@ -88,6 +88,13 @@ $(document).ready(function() {
                     statusHtml += `<li><strong>${modelName}</strong>: MAE ${formatCurrency(metrics.mae)} | R² ${formatNumber(metrics.r2, 3)}</li>`;
                 }
                 statusHtml += '</ul>';
+                const rfMetrics = state.model.metrics['RandomForest'];
+                if (rfMetrics?.best_params) {
+                    const paramsText = Object.entries(rfMetrics.best_params)
+                        .map(([key, value]) => `${key}=${value}`)
+                        .join(', ');
+                    statusHtml += `<div class="small text-muted mt-1">RF params: ${paramsText}</div>`;
+                }
             }
         }
 
@@ -183,6 +190,7 @@ $(document).ready(function() {
         }
 
         let html = '<div class="row">';
+        const bestParamsList = [];
 
         // Display models
         html += '<div class="col-md-6">';
@@ -198,6 +206,12 @@ $(document).ready(function() {
                 <td>${formatNumber(metrics.r2, 3)}</td>
                 <td>${formatNumber(metrics.mape, 1)}%</td>
             </tr>`;
+            if (metrics.best_params) {
+                const paramsText = Object.entries(metrics.best_params)
+                    .map(([key, value]) => `${key}=${value}`)
+                    .join(', ');
+                bestParamsList.push(`<li><strong>${modelName}:</strong> ${paramsText}</li>`);
+            }
         }
 
         html += '</tbody></table>';
@@ -228,6 +242,13 @@ $(document).ready(function() {
             html += `<div><strong>Dataset:</strong> ${data.dataset.name || data.dataset.original_filename} (${data.dataset.row_count} linhas)</div>`;
         }
         html += '</div>';
+
+        if (bestParamsList.length) {
+            html += '<div class="col-12 mt-2">';
+            html += '<h6>Best Hyperparameters</h6>';
+            html += `<ul class="small text-muted mb-0">${bestParamsList.join('')}</ul>`;
+            html += '</div>';
+        }
 
         html += '</div>';
 

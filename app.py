@@ -3013,7 +3013,7 @@ def _load_default_cod_forecaster():
         _default_cod_forecaster = CoDForecaster()
         try:
             sample_data = generate_sample_cod_data(n_samples=100)
-            _default_cod_forecaster.train_models(sample_data)
+            _default_cod_forecaster.train_models(sample_data, use_hyperparam_search=False)
             print("CoD Forecaster initialized with sample data", flush=True)
         except Exception as exc:
             print(f"Warning: Could not initialize default CoD forecaster: {exc}", flush=True)
@@ -3260,7 +3260,7 @@ def train_cod_model():
             df[column] = pd.to_numeric(df[column], errors='coerce')
         df = df.dropna(subset=numeric_columns)
         forecaster = CoDForecaster()
-        forecaster.train_models(df)
+        forecaster.train_models(df, use_hyperparam_search=True, search_iterations=30)
     except ValueError as exc:
         return jsonify({'error': str(exc)}), 400
     except Exception as exc:
@@ -3273,6 +3273,7 @@ def train_cod_model():
             'rmse': float(model_data['rmse']),
             'r2': float(model_data['r2']),
             'mape': float(model_data['mape']),
+            'best_params': model_data.get('best_params'),
         }
 
     feature_names_json = json.dumps(forecaster.feature_names)
@@ -3450,7 +3451,8 @@ def cod_model_info():
                 'mae': float(data['mae']),
                 'rmse': float(data['rmse']),
                 'r2': float(data['r2']),
-                'mape': float(data['mape'])
+                'mape': float(data['mape']),
+                'best_params': data.get('best_params'),
             }
 
         source = 'custom' if model_record and model_record.model_blob else 'default'
