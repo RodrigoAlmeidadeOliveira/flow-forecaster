@@ -130,7 +130,7 @@ for table in tables_to_migrate:
         trans = pg_conn.begin()
 
         try:
-            # Inserir no PostgreSQL (ignorar duplicatas se houver)
+            # Inserir no PostgreSQL (ignorar duplicatas com ON CONFLICT)
             migrated = 0
             for row in rows:
                 row_dict = dict(zip(columns, row))
@@ -141,18 +141,16 @@ for table in tables_to_migrate:
                         row_dict[col_name] = bool(row_dict[col_name])
 
                 try:
-                    # Tentar inserir
-                    pg_conn.execute(
-                        text(f"INSERT INTO {table} ({columns_str}) VALUES ({placeholders})"),
+                    # Inserir com ON CONFLICT DO NOTHING (ignora duplicatas sem erro)
+                    result = pg_conn.execute(
+                        text(f"INSERT INTO {table} ({columns_str}) VALUES ({placeholders}) ON CONFLICT DO NOTHING"),
                         row_dict
                     )
-                    migrated += 1
+                    # Verificar se realmente inseriu (rowcount > 0)
+                    if result.rowcount > 0:
+                        migrated += 1
                 except Exception as insert_error:
-                    # Se falhar (ex: duplicata), continuar
-                    if 'duplicate' in str(insert_error).lower() or 'unique' in str(insert_error).lower():
-                        pass  # Ignorar duplicatas
-                    else:
-                        print(f"      ⚠ Erro ao inserir registro: {insert_error}")
+                    print(f"      ⚠ Erro ao inserir registro: {insert_error}")
 
             trans.commit()
             migrated_counts[table] = migrated
