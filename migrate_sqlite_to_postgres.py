@@ -106,9 +106,18 @@ for table in tables_to_migrate:
 
     try:
         # Obter colunas da tabela
-        columns = [col['name'] for col in sqlite_inspector.get_columns(table)]
+        sqlite_columns = sqlite_inspector.get_columns(table)
+        pg_columns = pg_inspector.get_columns(table)
+
+        columns = [col['name'] for col in sqlite_columns]
         columns_str = ', '.join(columns)
         placeholders = ', '.join([f':{col}' for col in columns])
+
+        # Identificar colunas booleanas no PostgreSQL
+        boolean_columns = {
+            col['name'] for col in pg_columns
+            if str(col['type']).upper() == 'BOOLEAN'
+        }
 
         # Ler dados do SQLite
         rows = sqlite_conn.execute(text(f"SELECT {columns_str} FROM {table}")).fetchall()
@@ -125,6 +134,12 @@ for table in tables_to_migrate:
             migrated = 0
             for row in rows:
                 row_dict = dict(zip(columns, row))
+
+                # Converter valores inteiros para booleanos onde necessário
+                for col_name in boolean_columns:
+                    if col_name in row_dict and row_dict[col_name] is not None:
+                        row_dict[col_name] = bool(row_dict[col_name])
+
                 try:
                     # Tentar inserir
                     pg_conn.execute(
