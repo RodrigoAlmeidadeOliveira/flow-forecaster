@@ -38,6 +38,7 @@ env/
 instance/
 .webassets-cache
 *.db
+*.db.backup.*
 
 # Environment variables
 .env
@@ -81,6 +82,11 @@ tmp/
 temp/
 *.tmp
 
+# Load testing results
+load_test_results/
+*.csv
+*.html
+
 # Microsoft Office
 *.pptx
 *.docx
@@ -93,3 +99,4 @@ temp/
 
 # PDF generated files (keep source, ignore compiled)
 # workshop/*.pdf
+dump.rdb

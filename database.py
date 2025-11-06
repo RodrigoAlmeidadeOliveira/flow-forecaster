@@ -1,60 +1,69 @@
 """
 Database initialization and session management for Flow Forecaster
+Supports both SQLite (development) and PostgreSQL (production)
 """
 import os
 from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import sessionmaker, scoped_session
+from sqlalchemy.pool import QueuePool, NullPool
 from models import Base, Project, Forecast, Actual, User
 
-# Database configuration
-DB_PATH = os.environ.get('DATABASE_URL', 'sqlite:///forecaster.db')
+DATABASE_URL = os.environ.get('DATABASE_URL', 'sqlite:///forecaster.db')
 
-# PostgreSQL connection pool settings for production
-connect_args = {}
-pool_settings = {}
+# Normalize legacy connection string prefix for compatibility with Fly.io/Heroku
+if DATABASE_URL.startswith('postgres://'):
+    DATABASE_URL = DATABASE_URL.replace('postgres://', 'postgresql://', 1)
 
-if DB_PATH.startswith('postgres://') or DB_PATH.startswith('postgresql://'):
-    # PostgreSQL production settings
-    pool_settings = {
-        'pool_size': 5,
-        'max_overflow': 10,
-        'pool_pre_ping': True,  # Verify connections before using
-        'pool_recycle': 3600,   # Recycle connections after 1 hour
-    }
-    # Fix Heroku/Fly.io postgres:// URL (should be postgresql://)
-    if DB_PATH.startswith('postgres://'):
-        DB_PATH = DB_PATH.replace('postgres://', 'postgresql://', 1)
+is_postgresql = DATABASE_URL.startswith('postgresql://')
+is_sqlite = DATABASE_URL.startswith('sqlite://')
+
+if is_postgresql:
+    engine = create_engine(
+        DATABASE_URL,
+        poolclass=QueuePool,
+        pool_size=20,
+        max_overflow=40,
+        pool_pre_ping=True,
+        pool_recycle=3600,
+        pool_timeout=30,
+        echo=False,
+        connect_args={
+            'connect_timeout': 10,
+            'application_name': 'flow-forecaster',
+        },
+    )
+    print("[DATABASE] PostgreSQL engine created with connection pooling")
+    print("[DATABASE] Pool size: 20, Max overflow: 40")
+elif is_sqlite:
+    engine = create_engine(
+        DATABASE_URL,
+        poolclass=NullPool,
+        echo=False,
+        connect_args={'check_same_thread': False},
+    )
+    print("[DATABASE] SQLite engine created (development mode)")
 else:
-    # SQLite settings
-    connect_args = {'check_same_thread': False}
+    engine = create_engine(DATABASE_URL, echo=False)
+    print(f"[DATABASE] Generic engine created for {DATABASE_URL}")
 
-engine = create_engine(
-    DB_PATH,
-    echo=False,
-    connect_args=connect_args,
-    **pool_settings
-)
-
-# Session factory
 session_factory = sessionmaker(bind=engine)
 Session = scoped_session(session_factory)
 
+DB_PATH = DATABASE_URL  # Maintains backwards compatibility for existing code paths
+
 
 def init_db():
-    """Initialize database, create all tables"""
+    """Initialize database, create all tables."""
     Base.metadata.create_all(engine)
     print(f"Database initialized at {DB_PATH}")
 
 
 def ensure_schema():
-    """Ensure existing databases include the latest columns"""
+    """Ensure existing databases include the latest columns."""
     inspector = inspect(engine)
     table_names = set(inspector.get_table_names())
     if 'projects' not in table_names:
         return
-
-    # Detect database type
-    is_postgres = DB_PATH.startswith('postgresql://')
 
     existing_project_columns = {col['name'] for col in inspector.get_columns('projects')}
 
@@ -96,13 +105,12 @@ def ensure_schema():
         if 'users' in table_names:
             existing_user_columns = {col['name'] for col in inspector.get_columns('users')}
 
-            if is_postgres:
-                # PostgreSQL-specific syntax
+            if is_postgresql:
                 user_columns = [
                     (
                         'registration_date',
                         "ALTER TABLE users ADD COLUMN registration_date TIMESTAMP",
-                        "UPDATE users SET registration_date = COALESCE(created_at, CURRENT_TIMESTAMP) WHERE registration_date IS NULL"
+                        "UPDATE users SET registration_date = COALESCE(created_at, CURRENT_TIMESTAMP) WHERE registration_date IS NULL",
                     ),
                     (
                         'access_expires_at',
@@ -111,16 +119,15 @@ def ensure_schema():
                             "UPDATE users "
                             "SET access_expires_at = COALESCE(registration_date, created_at, CURRENT_TIMESTAMP) + INTERVAL '365 days' "
                             "WHERE access_expires_at IS NULL"
-                        )
+                        ),
                     ),
                 ]
             else:
-                # SQLite-specific syntax
                 user_columns = [
                     (
                         'registration_date',
                         "ALTER TABLE users ADD COLUMN registration_date DATETIME",
-                        "UPDATE users SET registration_date = COALESCE(created_at, CURRENT_TIMESTAMP) WHERE registration_date IS NULL"
+                        "UPDATE users SET registration_date = COALESCE(created_at, CURRENT_TIMESTAMP) WHERE registration_date IS NULL",
                     ),
                     (
                         'access_expires_at',
@@ -130,7 +137,7 @@ def ensure_schema():
                             "SET access_expires_at = DATETIME("
                             "COALESCE(registration_date, created_at, CURRENT_TIMESTAMP), '+365 days') "
                             "WHERE access_expires_at IS NULL"
-                        )
+                        ),
                     ),
                 ]
 
@@ -143,46 +150,59 @@ def ensure_schema():
 
 
 def get_session():
-    """Get a new database session"""
+    """Get a new database session."""
     return Session()
 
 
 def close_session():
-    """Close the current session"""
+    """Close the current session."""
     Session.remove()
 
 
 def reset_db():
-    """Drop all tables and recreate (WARNING: destroys all data)"""
+    """Drop all tables and recreate (WARNING: destroys all data)."""
     Base.metadata.drop_all(engine)
     Base.metadata.create_all(engine)
     print("Database reset complete")
 
 
-# Initialize database on import
-if DB_PATH.startswith('sqlite'):
-    # SQLite: check if file exists
+if is_sqlite:
     db_file = DB_PATH.replace('sqlite:///', '').replace('sqlite:////', '/')
     if not os.path.exists(db_file) or os.path.getsize(db_file) == 0:
-        # Ensure directory exists
         db_dir = os.path.dirname(db_file)
         if db_dir and not os.path.exists(db_dir):
             os.makedirs(db_dir, exist_ok=True)
+        print(f"[DATABASE] Initializing new SQLite database at {db_file}")
         init_db()
-else:
-    # PostgreSQL: just ensure schema exists (tables created externally or via init_db)
-    try:
-        # Test connection
-        with engine.connect() as conn:
-            result = conn.execute(text("SELECT 1"))
-            print(f"✓ Connected to PostgreSQL database successfully")
-    except Exception as e:
-        print(f"⚠ PostgreSQL connection error: {e}")
-        print(f"  DATABASE_URL: {DB_PATH[:50]}...")  # Print first 50 chars only
+    else:
+        print(f"[DATABASE] Using existing SQLite database at {db_file}")
 
-# Ensure schema is up to date (works for both SQLite and PostgreSQL)
-try:
-    ensure_schema()
-except Exception as e:
-    print(f"⚠ Schema update warning: {e}")
-    # Don't fail startup on schema update errors
+    try:
+        ensure_schema()
+    except Exception as exc:
+        print(f"[DATABASE] SQLite schema update warning: {exc}")
+
+elif is_postgresql:
+    try:
+        inspector = inspect(engine)
+        tables = inspector.get_table_names()
+        if not tables:
+            print("[DATABASE] No tables found in PostgreSQL, creating initial schema")
+            init_db()
+        else:
+            print(f"[DATABASE] Connected to PostgreSQL with {len(tables)} tables")
+    except Exception as exc:
+        print(f"[DATABASE] Warning: Could not inspect PostgreSQL database: {exc}")
+
+    try:
+        ensure_schema()
+    except Exception as exc:
+        print(f"[DATABASE] PostgreSQL schema update warning: {exc}")
+
+else:
+    print(f"[DATABASE] Initializing database at {DATABASE_URL}")
+    init_db()
+    try:
+        ensure_schema()
+    except Exception as exc:
+        print(f"[DATABASE] Schema update warning for {DATABASE_URL}: {exc}")
