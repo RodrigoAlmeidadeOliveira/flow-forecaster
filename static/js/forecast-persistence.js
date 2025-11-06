@@ -10,8 +10,15 @@ function openSaveModal() {
 
 // Open load modal and fetch forecasts
 function openLoadModal() {
-    $('#loadForecastModal').modal('show');
-    loadForecasts();
+    console.log('[openLoadModal] Abrindo modal...');
+    try {
+        $('#loadForecastModal').modal('show');
+        console.log('[openLoadModal] Modal exibido, chamando loadForecasts...');
+        loadForecasts();
+    } catch (error) {
+        console.error('[openLoadModal] ERRO:', error);
+        alert('Erro ao abrir modal: ' + error.message);
+    }
 }
 
 // Save forecast to database
@@ -107,6 +114,9 @@ async function saveForecast() {
 
 // Load forecasts list from database
 async function loadForecasts() {
+    console.log('=== [loadForecasts] INICIANDO ===');
+    alert('loadForecasts() foi chamada! Verifique o console.');
+
     try {
         console.log('loadForecasts: Iniciando carregamento...');
         $('#loadingForecasts').show();
