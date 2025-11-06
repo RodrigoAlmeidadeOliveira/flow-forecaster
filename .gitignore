@@ -87,3 +87,4 @@ temp/
 
 # PDF generated files (keep source, ignore compiled)
 # workshop/*.pdf
+dump.rdb
