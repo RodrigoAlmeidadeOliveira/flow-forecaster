@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Backtesting com fold_stride - Flow Forecaster</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        body {
+            background-color: #f8f9fa;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+        .navbar {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .hero-section {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px 0;
+            margin-bottom: 30px;
+        }
+        .card {
+            border: none;
+            border-radius: 12px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+            margin-bottom: 24px;
+        }
+        .card-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 12px 12px 0 0 !important;
+            font-weight: 600;
+            padding: 16px 24px;
+        }
+        .form-label {
+            font-weight: 600;
+            color: #495057;
+            margin-bottom: 8px;
+        }
+        .form-control, .form-select {
+            border-radius: 8px;
+            border: 1px solid #dee2e6;
+            padding: 10px 14px;
+        }
+        .form-control:focus, .form-select:focus {
+            border-color: #667eea;
+            box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            border-radius: 8px;
+            padding: 12px 32px;
+            font-weight: 600;
+            transition: transform 0.2s;
+        }
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+        .info-box {
+            background: #e7f3ff;
+            border-left: 4px solid #667eea;
+            padding: 16px;
+            border-radius: 8px;
+            margin: 16px 0;
+        }
+        .efficiency-badge {
+            background: #d4edda;
+            color: #155724;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            display: inline-block;
+            margin-left: 8px;
+        }
+        .metric-card {
+            text-align: center;
+            padding: 24px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+        .metric-value {
+            font-size: 2.5rem;
+            font-weight: bold;
+            color: #667eea;
+        }
+        .metric-label {
+            color: #6c757d;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-top: 8px;
+        }
+        .result-table {
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+        }
+        .spinner-border {
+            color: #667eea;
+        }
+        .alert-custom {
+            border-radius: 8px;
+            border: none;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+        .example-card {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 12px;
+            border-left: 4px solid #667eea;
+        }
+        .example-card h6 {
+            color: #667eea;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+    </style>
+</head>
+<body>
+
+<!-- Navbar -->
+<nav class="navbar navbar-expand-lg navbar-dark">
+    <div class="container">
+        <a class="navbar-brand" href="/">
+            <i class="fas fa-chart-line"></i> Flow Forecaster
+        </a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarNav">
+            <ul class="navbar-nav ms-auto">
+                <li class="nav-item">
+                    <a class="nav-link" href="/">Monte Carlo</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="/forecast-vs-actual">Forecast vs Actual</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link active" href="/backtesting">Backtesting</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="/documentacao">Documentação</a>
+                </li>
+            </ul>
+        </div>
+    </div>
+</nav>
+
+<!-- Hero Section -->
+<div class="hero-section">
+    <div class="container">
+        <h1><i class="fas fa-vial"></i> Backtesting com fold_stride</h1>
+        <p class="lead mb-0">
+            Valide suas previsões com horizontes longos e atualizações periódicas
+        </p>
+        <p class="mb-0">
+            <small>Exemplo: horizonte de 30 dias com atualizações semanais</small>
+        </p>
+    </div>
+</div>
+
+<!-- Main Content -->
+<div class="container mb-5">
+
+    <!-- Configuration Card -->
+    <div class="card">
+        <div class="card-header">
+            <i class="fas fa-cog"></i> Configuração do Backtesting
+        </div>
+        <div class="card-body">
+
+            <!-- Throughput Input -->
+            <div class="mb-4">
+                <label for="throughputData" class="form-label">
+                    <i class="fas fa-chart-bar"></i> Dados de Throughput
+                    <small class="text-muted">(valores separados por vírgula ou espaço)</small>
+                </label>
+                <textarea
+                    class="form-control"
+                    id="throughputData"
+                    rows="4"
+                    placeholder="Ex: 5, 6, 4, 7, 5, 6, 8, 5, 4, 7, 6, 5, 7, 8, 6...&#10;&#10;Insira pelo menos 20 valores para testes significativos"
+                ></textarea>
+                <small class="text-muted">
+                    💡 Dica: Cole dados diários de throughput dos últimos 60-90 dias
+                </small>
+            </div>
+
+            <!-- Backlog -->
+            <div class="row mb-4">
+                <div class="col-md-6">
+                    <label for="backlog" class="form-label">
+                        <i class="fas fa-tasks"></i> Backlog
+                    </label>
+                    <input
+                        type="number"
+                        class="form-control"
+                        id="backlog"
+                        value="150"
+                        min="1"
+                        placeholder="Número de itens a prever"
+                    >
+                    <small class="text-muted">Quantos itens você quer prever?</small>
+                </div>
+                <div class="col-md-6">
+                    <label for="minTrainSize" class="form-label">
+                        <i class="fas fa-database"></i> Histórico Mínimo
+                    </label>
+                    <input
+                        type="number"
+                        class="form-control"
+                        id="minTrainSize"
+                        value="14"
+                        min="5"
+                        max="90"
+                    >
+                    <small class="text-muted">Mínimo de dias de histórico para treinar</small>
+                </div>
+            </div>
+
+            <!-- fold_stride Configuration -->
+            <div class="row mb-4">
+                <div class="col-md-6">
+                    <label for="testSize" class="form-label">
+                        <i class="fas fa-binoculars"></i> Horizonte de Previsão
+                    </label>
+                    <select class="form-select" id="testSize">
+                        <option value="1">1 dia (padrão)</option>
+                        <option value="7">1 semana (7 dias)</option>
+                        <option value="14">2 semanas (14 dias)</option>
+                        <option value="30" selected>1 mês (30 dias)</option>
+                        <option value="60">2 meses (60 dias)</option>
+                        <option value="90">3 meses (90 dias)</option>
+                        <option value="custom">Personalizado...</option>
+                    </select>
+                    <input
+                        type="number"
+                        class="form-control mt-2 d-none"
+                        id="testSizeCustom"
+                        min="1"
+                        max="365"
+                        placeholder="Dias de horizonte"
+                    >
+                    <small class="text-muted">Quantos dias à frente você quer prever?</small>
+                </div>
+                <div class="col-md-6">
+                    <label for="foldStride" class="form-label">
+                        <i class="fas fa-sync-alt"></i> Cadência de Atualização
+                        <span id="efficiencyBadge" class="efficiency-badge d-none">85% mais rápido</span>
+                    </label>
+                    <select class="form-select" id="foldStride">
+                        <option value="1">Diária (a cada 1 dia)</option>
+                        <option value="7" selected>Semanal (a cada 7 dias)</option>
+                        <option value="14">Quinzenal (a cada 14 dias)</option>
+                        <option value="30">Mensal (a cada 30 dias)</option>
+                        <option value="custom">Personalizado...</option>
+                    </select>
+                    <input
+                        type="number"
+                        class="form-control mt-2 d-none"
+                        id="foldStrideCustom"
+                        min="1"
+                        max="365"
+                        placeholder="Dias entre atualizações"
+                    >
+                    <small class="text-muted">Com que frequência atualizar a previsão?</small>
+                </div>
+            </div>
+
+            <!-- Info Box -->
+            <div class="info-box">
+                <strong><i class="fas fa-lightbulb"></i> Como funciona:</strong><br>
+                Com <strong>horizonte de 30 dias</strong> e <strong>atualização semanal</strong>, o sistema:
+                <ul class="mb-0 mt-2">
+                    <li>Faz uma previsão para os próximos 30 dias</li>
+                    <li>Espera 7 dias</li>
+                    <li>Faz nova previsão (com mais 7 dias de histórico)</li>
+                    <li>Repete até acabarem os dados</li>
+                </ul>
+                <strong class="mt-2 d-block">Resultado:</strong> ~85% menos simulações que o padrão!
+            </div>
+
+            <!-- Advanced Options -->
+            <div class="accordion mb-4" id="advancedOptions">
+                <div class="accordion-item">
+                    <h2 class="accordion-header">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseAdvanced">
+                            <i class="fas fa-sliders-h me-2"></i> Opções Avançadas
+                        </button>
+                    </h2>
+                    <div id="collapseAdvanced" class="accordion-collapse collapse" data-bs-parent="#advancedOptions">
+                        <div class="accordion-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <label for="confidenceLevel" class="form-label">Nível de Confiança</label>
+                                    <select class="form-select" id="confidenceLevel">
+                                        <option value="P50">P50 (mediana)</option>
+                                        <option value="P85" selected>P85 (conservador)</option>
+                                        <option value="P95">P95 (muito conservador)</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="nSimulations" class="form-label">Número de Simulações</label>
+                                    <input type="number" class="form-control" id="nSimulations" value="5000" min="1000" max="50000" step="1000">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                <button class="btn btn-outline-secondary" type="button" id="loadExampleBtn">
+                    <i class="fas fa-download"></i> Carregar Exemplo
+                </button>
+                <button class="btn btn-primary" type="button" id="runBacktestBtn">
+                    <i class="fas fa-play"></i> Executar Backtesting
+                </button>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Examples -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <i class="fas fa-graduation-cap"></i> Exemplos de Uso
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-4">
+                    <div class="example-card">
+                        <h6><i class="fas fa-calendar-week"></i> Atualização Semanal</h6>
+                        <p class="mb-2 small">
+                            <strong>Horizonte:</strong> 30 dias<br>
+                            <strong>Cadência:</strong> 7 dias<br>
+                            <strong>Redução:</strong> ~85%
+                        </p>
+                        <p class="mb-0 small text-muted">
+                            Ideal para equipes ágeis com sprints semanais
+                        </p>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="example-card">
+                        <h6><i class="fas fa-calendar-alt"></i> Atualização Quinzenal</h6>
+                        <p class="mb-2 small">
+                            <strong>Horizonte:</strong> 60 dias<br>
+                            <strong>Cadência:</strong> 14 dias<br>
+                            <strong>Redução:</strong> ~92%
+                        </p>
+                        <p class="mb-0 small text-muted">
+                            Perfeito para releases quinzenais
+                        </p>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="example-card">
+                        <h6><i class="fas fa-calendar"></i> Atualização Mensal</h6>
+                        <p class="mb-2 small">
+                            <strong>Horizonte:</strong> 90 dias<br>
+                            <strong>Cadência:</strong> 30 dias<br>
+                            <strong>Redução:</strong> ~96%
+                        </p>
+                        <p class="mb-0 small text-muted">
+                            Ótimo para planejamento trimestral
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading State -->
+    <div id="loadingState" class="text-center d-none my-5">
+        <div class="spinner-border" role="status" style="width: 3rem; height: 3rem;">
+            <span class="visually-hidden">Carregando...</span>
+        </div>
+        <p class="mt-3"><strong>Executando backtesting...</strong></p>
+        <p class="text-muted">Isso pode levar alguns segundos dependendo do volume de dados</p>
+    </div>
+
+    <!-- Results Section -->
+    <div id="resultsSection" class="d-none">
+
+        <!-- Summary Metrics -->
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-chart-bar"></i> Resumo dos Resultados
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-3">
+                        <div class="metric-card">
+                            <div class="metric-value" id="totalTests">-</div>
+                            <div class="metric-label">Testes Executados</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="metric-card">
+                            <div class="metric-value" id="meanError">-</div>
+                            <div class="metric-label">Erro Médio</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="metric-card">
+                            <div class="metric-value" id="mape">-</div>
+                            <div class="metric-label">MAPE</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="metric-card">
+                            <div class="metric-value" id="rSquared">-</div>
+                            <div class="metric-label">R² Score</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Detailed Results Table -->
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-table"></i> Resultados Detalhados
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover" id="resultsTable">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Teste</th>
+                                <th>Treino</th>
+                                <th>Previsto</th>
+                                <th>Real</th>
+                                <th>Erro</th>
+                                <th>Erro %</th>
+                            </tr>
+                        </thead>
+                        <tbody id="resultsTableBody">
+                            <!-- Will be populated dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Report -->
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-file-alt"></i> Relatório Completo
+            </div>
+            <div class="card-body">
+                <pre id="reportText" style="background: #f8f9fa; padding: 20px; border-radius: 8px; overflow-x: auto;"></pre>
+            </div>
+        </div>
+
+    </div>
+
+</div>
+
+<!-- Bootstrap JS -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+// Handle custom values
+document.getElementById('testSize').addEventListener('change', function(e) {
+    const customInput = document.getElementById('testSizeCustom');
+    if (e.target.value === 'custom') {
+        customInput.classList.remove('d-none');
+    } else {
+        customInput.classList.add('d-none');
+    }
+});
+
+document.getElementById('foldStride').addEventListener('change', function(e) {
+    const customInput = document.getElementById('foldStrideCustom');
+    const efficiencyBadge = document.getElementById('efficiencyBadge');
+
+    if (e.target.value === 'custom') {
+        customInput.classList.remove('d-none');
+    } else {
+        customInput.classList.add('d-none');
+    }
+
+    // Show efficiency badge for stride > 1
+    if (e.target.value > 1) {
+        efficiencyBadge.classList.remove('d-none');
+        const reduction = Math.round((1 - 1/parseInt(e.target.value)) * 100);
+        efficiencyBadge.textContent = `~${reduction}% mais rápido`;
+    } else {
+        efficiencyBadge.classList.add('d-none');
+    }
+});
+
+// Load example data
+document.getElementById('loadExampleBtn').addEventListener('click', function() {
+    // Generate 60 days of sample daily throughput
+    const sampleData = Array.from({length: 60}, () =>
+        Math.max(1, Math.round(5 + Math.random() * 3))
+    ).join(', ');
+
+    document.getElementById('throughputData').value = sampleData;
+    document.getElementById('backlog').value = '150';
+    document.getElementById('testSize').value = '30';
+    document.getElementById('foldStride').value = '7';
+
+    alert('✅ Dados de exemplo carregados!\n\n60 dias de throughput diário\nHorizonte: 30 dias\nCadência: Semanal (7 dias)');
+});
+
+// Run backtesting
+document.getElementById('runBacktestBtn').addEventListener('click', async function() {
+
+    // Parse inputs
+    const throughputText = document.getElementById('throughputData').value;
+    const tpSamples = throughputText.split(/[,\s]+/).map(x => parseFloat(x.trim())).filter(x => !isNaN(x));
+
+    const testSizeSelect = document.getElementById('testSize');
+    const testSize = testSizeSelect.value === 'custom'
+        ? parseInt(document.getElementById('testSizeCustom').value)
+        : parseInt(testSizeSelect.value);
+
+    const foldStrideSelect = document.getElementById('foldStride');
+    const foldStride = foldStrideSelect.value === 'custom'
+        ? parseInt(document.getElementById('foldStrideCustom').value)
+        : parseInt(foldStrideSelect.value);
+
+    // Validation
+    if (tpSamples.length < 20) {
+        alert('❌ Erro: Insira pelo menos 20 valores de throughput para um backtesting significativo.');
+        return;
+    }
+
+    if (isNaN(testSize) || testSize < 1) {
+        alert('❌ Erro: Horizonte de previsão inválido.');
+        return;
+    }
+
+    if (isNaN(foldStride) || foldStride < 1) {
+        alert('❌ Erro: Cadência de atualização inválida.');
+        return;
+    }
+
+    const backlog = parseInt(document.getElementById('backlog').value);
+    const minTrainSize = parseInt(document.getElementById('minTrainSize').value);
+    const confidenceLevel = document.getElementById('confidenceLevel').value;
+    const nSimulations = parseInt(document.getElementById('nSimulations').value);
+
+    // Prepare payload
+    const payload = {
+        tpSamples: tpSamples,
+        backlog: backlog,
+        method: 'walk_forward',
+        minTrainSize: minTrainSize,
+        testSize: testSize,
+        foldStride: foldStride,
+        confidenceLevel: confidenceLevel,
+        nSimulations: nSimulations
+    };
+
+    console.log('Sending backtesting request:', payload);
+
+    // Show loading
+    document.getElementById('loadingState').classList.remove('d-none');
+    document.getElementById('resultsSection').classList.add('d-none');
+
+    try {
+        const response = await fetch('/api/backtest', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(payload)
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Erro ao executar backtesting');
+        }
+
+        const data = await response.json();
+        console.log('Backtesting results:', data);
+
+        // Display results
+        displayResults(data);
+
+    } catch (error) {
+        console.error('Error:', error);
+        alert('❌ Erro ao executar backtesting:\n\n' + error.message);
+    } finally {
+        document.getElementById('loadingState').classList.add('d-none');
+    }
+});
+
+function displayResults(data) {
+    const summary = data.summary;
+    const accuracyMetrics = summary.accuracy_metrics;
+
+    // Summary metrics
+    document.getElementById('totalTests').textContent = summary.total_tests;
+    document.getElementById('meanError').textContent = summary.mean_error_pct.toFixed(1) + '%';
+
+    if (accuracyMetrics) {
+        document.getElementById('mape').textContent = accuracyMetrics.mape.toFixed(1) + '%';
+        document.getElementById('rSquared').textContent = accuracyMetrics.r_squared.toFixed(3);
+    } else {
+        document.getElementById('mape').textContent = 'N/A';
+        document.getElementById('rSquared').textContent = 'N/A';
+    }
+
+    // Detailed table
+    const tbody = document.getElementById('resultsTableBody');
+    tbody.innerHTML = '';
+
+    summary.results.forEach((result, index) => {
+        const row = document.createElement('tr');
+        const errorClass = result.error_pct > 0 ? 'text-danger' : 'text-success';
+
+        row.innerHTML = `
+            <td>${index + 1}</td>
+            <td>${result.train_size} amostras</td>
+            <td>${result.forecasted_weeks.toFixed(2)} semanas</td>
+            <td>${result.actual_weeks.toFixed(2)} semanas</td>
+            <td>${result.error_weeks.toFixed(2)}</td>
+            <td class="${errorClass}">${result.error_pct > 0 ? '+' : ''}${result.error_pct.toFixed(1)}%</td>
+        `;
+        tbody.appendChild(row);
+    });
+
+    // Report
+    document.getElementById('reportText').textContent = data.report;
+
+    // Show results
+    document.getElementById('resultsSection').classList.remove('d-none');
+
+    // Scroll to results
+    document.getElementById('resultsSection').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+</script>
+
+</body>
+</html>

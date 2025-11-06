@@ -2310,6 +2310,24 @@ def forecast_vs_actual_page():
         """, 500
 
 
+@app.route('/backtesting')
+@login_required
+def backtesting_page():
+    """Render the Backtesting with fold_stride page"""
+    try:
+        return render_template('backtesting.html')
+    except Exception as e:
+        return f"""
+        <html>
+        <head><title>Backtesting - Error</title></head>
+        <body>
+            <h1>Template Error</h1>
+            <p>Error loading Backtesting template: {str(e)}</p>
+        </body>
+        </html>
+        """, 500
+
+
 @app.route('/api/actuals', methods=['GET', 'POST'])
 @login_required
 def handle_actuals():
