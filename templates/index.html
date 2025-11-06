@@ -314,6 +314,11 @@
 <i class="fas fa-briefcase"></i> Portfolio
 </a>
 </li>
+<li class="nav-item">
+<a aria-controls="backtesting-tab" aria-selected="false" class="nav-link" data-toggle="tab" href="#backtesting-tab" id="tab-backtesting-link" role="tab">
+<i class="fas fa-history"></i> Backtesting
+</a>
+</li>
 </ul>
 <div class="tab-content" id="forecastTabsContent">
 <div aria-labelledby="tab-mc-link" class="tab-pane fade show active" id="mc-forecast" role="tabpanel">
@@ -3103,6 +3108,96 @@ a probabilidade de todas serem entregues no prazo é de <strong>1 em 2^n</strong
     </div>
 </div>
 
+<!-- Backtesting Tab -->
+<div aria-labelledby="tab-backtesting-link" class="tab-pane fade" id="backtesting-tab" role="tabpanel">
+    <div class="container-fluid pt-4">
+        <div class="row">
+            <div class="col-12">
+                <h2 class="text-center mb-4">
+                    <i class="fas fa-history"></i> Backtesting
+                </h2>
+                <div class="alert alert-info">
+                    <h5 class="alert-heading"><i class="fas fa-info-circle"></i> Sobre o Backtesting</h5>
+                    <p>
+                        O backtesting valida a acurácia do modelo comparando as previsões com os resultados reais.
+                        Essa funcionalidade permite avaliar a qualidade das estimativas ao longo do tempo.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0"><i class="fas fa-chart-bar"></i> Análise de Backtesting</h5>
+                    </div>
+                    <div class="card-body">
+                        <form id="backtestingForm">
+                            <div class="form-row">
+                                <div class="form-group col-md-6">
+                                    <label for="backtest-project">Projeto</label>
+                                    <select class="form-control" id="backtest-project" required>
+                                        <option value="">Selecione um projeto...</option>
+                                    </select>
+                                </div>
+                                <div class="form-group col-md-6">
+                                    <label for="backtest-min-samples">Mínimo de Amostras</label>
+                                    <input type="number" class="form-control" id="backtest-min-samples" value="5" min="3" max="50">
+                                    <small class="form-text text-muted">Número mínimo de dados históricos para treinar</small>
+                                </div>
+                            </div>
+                            <button type="submit" class="btn btn-primary btn-block">
+                                <i class="fas fa-play"></i> Executar Backtesting
+                            </button>
+                        </form>
+
+                        <div id="backtesting-loading" class="text-center mt-4" style="display:none;">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="sr-only">Carregando...</span>
+                            </div>
+                            <p class="mt-2">Executando análise de backtesting...</p>
+                        </div>
+
+                        <div id="backtesting-results" class="mt-4" style="display:none;">
+                            <h5 class="mb-3">Resultados</h5>
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <div class="card bg-light">
+                                        <div class="card-body text-center">
+                                            <h6 class="text-muted">Acurácia Média</h6>
+                                            <h3 class="mb-0" id="backtest-accuracy">-</h3>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="card bg-light">
+                                        <div class="card-body text-center">
+                                            <h6 class="text-muted">Erro Médio (%)</h6>
+                                            <h3 class="mb-0" id="backtest-error">-</h3>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="card bg-light">
+                                        <div class="card-body text-center">
+                                            <h6 class="text-muted">Testes Realizados</h6>
+                                            <h3 class="mb-0" id="backtest-count">-</h3>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="mt-4">
+                                <canvas id="backtesting-chart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <br/><br/>
 </main>
 
@@ -3236,6 +3331,7 @@ a probabilidade de todas serem entregues no prazo é de <strong>1 em 2^n</strong
                 '#deadline-analysis': '#tab-deadline-link',
                 '#historical-charts': '#tab-historical-link',
                 '#cost-analysis': '#tab-cost-link',
+                '#cost-of-delay': '#tab-cod-link',
                 '#trend-analysis': '#tab-trend-link',
                 '#forecast-vs-actual': '#tab-forecast-vs-actual',
                 '#forecast-vs-actual-tab': '#tab-forecast-vs-actual',
@@ -3244,7 +3340,9 @@ a probabilidade de todas serem entregues no prazo é de <strong>1 em 2^n</strong
                 '#executive-dashboard': '#tab-dashboard-link',
                 '#dashboard': '#tab-dashboard-link',
                 '#portfolio-dashboard': '#tab-portfolio-link',
-                '#portfolio': '#tab-portfolio-link'
+                '#portfolio': '#tab-portfolio-link',
+                '#backtesting-tab': '#tab-backtesting-link',
+                '#backtesting': '#tab-backtesting-link'
             };
 
             const DEFAULT_TAB = '#mc-forecast';
@@ -3336,5 +3434,145 @@ a probabilidade de todas serem entregues no prazo é de <strong>1 em 2^n</strong
     </script>
     <script src="{{ url_for('static', filename='js/portfolio.js') }}"></script>
     <script src="{{ url_for('static', filename='js/forecast-vs-actual.js') }}"></script>
+
+    <!-- Backtesting JavaScript -->
+    <script>
+        $(document).ready(function() {
+            // Load projects on tab show
+            $('#tab-backtesting-link').on('shown.bs.tab', function() {
+                loadBacktestProjects();
+            });
+
+            function loadBacktestProjects() {
+                $.get('/api/projects', function(data) {
+                    const select = $('#backtest-project');
+                    select.empty().append('<option value="">Selecione um projeto...</option>');
+
+                    if (data.projects && data.projects.length > 0) {
+                        data.projects.forEach(project => {
+                            select.append(`<option value="${project.id}">${project.name}</option>`);
+                        });
+                    }
+                });
+            }
+
+            // Handle form submission
+            $('#backtestingForm').on('submit', function(e) {
+                e.preventDefault();
+
+                const projectId = $('#backtest-project').val();
+                const minSamples = parseInt($('#backtest-min-samples').val());
+
+                if (!projectId) {
+                    alert('Por favor, selecione um projeto');
+                    return;
+                }
+
+                // Show loading
+                $('#backtesting-loading').show();
+                $('#backtesting-results').hide();
+
+                // Make API call
+                $.ajax({
+                    url: '/api/backtest',
+                    method: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify({
+                        project_id: projectId,
+                        min_train_size: minSamples
+                    }),
+                    success: function(response) {
+                        displayBacktestResults(response);
+                    },
+                    error: function(xhr) {
+                        alert('Erro ao executar backtesting: ' + (xhr.responseJSON?.error || 'Erro desconhecido'));
+                    },
+                    complete: function() {
+                        $('#backtesting-loading').hide();
+                    }
+                });
+            });
+
+            function displayBacktestResults(data) {
+                // Display metrics
+                const accuracy = (data.metrics?.avg_accuracy * 100 || 0).toFixed(1);
+                const error = (data.metrics?.avg_error_pct || 0).toFixed(1);
+                const count = data.results?.length || 0;
+
+                $('#backtest-accuracy').text(accuracy + '%');
+                $('#backtest-error').text(error + '%');
+                $('#backtest-count').text(count);
+
+                // Create chart if we have results
+                if (data.results && data.results.length > 0) {
+                    createBacktestChart(data.results);
+                }
+
+                $('#backtesting-results').show();
+            }
+
+            function createBacktestChart(results) {
+                const ctx = document.getElementById('backtesting-chart').getContext('2d');
+
+                // Destroy existing chart if any
+                if (window.backtestChart) {
+                    window.backtestChart.destroy();
+                }
+
+                const labels = results.map((_, idx) => `Test ${idx + 1}`);
+                const predicted = results.map(r => r.predicted_p85);
+                const actual = results.map(r => r.actual_duration);
+
+                window.backtestChart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: 'Previsão (P85)',
+                            data: predicted,
+                            borderColor: 'rgb(54, 162, 235)',
+                            backgroundColor: 'rgba(54, 162, 235, 0.1)',
+                            tension: 0.1
+                        }, {
+                            label: 'Real',
+                            data: actual,
+                            borderColor: 'rgb(255, 99, 132)',
+                            backgroundColor: 'rgba(255, 99, 132, 0.1)',
+                            tension: 0.1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: true,
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                title: {
+                                    display: true,
+                                    text: 'Duração (semanas)'
+                                }
+                            },
+                            x: {
+                                title: {
+                                    display: true,
+                                    text: 'Testes de Backtesting'
+                                }
+                            }
+                        },
+                        plugins: {
+                            legend: {
+                                display: true,
+                                position: 'top'
+                            },
+                            title: {
+                                display: true,
+                                text: 'Previsão vs Real - Backtesting'
+                            }
+                        }
+                    }
+                });
+            }
+        });
+    </script>
 </body>
 </html>
