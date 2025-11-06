@@ -284,6 +284,11 @@
 <a aria-controls="cost-analysis" aria-selected="false" class="nav-link" data-toggle="tab" href="#cost-analysis" id="tab-cost-link" role="tab" data-i18n="tab_cost">Análise de Custos</a>
 </li>
 <li class="nav-item">
+<a aria-controls="cost-of-delay" aria-selected="false" class="nav-link" data-toggle="tab" href="#cost-of-delay" id="tab-cod-link" role="tab">
+<i class="fas fa-money-bill-wave"></i> Cost of Delay
+</a>
+</li>
+<li class="nav-item">
 <a aria-controls="trend-analysis" aria-selected="false" class="nav-link" data-toggle="tab" href="#trend-analysis" id="tab-trend-link" role="tab">
 <i class="fas fa-chart-line"></i> Análise de Tendências
 </a>
@@ -1990,6 +1995,272 @@ Histograma mostrando a distribuição de probabilidade do esforço estimado usan
 </div>
 </div>
 </div>
+<!-- ============================================ -->
+<!-- Cost of Delay Tab -->
+<!-- ============================================ -->
+<div aria-labelledby="tab-cod-link" class="tab-pane fade" id="cost-of-delay" role="tabpanel">
+<div class="pt-4 pb-5">
+<div class="container">
+<h2 class="text-center mb-4">Cost of Delay Analysis</h2>
+<p class="text-center text-muted">Predict weekly delay cost using Machine Learning</p>
+
+<!-- Model Info Alert -->
+<div class="alert alert-info" role="alert">
+<h5 class="alert-heading"><i class="fas fa-info-circle"></i> About the CoD Model</h5>
+<p class="mb-0">
+The Cost of Delay (CoD) model uses Machine Learning to predict the weekly cost of delaying a project.
+The model is trained on historical project data and considers multiple factors.
+</p>
+<button id="showModelInfo" class="btn btn-sm btn-outline-info mt-2">Show Model Details</button>
+</div>
+
+<!-- Model Info Panel (initially hidden) -->
+<div id="model-info-panel" class="card mt-3" style="display:none">
+<div class="card-header bg-info text-white">
+<h5 class="mb-0">Model Information</h5>
+</div>
+<div class="card-body">
+<div id="model-info-content">
+<div class="text-center">
+<div class="spinner-border text-primary" role="status">
+<span class="sr-only">Loading...</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+<!-- Project Input Form -->
+<div class="card mt-4">
+<div class="card-header bg-primary text-white">
+<h5 class="mb-0"><i class="fas fa-project-diagram"></i> 1️⃣ Project Characteristics</h5>
+</div>
+<div class="card-body">
+<div class="row">
+<div class="col-md-6">
+<div class="form-group">
+<label>Budget (R$ millions)<span style="color:red">*</span></label>
+<input type="number" step="0.1" min="0.1" id="codBudget" class="form-control" placeholder="e.g., 2.5" required />
+<small class="form-text text-muted">Project budget in millions of reais</small>
+</div>
+<div class="form-group">
+<label>Duration (weeks)<span style="color:red">*</span></label>
+<input type="number" min="1" id="codDuration" class="form-control" placeholder="e.g., 20" required />
+<small class="form-text text-muted">Expected project duration</small>
+</div>
+<div class="form-group">
+<label>Team Size<span style="color:red">*</span></label>
+<input type="number" min="1" id="codTeamSize" class="form-control" placeholder="e.g., 5" required />
+<small class="form-text text-muted">Number of team members</small>
+</div>
+</div>
+<div class="col-md-6">
+<div class="form-group">
+<label>Number of Stakeholders<span style="color:red">*</span></label>
+<input type="number" min="1" id="codStakeholders" class="form-control" placeholder="e.g., 8" required />
+<small class="form-text text-muted">Total stakeholders involved</small>
+</div>
+<div class="form-group">
+<label>Business Value (0-100)<span style="color:red">*</span></label>
+<input type="number" min="0" max="100" id="codBusinessValue" class="form-control" placeholder="e.g., 75" required />
+<small class="form-text text-muted">Business value score</small>
+</div>
+<div class="form-group">
+<label>Complexity (1-5)<span style="color:red">*</span></label>
+<select id="codComplexity" class="form-control" required>
+<option value="">Select...</option>
+<option value="1">1 - Very Low</option>
+<option value="2">2 - Low</option>
+<option value="3">3 - Medium</option>
+<option value="4">4 - High</option>
+<option value="5">5 - Very High</option>
+</select>
+<small class="form-text text-muted">Project complexity level</small>
+</div>
+</div>
+</div>
+<div class="row">
+<div class="col-md-6">
+<div class="form-group">
+<label>Project Type</label>
+<select id="codProjectType" class="form-control">
+<option value="ERP">ERP</option>
+<option value="CRM">CRM</option>
+<option value="Analytics">Analytics</option>
+<option value="Mobile">Mobile</option>
+<option value="Web">Web</option>
+</select>
+<small class="form-text text-muted">Type of project</small>
+</div>
+</div>
+<div class="col-md-6">
+<div class="form-group">
+<label>Risk Level (1-5)</label>
+<select id="codRiskLevel" class="form-control">
+<option value="1">1 - Very Low</option>
+<option value="2">2 - Low</option>
+<option value="3" selected>3 - Medium</option>
+<option value="4">4 - High</option>
+<option value="5">5 - Very High</option>
+</select>
+<small class="form-text text-muted">Overall risk level</small>
+</div>
+</div>
+</div>
+<div class="text-center mt-3">
+<button id="predictCoD" type="button" class="btn btn-success btn-lg">
+<i class="fas fa-magic"></i> Predict Cost of Delay
+</button>
+</div>
+</div>
+</div>
+
+<!-- CoD Prediction Results -->
+<div id="cod-prediction-results" class="mt-4" style="display:none">
+<div class="card">
+<div class="card-header bg-success text-white">
+<h5 class="mb-0"><i class="fas fa-chart-bar"></i> Cost of Delay Prediction</h5>
+</div>
+<div class="card-body">
+<div class="row">
+<div class="col-md-4">
+<div class="card bg-light">
+<div class="card-body text-center">
+<h6 class="text-primary">Weekly CoD</h6>
+<h2 id="cod-weekly-value" class="text-success mb-0">-</h2>
+<p class="text-muted mb-0"><small>Cost per week of delay</small></p>
+</div>
+</div>
+</div>
+<div class="col-md-4">
+<div class="card bg-light">
+<div class="card-body text-center">
+<h6 class="text-primary">Daily CoD</h6>
+<h3 id="cod-daily-value" class="text-info mb-0">-</h3>
+<p class="text-muted mb-0"><small>Cost per day of delay</small></p>
+</div>
+</div>
+</div>
+<div class="col-md-4">
+<div class="card bg-light">
+<div class="card-body text-center">
+<h6 class="text-primary">Monthly CoD</h6>
+<h3 id="cod-monthly-value" class="text-warning mb-0">-</h3>
+<p class="text-muted mb-0"><small>Cost per month (4.33 weeks)</small></p>
+</div>
+</div>
+</div>
+</div>
+<div class="row mt-3">
+<div class="col-md-12">
+<div class="card bg-light">
+<div class="card-body">
+<h6 class="text-primary">Confidence Interval (95%)</h6>
+<p id="cod-confidence-interval" class="mb-0">-</p>
+<small class="text-muted">Range of predicted values</small>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+<!-- Total CoD Calculator -->
+<div class="card mt-4">
+<div class="card-header bg-warning text-dark">
+<h5 class="mb-0"><i class="fas fa-calculator"></i> 2️⃣ Total Cost of Delay Calculator</h5>
+</div>
+<div class="card-body">
+<p class="text-muted">Calculate the total cost based on delay duration</p>
+<div class="row">
+<div class="col-md-6">
+<div class="form-group">
+<label>Weekly CoD (R$)<span style="color:red">*</span></label>
+<input type="number" step="0.01" min="0" id="codWeeklyInput" class="form-control" placeholder="Will be filled from prediction" />
+<small class="form-text text-muted">Will auto-fill after prediction</small>
+</div>
+</div>
+<div class="col-md-6">
+<div class="form-group">
+<label>Delay Duration (weeks)<span style="color:red">*</span></label>
+<input type="number" step="0.1" min="0" id="delayWeeks" class="form-control" placeholder="e.g., 4" />
+<small class="form-text text-muted">How many weeks of delay</small>
+</div>
+</div>
+</div>
+<div class="text-center">
+<button id="calculateTotalCoD" type="button" class="btn btn-warning">
+<i class="fas fa-coins"></i> Calculate Total Cost
+</button>
+</div>
+</div>
+</div>
+
+<!-- Total CoD Results -->
+<div id="total-cod-results" class="mt-4" style="display:none">
+<div class="card border-danger">
+<div class="card-header bg-danger text-white">
+<h5 class="mb-0"><i class="fas fa-exclamation-triangle"></i> Total Cost of Delay</h5>
+</div>
+<div class="card-body">
+<div class="row align-items-center">
+<div class="col-md-8">
+<h5>Total Cost</h5>
+<h1 id="total-cod-value" class="text-danger mb-0">-</h1>
+</div>
+<div class="col-md-4 text-right">
+<p class="mb-1"><strong>Weekly CoD:</strong> <span id="total-cod-weekly">-</span></p>
+<p class="mb-0"><strong>Delay:</strong> <span id="total-cod-weeks">-</span> weeks</p>
+</div>
+</div>
+<div class="alert alert-danger mt-3 mb-0" role="alert">
+<strong><i class="fas fa-exclamation-circle"></i> Impact Assessment:</strong> This represents the potential financial loss due to project delay.
+Consider this when making prioritization decisions.
+</div>
+</div>
+</div>
+</div>
+
+<!-- Feature Importance -->
+<div class="card mt-4">
+<div class="card-header bg-info text-white">
+<h5 class="mb-0"><i class="fas fa-chart-pie"></i> 3️⃣ Feature Importance Analysis</h5>
+</div>
+<div class="card-body">
+<p class="text-muted">See which factors most influence the CoD prediction</p>
+<div class="text-center">
+<button id="showFeatureImportance" type="button" class="btn btn-info">
+<i class="fas fa-chart-bar"></i> Show Feature Importance
+</button>
+</div>
+<div id="feature-importance-results" class="mt-4" style="display:none">
+<div style="height: 400px;">
+<canvas id="feature-importance-chart"></canvas>
+</div>
+<div class="table-responsive mt-3">
+<table class="table table-striped">
+<thead>
+<tr>
+<th>Feature</th>
+<th>Importance</th>
+<th>Impact</th>
+</tr>
+</thead>
+<tbody id="feature-importance-table">
+</tbody>
+</table>
+</div>
+</div>
+</div>
+</div>
+
+</div>
+</div>
+</div>
+<!-- ============================================ -->
+<!-- End Cost of Delay Tab -->
+<!-- ============================================ -->
 <div aria-labelledby="tab-trend-link" class="tab-pane fade" id="trend-analysis" role="tabpanel">
 <div class="pt-4 pb-5">
 <div class="container text-center">
@@ -2904,6 +3175,7 @@ a probabilidade de todas serem entregues no prazo é de <strong>1 em 2^n</strong
 <script src="{{ url_for('static', filename='js/demand_forecast.js') }}"></script>
 <script src="{{ url_for('static', filename='js/charts.js') }}"></script>
 <script src="{{ url_for('static', filename='js/cost_analysis.js') }}"></script>
+<script src="{{ url_for('static', filename='js/cost_of_delay.js') }}"></script>
 <script src="{{ url_for('static', filename='js/forecast-persistence.js') }}"></script>
 <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
 <script src="{{ url_for('static', filename='js/trend_insights.js') }}"></script>
