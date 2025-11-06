@@ -33,4 +33,10 @@ EXPOSE 8080 5555
 # For flower:
 #   celery -A celery_app flower --port=5555
 
-CMD ["sh", "-c", "exec gunicorn wsgi:application --bind 0.0.0.0:${PORT:-8080} --timeout 300 --workers 4 --worker-class sync --max-requests 1000 --max-requests-jitter 100"]
+# Health check
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+  CMD python -c "import requests; requests.get('http://localhost:8080/api/async/health', timeout=5)"
+
+# Default command will be overridden by fly.toml processes
+# This is a fallback for local development
+CMD ["sh", "-c", "exec gunicorn wsgi:application --bind 0.0.0.0:${PORT:-8080} --timeout 300 --workers 4 --worker-class gevent --worker-connections 1000 --max-requests 1000 --max-requests-jitter 100"]
