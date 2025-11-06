@@ -19,14 +19,14 @@ $(document).ready(function() {
 });
 
 function initForecastVsActual() {
-    loadForecasts();
+    loadForecastsForComparison();
 
     // Event handlers
     $('#fva-btn-save-actual').click(saveActual);
 
     // Reload forecasts when modal is shown
     $('#registerActualModal').on('show.bs.modal', function() {
-        loadForecasts();
+        loadForecastsForComparison();
     });
 
     $('#registerActualModal').on('hidden.bs.modal', function() {
@@ -268,9 +268,9 @@ function populateComparisonsTable(comparisons) {
 }
 
 /**
- * Load forecasts for the dropdown
+ * Load forecasts for the comparison dropdown (Forecast vs Actual feature)
  */
-async function loadForecasts() {
+async function loadForecastsForComparison() {
     try {
         const response = await fetch('/api/forecasts');
         const forecasts = await response.json();
@@ -350,7 +350,7 @@ async function saveActual() {
         // Reload dashboard
         setTimeout(() => {
             loadDashboard();
-            loadForecasts();
+            loadForecastsForComparison();
         }, 500);
 
     } catch (error) {

@@ -10,15 +10,8 @@ function openSaveModal() {
 
 // Open load modal and fetch forecasts
 function openLoadModal() {
-    console.log('[openLoadModal] Abrindo modal...');
-    try {
-        $('#loadForecastModal').modal('show');
-        console.log('[openLoadModal] Modal exibido, chamando loadForecasts...');
-        loadForecasts();
-    } catch (error) {
-        console.error('[openLoadModal] ERRO:', error);
-        alert('Erro ao abrir modal: ' + error.message);
-    }
+    $('#loadForecastModal').modal('show');
+    loadForecasts();
 }
 
 // Save forecast to database
@@ -114,30 +107,21 @@ async function saveForecast() {
 
 // Load forecasts list from database
 async function loadForecasts() {
-    console.log('=== [loadForecasts] INICIANDO ===');
-    alert('loadForecasts() foi chamada! Verifique o console.');
-
     try {
-        console.log('loadForecasts: Iniciando carregamento...');
         $('#loadingForecasts').show();
         $('#forecastsList').empty();
 
         const response = await fetch('/api/forecasts', { credentials: 'include' });
-        console.log('loadForecasts: Response status:', response.status);
 
         if (!response.ok) {
-            const errorText = await response.text();
-            console.error('loadForecasts: Erro HTTP', response.status, errorText);
-            throw new Error(`Erro ${response.status}: ${errorText}`);
+            throw new Error('Erro ao carregar análises');
         }
 
         const forecasts = await response.json();
-        console.log('loadForecasts: Forecasts recebidos:', forecasts.length, forecasts);
 
         $('#loadingForecasts').hide();
 
         if (!Array.isArray(forecasts)) {
-            console.error('loadForecasts: Resposta não é um array:', forecasts);
             $('#forecastsList').html('<p class="text-danger">Erro: resposta inválida da API.</p>');
             return;
         }
@@ -184,7 +168,6 @@ async function loadForecasts() {
         html += '</div>';
 
         $('#forecastsList').html(html);
-        console.log('loadForecasts: Lista renderizada com sucesso');
 
     } catch (error) {
         console.error('Error loading forecasts:', error);
