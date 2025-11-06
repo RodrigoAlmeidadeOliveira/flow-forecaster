@@ -2919,16 +2919,32 @@ def backtest_project():
         for forecast in forecasts:
             try:
                 input_data = json.loads(forecast.input_data)
-                tp_samples = input_data.get('tpSamples', input_data.get('tp_samples', []))
+
+                # Try multiple possible field names for throughput samples
+                tp_samples = (
+                    input_data.get('tpSamples') or
+                    input_data.get('tp_samples') or
+                    input_data.get('throughput_samples') or
+                    []
+                )
+
                 backlog = input_data.get('backlog', 0)
 
-                if tp_samples:
+                if tp_samples and isinstance(tp_samples, list) and len(tp_samples) > 0:
                     all_tp_samples.extend(tp_samples)
+                    print(f"✓ Forecast {forecast.id}: {len(tp_samples)} samples")
+                else:
+                    print(f"⚠ Forecast {forecast.id}: No TP samples (keys: {list(input_data.keys())})")
+
                 if backlog > 0:
                     backlog_values.append(backlog)
             except Exception as e:
-                print(f"Error parsing forecast {forecast.id}: {e}")
+                print(f"✗ Error parsing forecast {forecast.id}: {e}")
+                import traceback
+                traceback.print_exc()
                 continue
+
+        print(f"\n=== Summary: {len(all_tp_samples)} total samples from {len(forecasts)} forecasts ===")
 
         # Validation
         if not all_tp_samples:
@@ -2949,7 +2965,7 @@ def backtest_project():
             backlog = int(sum(all_tp_samples) / len(all_tp_samples)) * 10  # Estimate: 10 weeks of work
 
         # Run backtesting using expanding window method
-        summary = run_backtest_expanding(
+        summary = run_expanding_window_backtest(
             tp_samples=all_tp_samples,
             backlog=backlog,
             initial_train_size=min_train_size,
