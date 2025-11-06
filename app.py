@@ -3260,7 +3260,9 @@ def train_cod_model():
             df[column] = pd.to_numeric(df[column], errors='coerce')
         df = df.dropna(subset=numeric_columns)
         forecaster = CoDForecaster()
-        search_iterations = 30 if request.json and request.json.get('full_search') else 12
+        options = request.get_json(silent=True)
+        full_search = isinstance(options, dict) and options.get('full_search')
+        search_iterations = 30 if full_search else 12
         forecaster.train_models(
             df,
             use_hyperparam_search=True,
