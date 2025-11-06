@@ -66,6 +66,11 @@ from portfolio_analyzer import (
     generate_portfolio_alerts
 )
 from trend_analysis import comprehensive_trend_analysis
+from logger import get_logger
+from error_handlers import register_error_handlers
+
+# Initialize logger
+logger = get_logger('app')
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('FLOW_FORECASTER_SECRET_KEY') or os.environ.get('SECRET_KEY') or 'change-me-in-production'
@@ -88,6 +93,9 @@ login_manager.login_message_category = 'info'
 
 # Initialize database
 init_db()
+
+# Register error handlers
+register_error_handlers(app)
 
 
 @login_manager.user_loader
@@ -117,6 +125,18 @@ def remove_session(exception=None):
     close_session()
 
 
+@app.after_request
+def add_security_headers(response):
+    """Add security headers to all responses."""
+    from config import SecuritySettings
+
+    # Add security headers
+    for header, value in SecuritySettings.SECURITY_HEADERS.items():
+        response.headers[header] = value
+
+    return response
+
+
 @app.context_processor
 def inject_auth_context():
     """Expose auth helpers to Jinja templates."""
@@ -125,16 +145,16 @@ def inject_auth_context():
         'ADMIN_ROLES': ADMIN_ROLES
     }
 
-# Debugging: Print routes at startup
+# Application initialization logging
 import sys
 import math
-print("="*60, flush=True)
-print("Flask app created successfully!", flush=True)
-print(f"App name: {app.name}", flush=True)
-print(f"Template folder: {app.template_folder}", flush=True)
-print(f"Root path: {app.root_path}", flush=True)
-print("="*60, flush=True)
-sys.stdout.flush()
+
+logger.info("=" * 60)
+logger.info("Flask app created successfully!")
+logger.info(f"App name: {app.name}")
+logger.info(f"Template folder: {app.template_folder}")
+logger.info(f"Root path: {app.root_path}")
+logger.info("=" * 60)
 
 EMAIL_REGEX = re.compile(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
 ADMIN_ROLES = {'admin', 'instructor'}
@@ -540,18 +560,18 @@ def simulate():
             simulation_data['teamFocusPercent'] = round(team_focus_value * 100, 2)
 
         # Debug: log dependencies
-        print(f"[INFO] Received {len(simulation_data['dependencies'])} dependencies", flush=True)
+        logger.info(f"Received {len(simulation_data['dependencies'])} dependencies")
         if simulation_data['dependencies']:
-            print(f"[INFO] First dependency: {simulation_data['dependencies'][0]}", flush=True)
+            logger.debug(f"First dependency: {simulation_data['dependencies'][0]}")
 
         # Run the simulation
         result = run_monte_carlo_simulation(simulation_data)
 
         # Debug: check if dependency_analysis is in result
         if 'dependency_analysis' in result:
-            print(f"[INFO] dependency_analysis is in result with {result['dependency_analysis']['total_dependencies']} deps", flush=True)
+            logger.info(f"dependency_analysis is in result with {result['dependency_analysis']['total_dependencies']} deps")
         else:
-            print(f"[WARNING] dependency_analysis NOT in result. Result keys: {list(result.keys())}", flush=True)
+            logger.warning(f"dependency_analysis NOT in result. Result keys: {list(result.keys())}")
 
         # Compute 30-day probability table for quick planning
         items_forecast_30_days = None
@@ -994,12 +1014,12 @@ def api_deadline_analysis():
         JSON with deadline analysis results from both methods, including cost estimates
     """
     try:
-        print("=" * 60, flush=True)
-        print("API DEADLINE ANALYSIS CALLED", flush=True)
-        print("=" * 60, flush=True)
+        logger.info("=" * 60)
+        logger.info("API DEADLINE ANALYSIS CALLED")
+        logger.info("=" * 60)
 
         data = request.json
-        print(f"Received data keys: {list(data.keys()) if data else 'None'}", flush=True)
+        logger.debug(f"Received data keys: {list(data.keys()) if data else 'None'}")
 
         tp_samples = data.get('tpSamples', [])
         backlog = data.get('backlog', 0)
@@ -1428,28 +1448,28 @@ def api_deadline_analysis():
                 'mc_more_conservative': mc_weeks > ml_weeks if (mc_weeks and ml_weeks) else None
             }
 
-        print("=" * 60, flush=True)
-        print("DEADLINE ANALYSIS COMPLETED SUCCESSFULLY", flush=True)
-        print("=" * 60, flush=True)
+        logger.info("=" * 60)
+        logger.info("DEADLINE ANALYSIS COMPLETED SUCCESSFULLY")
+        logger.info("=" * 60)
         return jsonify(convert_to_native_types(response_data))
 
     except ValueError as e:
         import traceback
         error_msg = str(e)
         trace_msg = traceback.format_exc()
-        print("=" * 60, flush=True)
-        print(f"DEADLINE ANALYSIS ERROR (ValueError): {error_msg}", flush=True)
-        print(trace_msg, flush=True)
-        print("=" * 60, flush=True)
+        logger.error("=" * 60)
+        logger.error(f"DEADLINE ANALYSIS ERROR (ValueError): {error_msg}")
+        logger.error(trace_msg)
+        logger.error("=" * 60)
         return jsonify({'error': error_msg, 'trace': trace_msg, 'error_type': 'ValueError'}), 400
     except Exception as e:
         import traceback
         error_msg = str(e)
         trace_msg = traceback.format_exc()
-        print("=" * 60, flush=True)
-        print(f"DEADLINE ANALYSIS ERROR (Exception): {error_msg}", flush=True)
-        print(trace_msg, flush=True)
-        print("=" * 60, flush=True)
+        logger.error("=" * 60)
+        logger.error(f"DEADLINE ANALYSIS ERROR (Exception): {error_msg}")
+        logger.error(trace_msg)
+        logger.error("=" * 60)
         return jsonify({'error': error_msg, 'trace': trace_msg, 'error_type': type(e).__name__}), 500
 
 
@@ -1708,8 +1728,9 @@ def api_cost_analysis():
 
 
 # Print registered routes for debugging
-print("="*60, flush=True)
-print(f"Total routes registered: {len(list(app.url_map.iter_rules()))}", flush=True)
+logger.info("="*60)
+logger.info(f"Total routes registered: {len(list(app.url_map.iter_rules()))}")
+
 @app.route('/api/dependency-analysis', methods=['POST'])
 @login_required
 def dependency_analysis():
@@ -3013,10 +3034,12 @@ def _load_default_cod_forecaster():
         _default_cod_forecaster = CoDForecaster()
         try:
             sample_data = generate_sample_cod_data(n_samples=100)
+            _default_cod_forecaster.train_models(sample_data)
+            logger.info("CoD Forecaster initialized with sample data")
             _default_cod_forecaster.train_models(sample_data, use_hyperparam_search=False)
             print("CoD Forecaster initialized with sample data", flush=True)
         except Exception as exc:
-            print(f"Warning: Could not initialize default CoD forecaster: {exc}", flush=True)
+            logger.warning(f"Could not initialize default CoD forecaster: {exc}")
     return _default_cod_forecaster
 
 
@@ -3038,7 +3061,7 @@ def _load_user_cod_forecaster(user_id: int):
                 _cod_forecasters_by_user[user_id] = forecaster
                 return forecaster
             except Exception as exc:
-                print(f"Warning: Could not unpickle CoD model for user {user_id}: {exc}", flush=True)
+                logger.warning(f"Could not unpickle CoD model for user {user_id}: {exc}")
     finally:
         session.close()
 
@@ -3493,18 +3516,18 @@ def cod_model_info():
 try:
     from app_async_endpoints import register_async_endpoints
     register_async_endpoints(app)
-    print("[INFO] Async endpoints registered successfully", flush=True)
+    logger.info("Async endpoints registered successfully")
 except ImportError as e:
-    print(f"[WARNING] Celery/Async endpoints not available: {e}", flush=True)
-    print("[WARNING] Application will run in synchronous mode only", flush=True)
+    logger.warning(f"Celery/Async endpoints not available: {e}")
+    logger.warning("Application will run in synchronous mode only")
 
 # ============================================================================
-# Print all registered routes
+# Log all registered routes
 # ============================================================================
+logger.debug("Registered routes:")
 for rule in app.url_map.iter_rules():
-    print(f"  {rule.endpoint:30s} {rule.rule}", flush=True)
-print("="*60, flush=True)
-sys.stdout.flush()
+    logger.debug(f"  {rule.endpoint:30s} {rule.rule}")
+logger.info("="*60)
 
 
 if __name__ == '__main__':

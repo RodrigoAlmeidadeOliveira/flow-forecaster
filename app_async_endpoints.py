@@ -6,6 +6,9 @@ Import and register these routes in app.py
 from flask import jsonify, request
 from flask_login import login_required, current_user
 from celery.result import AsyncResult
+from logger import get_logger
+
+logger = get_logger('async_endpoints')
 
 # Import Celery app and tasks
 try:
@@ -19,7 +22,7 @@ try:
     CELERY_AVAILABLE = True
 except ImportError:
     CELERY_AVAILABLE = False
-    print("[WARNING] Celery not available. Async endpoints will be disabled.")
+    logger.warning("Celery not available. Async endpoints will be disabled.")
 
 
 def register_async_endpoints(app):
@@ -32,7 +35,7 @@ def register_async_endpoints(app):
     """
 
     if not CELERY_AVAILABLE:
-        print("[WARNING] Celery not available. Skipping async endpoint registration.")
+        logger.warning("Celery not available. Skipping async endpoint registration.")
         return
 
     @app.route('/api/async/simulate', methods=['POST'])
@@ -73,7 +76,7 @@ def register_async_endpoints(app):
                 save_forecast=save_forecast
             )
 
-            print(f"[ASYNC] Submitted Monte Carlo task {task.id} for user {current_user.id}")
+            logger.info(f"Submitted Monte Carlo task {task.id} for user {current_user.id}")
 
             # Return immediately with task_id
             return jsonify({
@@ -108,7 +111,7 @@ def register_async_endpoints(app):
                 save_forecast=save_forecast
             )
 
-            print(f"[ASYNC] Submitted ML deadline analysis task {task.id} for user {current_user.id}")
+            logger.info(f"Submitted ML deadline analysis task {task.id} for user {current_user.id}")
 
             return jsonify({
                 'task_id': task.id,
@@ -142,7 +145,7 @@ def register_async_endpoints(app):
                 save_forecast=save_forecast
             )
 
-            print(f"[ASYNC] Submitted backtest task {task.id} for user {current_user.id}")
+            logger.info(f"Submitted backtest task {task.id} for user {current_user.id}")
 
             return jsonify({
                 'task_id': task.id,
@@ -283,11 +286,11 @@ def register_async_endpoints(app):
                 'workers': 'unavailable'
             }), 503
 
-    print("[INFO] Async endpoints registered successfully")
-    print("[INFO] Available async endpoints:")
-    print("  POST   /api/async/simulate")
-    print("  POST   /api/async/deadline-analysis")
-    print("  POST   /api/async/backtest")
-    print("  GET    /api/tasks/<task_id>")
-    print("  DELETE /api/tasks/<task_id>")
-    print("  GET    /api/health/celery")
+    logger.info("Async endpoints registered successfully")
+    logger.info("Available async endpoints:")
+    logger.info("  POST   /api/async/simulate")
+    logger.info("  POST   /api/async/deadline-analysis")
+    logger.info("  POST   /api/async/backtest")
+    logger.info("  GET    /api/tasks/<task_id>")
+    logger.info("  DELETE /api/tasks/<task_id>")
+    logger.info("  GET    /api/health/celery")

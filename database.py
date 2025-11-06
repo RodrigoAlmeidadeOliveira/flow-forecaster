@@ -7,6 +7,9 @@ from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import sessionmaker, scoped_session
 from sqlalchemy.pool import QueuePool, NullPool
 from models import Base, Project, Forecast, Actual, User, CoDTrainingDataset, CoDModel
+from logger import get_logger
+
+logger = get_logger('database')
 
 DATABASE_URL = os.environ.get('DATABASE_URL', 'sqlite:///forecaster.db')
 
@@ -32,8 +35,8 @@ if is_postgresql:
             'application_name': 'flow-forecaster',
         },
     )
-    print("[DATABASE] PostgreSQL engine created with connection pooling")
-    print("[DATABASE] Pool size: 20, Max overflow: 40")
+    logger.info("PostgreSQL engine created with connection pooling")
+    logger.info("Pool size: 20, Max overflow: 40")
 elif is_sqlite:
     engine = create_engine(
         DATABASE_URL,
@@ -41,10 +44,10 @@ elif is_sqlite:
         echo=False,
         connect_args={'check_same_thread': False},
     )
-    print("[DATABASE] SQLite engine created (development mode)")
+    logger.info("SQLite engine created (development mode)")
 else:
     engine = create_engine(DATABASE_URL, echo=False)
-    print(f"[DATABASE] Generic engine created for {DATABASE_URL}")
+    logger.info(f"Generic engine created for {DATABASE_URL}")
 
 session_factory = sessionmaker(bind=engine)
 Session = scoped_session(session_factory)
@@ -55,7 +58,7 @@ DB_PATH = DATABASE_URL  # Maintains backwards compatibility for existing code pa
 def init_db():
     """Initialize database, create all tables."""
     Base.metadata.create_all(engine)
-    print(f"Database initialized at {DB_PATH}")
+    logger.info(f"Database initialized at {DB_PATH}")
 
 
 def ensure_schema():
@@ -166,7 +169,7 @@ def reset_db():
     """Drop all tables and recreate (WARNING: destroys all data)."""
     Base.metadata.drop_all(engine)
     Base.metadata.create_all(engine)
-    print("Database reset complete")
+    logger.warning("Database reset complete")
 
 
 if is_sqlite:
@@ -175,37 +178,37 @@ if is_sqlite:
         db_dir = os.path.dirname(db_file)
         if db_dir and not os.path.exists(db_dir):
             os.makedirs(db_dir, exist_ok=True)
-        print(f"[DATABASE] Initializing new SQLite database at {db_file}")
+        logger.info(f"Initializing new SQLite database at {db_file}")
         init_db()
     else:
-        print(f"[DATABASE] Using existing SQLite database at {db_file}")
+        logger.info(f"Using existing SQLite database at {db_file}")
 
     try:
         ensure_schema()
     except Exception as exc:
-        print(f"[DATABASE] SQLite schema update warning: {exc}")
+        logger.warning(f"SQLite schema update warning: {exc}")
 
 elif is_postgresql:
     try:
         inspector = inspect(engine)
         tables = inspector.get_table_names()
         if not tables:
-            print("[DATABASE] No tables found in PostgreSQL, creating initial schema")
+            logger.info("No tables found in PostgreSQL, creating initial schema")
             init_db()
         else:
-            print(f"[DATABASE] Connected to PostgreSQL with {len(tables)} tables")
+            logger.info(f"Connected to PostgreSQL with {len(tables)} tables")
     except Exception as exc:
-        print(f"[DATABASE] Warning: Could not inspect PostgreSQL database: {exc}")
+        logger.warning(f"Could not inspect PostgreSQL database: {exc}")
 
     try:
         ensure_schema()
     except Exception as exc:
-        print(f"[DATABASE] PostgreSQL schema update warning: {exc}")
+        logger.warning(f"PostgreSQL schema update warning: {exc}")
 
 else:
-    print(f"[DATABASE] Initializing database at {DATABASE_URL}")
+    logger.info(f"Initializing database at {DATABASE_URL}")
     init_db()
     try:
         ensure_schema()
     except Exception as exc:
-        print(f"[DATABASE] Schema update warning for {DATABASE_URL}: {exc}")
+        logger.warning(f"Schema update warning for {DATABASE_URL}: {exc}")
