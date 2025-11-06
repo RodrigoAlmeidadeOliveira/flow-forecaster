@@ -70,6 +70,9 @@ from trend_analysis import comprehensive_trend_analysis
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('FLOW_FORECASTER_SECRET_KEY') or os.environ.get('SECRET_KEY') or 'change-me-in-production'
 
+BASE_DIR = Path(__file__).resolve().parent
+COD_SAMPLE_PATH = BASE_DIR / 'data' / 'cod_training_sample.csv'
+
 # Enable GZIP compression for better performance over slow networks
 app.config['COMPRESS_MIMETYPES'] = [
     'text/html', 'text/css', 'text/xml', 'application/json',
@@ -3130,6 +3133,20 @@ def load_cod_dataframe(file_storage) -> pd.DataFrame:
         raise ValueError('É necessário pelo menos 10 linhas válidas para treinar o modelo.')
 
     return df
+
+
+@app.route('/downloads/cod-sample', methods=['GET'])
+@login_required
+def download_cod_sample():
+    """Provide the sample CoD CSV for users."""
+    if not COD_SAMPLE_PATH.exists():
+        return jsonify({'error': 'Sample dataset indisponível no servidor.'}), 404
+    return send_file(
+        str(COD_SAMPLE_PATH),
+        mimetype='text/csv',
+        as_attachment=True,
+        download_name='cod_training_sample.csv'
+    )
 
 
 @app.route('/api/cod/dataset', methods=['GET'])
