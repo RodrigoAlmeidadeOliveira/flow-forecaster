@@ -69,6 +69,12 @@ Desktop.ini
 *.bak
 *.backup
 *~
+backups/
+*.sql
+*.sql.gz
+*_backup_*.sql
+postgres_backup.sql
+forecaster_from_flyio*.db
 
 # Temporary files
 tmp/
