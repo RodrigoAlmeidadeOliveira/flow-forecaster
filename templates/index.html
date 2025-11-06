@@ -2030,6 +2030,47 @@ The model is trained on historical project data and considers multiple factors.
 </div>
 </div>
 
+<!-- Dataset Upload & Training -->
+<div class="card mt-4">
+<div class="card-header bg-secondary text-white">
+<h5 class="mb-0"><i class="fas fa-database"></i> 0️⃣ Train the Model with Your Data</h5>
+</div>
+<div class="card-body">
+<form id="codDatasetForm" enctype="multipart/form-data">
+<div class="form-row align-items-end">
+<div class="form-group col-md-4">
+<label>Dataset name</label>
+<input type="text" class="form-control" id="codDatasetName" placeholder="e.g., Projects 2024" />
+</div>
+<div class="form-group col-md-5">
+<label>CSV file<span style="color:red">*</span></label>
+<input type="file" class="form-control-file" id="codDatasetFile" accept=".csv" required />
+<small class="form-text text-muted">
+Include the columns: budget_millions, duration_weeks, team_size, num_stakeholders, business_value, complexity and cod_weekly (optionally project_type, risk_level).
+</small>
+</div>
+<div class="form-group col-md-3 text-md-right">
+<button type="submit" class="btn btn-primary btn-block" id="uploadCodDataset">
+<i class="fas fa-upload"></i> Import CSV
+</button>
+</div>
+</div>
+</form>
+<div id="codDatasetStatus" class="alert alert-light border mt-3" role="alert">
+No dataset uploaded yet.
+</div>
+<div class="d-flex flex-column flex-md-row align-items-start align-items-md-center">
+<button class="btn btn-success mr-md-3 mb-2 mb-md-0" id="trainCodModel" disabled>
+<i class="fas fa-robot"></i> Train model with my data
+</button>
+<a href="{{ url_for('download_cod_sample') }}" class="btn btn-outline-secondary" target="_blank" rel="noopener">
+<i class="fas fa-download"></i> Download sample CSV
+</a>
+</div>
+<div id="codTrainingMessage" class="mt-3"></div>
+</div>
+</div>
+
 <!-- Project Input Form -->
 <div class="card mt-4">
 <div class="card-header bg-primary text-white">
