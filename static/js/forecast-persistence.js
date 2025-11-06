@@ -464,6 +464,7 @@ $(document).on('change', '#importFileInput', function() {
 window.openSaveModal = openSaveModal;
 window.openLoadModal = openLoadModal;
 window.saveForecast = saveForecast;
+window.loadForecasts = loadForecasts;
 window.loadForecast = loadForecast;
 window.deleteForecast = deleteForecast;
 window.importForecastFromFile = importForecastFromFile;

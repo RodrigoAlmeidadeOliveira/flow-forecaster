@@ -2872,6 +2872,127 @@ def api_backtest():
         }), 500
 
 
+@app.route('/api/backtest-project', methods=['POST'])
+@login_required
+def backtest_project():
+    """
+    Run backtesting on a project using its historical forecasts.
+    Extracts throughput samples from all forecasts of the project.
+
+    Expects JSON:
+        {
+            "project_id": int,
+            "min_train_size": int (default: 5)
+        }
+
+    Returns:
+        JSON with backtest results
+    """
+    db_session = get_session()
+    try:
+        data = request.json
+        project_id = data.get('project_id')
+        min_train_size = data.get('min_train_size', 5)
+
+        if not project_id:
+            return jsonify({'error': 'project_id is required'}), 400
+
+        # Verify project exists and user has access
+        project = scoped_project_query(db_session).filter(Project.id == project_id).one_or_none()
+        if not project:
+            return jsonify({'error': 'Project not found'}), 404
+
+        # Get all forecasts for this project
+        forecasts = scoped_forecast_query(db_session).filter(
+            Forecast.project_id == project_id
+        ).order_by(Forecast.created_at).all()
+
+        if not forecasts:
+            return jsonify({
+                'error': 'No forecasts found for this project. Create some forecasts first to enable backtesting.'
+            }), 404
+
+        # Extract throughput samples from forecasts
+        all_tp_samples = []
+        backlog_values = []
+
+        for forecast in forecasts:
+            try:
+                input_data = json.loads(forecast.input_data)
+                tp_samples = input_data.get('tpSamples', input_data.get('tp_samples', []))
+                backlog = input_data.get('backlog', 0)
+
+                if tp_samples:
+                    all_tp_samples.extend(tp_samples)
+                if backlog > 0:
+                    backlog_values.append(backlog)
+            except Exception as e:
+                print(f"Error parsing forecast {forecast.id}: {e}")
+                continue
+
+        # Validation
+        if not all_tp_samples:
+            return jsonify({
+                'error': 'No throughput samples found in forecasts for this project.'
+            }), 404
+
+        if len(all_tp_samples) < min_train_size + 1:
+            return jsonify({
+                'error': f'Need at least {min_train_size + 1} throughput samples for backtesting. Got {len(all_tp_samples)}. '
+                         f'This project has {len(forecasts)} forecast(s) with a total of {len(all_tp_samples)} throughput sample(s).'
+            }), 400
+
+        # Use average backlog if available, otherwise use median from samples
+        if backlog_values:
+            backlog = int(sum(backlog_values) / len(backlog_values))
+        else:
+            backlog = int(sum(all_tp_samples) / len(all_tp_samples)) * 10  # Estimate: 10 weeks of work
+
+        # Run backtesting using expanding window method
+        summary = run_backtest_expanding(
+            tp_samples=all_tp_samples,
+            backlog=backlog,
+            initial_train_size=min_train_size,
+            confidence_level='P85',
+            n_simulations=10000
+        )
+
+        # Calculate metrics for response
+        results = summary.to_dict()
+        metrics = {
+            'avg_accuracy': sum(r['accuracy'] for r in results['results']) / len(results['results']) if results['results'] else 0,
+            'avg_error_pct': sum(abs(r['error_pct']) for r in results['results']) / len(results['results']) if results['results'] else 0,
+        }
+
+        response = {
+            'project': {
+                'id': project.id,
+                'name': project.name
+            },
+            'data_info': {
+                'total_forecasts': len(forecasts),
+                'total_samples': len(all_tp_samples),
+                'avg_backlog': backlog
+            },
+            'metrics': metrics,
+            'results': results['results'],
+            'report': generate_backtest_report(summary)
+        }
+
+        return jsonify(convert_to_native_types(response))
+
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+    except Exception as e:
+        import traceback
+        return jsonify({
+            'error': str(e),
+            'trace': traceback.format_exc()
+        }), 500
+    finally:
+        db_session.close()
+
+
 # ============================================================================
 # PORTFOLIO MANAGEMENT API ENDPOINTS
 # ============================================================================

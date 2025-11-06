@@ -3473,18 +3473,20 @@ a probabilidade de todas serem entregues no prazo é de <strong>1 em 2^n</strong
 
                 // Make API call
                 $.ajax({
-                    url: '/api/backtest',
+                    url: '/api/backtest-project',
                     method: 'POST',
                     contentType: 'application/json',
                     data: JSON.stringify({
-                        project_id: projectId,
+                        project_id: parseInt(projectId),
                         min_train_size: minSamples
                     }),
                     success: function(response) {
                         displayBacktestResults(response);
                     },
                     error: function(xhr) {
-                        alert('Erro ao executar backtesting: ' + (xhr.responseJSON?.error || 'Erro desconhecido'));
+                        console.error('Backtesting error:', xhr);
+                        const errorMsg = xhr.responseJSON?.error || xhr.responseText || 'Erro desconhecido';
+                        alert('Erro ao executar backtesting: ' + errorMsg);
                     },
                     complete: function() {
                         $('#backtesting-loading').hide();
