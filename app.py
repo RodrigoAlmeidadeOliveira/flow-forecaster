@@ -2705,10 +2705,22 @@ def api_backtest():
         "backlog": int,
         "method": "walk_forward" or "expanding_window" (default: walk_forward),
         "minTrainSize": int (default: 5),
+        "testSize": int (default: 1) - Number of periods to forecast,
+        "foldStride": int (default: 1) - Number of periods to advance between forecasts,
         "confidenceLevel": "P50", "P85", or "P95" (default: P85),
         "nSimulations": int (default: 10000),
         "compareConfidenceLevels": bool (default: false)
     }
+
+    Examples:
+        Standard walk-forward (every period):
+            {"foldStride": 1, "testSize": 1}
+
+        Weekly updates with 30-day horizon (daily data):
+            {"foldStride": 7, "testSize": 30}
+
+        Bi-weekly updates with 60-day horizon:
+            {"foldStride": 14, "testSize": 60}
 
     Returns:
         JSON with backtest results
@@ -2719,6 +2731,8 @@ def api_backtest():
         backlog = data.get('backlog', 0)
         method = data.get('method', 'walk_forward')
         min_train_size = data.get('minTrainSize', 5)
+        test_size = data.get('testSize', 1)
+        fold_stride = data.get('foldStride', 1)
         confidence_level = data.get('confidenceLevel', 'P85')
         n_simulations = data.get('nSimulations', 10000)
         compare_levels = data.get('compareConfidenceLevels', False)
@@ -2742,11 +2756,15 @@ def api_backtest():
                 tp_samples,
                 backlog,
                 min_train_size=min_train_size,
+                test_size=test_size,
+                fold_stride=fold_stride,
                 n_simulations=n_simulations
             )
 
             response = {
                 'method': 'comparison',
+                'test_size': test_size,
+                'fold_stride': fold_stride,
                 'results_by_level': {}
             }
 
@@ -2764,7 +2782,8 @@ def api_backtest():
                     tp_samples,
                     backlog,
                     min_train_size=min_train_size,
-                    test_size=1,
+                    test_size=test_size,
+                    fold_stride=fold_stride,
                     confidence_level=confidence_level,
                     n_simulations=n_simulations
                 )
@@ -2779,6 +2798,8 @@ def api_backtest():
 
             response = {
                 'method': method,
+                'test_size': test_size,
+                'fold_stride': fold_stride if method == 'walk_forward' else None,
                 'summary': summary.to_dict(),
                 'report': generate_backtest_report(summary)
             }

@@ -86,23 +86,30 @@ def run_walk_forward_backtest(
     backlog: int,
     min_train_size: int = 5,
     test_size: int = 1,
+    fold_stride: int = 1,
     confidence_level: str = 'P85',
     n_simulations: int = 10000
 ) -> BacktestSummary:
     """
-    Run walk-forward backtesting on throughput samples.
+    Run walk-forward backtesting on throughput samples with configurable stride.
 
     This simulates how the forecast would have performed by:
     1. Training on historical data up to a point
-    2. Making a forecast for the next period
+    2. Making a forecast for the next period(s)
     3. Comparing with actual data
-    4. Moving the window forward and repeating
+    4. Moving the window forward by fold_stride and repeating
+
+    The fold_stride parameter allows you to skip periods between forecasts,
+    enabling long-horizon forecasts with periodic updates.
 
     Args:
         tp_samples: List of historical throughput samples
         backlog: Number of items to forecast
         min_train_size: Minimum number of samples for training (default: 5)
         test_size: Number of samples to use for testing (default: 1)
+        fold_stride: Number of periods to advance between forecasts (default: 1)
+                     - fold_stride=1: forecast at every period (standard walk-forward)
+                     - fold_stride=7: forecast every 7 periods (e.g., weekly updates)
         confidence_level: 'P50', 'P85', or 'P95'
         n_simulations: Number of Monte Carlo simulations per forecast
 
@@ -110,7 +117,17 @@ def run_walk_forward_backtest(
         BacktestSummary with results
 
     Raises:
-        ValueError: If insufficient data
+        ValueError: If insufficient data or invalid parameters
+
+    Examples:
+        # Standard walk-forward (every period)
+        run_walk_forward_backtest(data, backlog=100, test_size=1, fold_stride=1)
+
+        # Long-horizon forecast with weekly updates (30-day horizon, weekly cadence)
+        run_walk_forward_backtest(data, backlog=100, test_size=30, fold_stride=7)
+
+        # Monthly forecasts with bi-weekly updates
+        run_walk_forward_backtest(data, backlog=100, test_size=60, fold_stride=14)
     """
     if len(tp_samples) < min_train_size + test_size:
         raise ValueError(
@@ -121,11 +138,21 @@ def run_walk_forward_backtest(
     if confidence_level not in ['P50', 'P85', 'P95']:
         raise ValueError("confidence_level must be 'P50', 'P85', or 'P95'")
 
+    if fold_stride < 1:
+        raise ValueError(f"fold_stride must be >= 1. Got {fold_stride}.")
+
+    if fold_stride > len(tp_samples):
+        raise ValueError(
+            f"fold_stride ({fold_stride}) cannot be larger than "
+            f"number of samples ({len(tp_samples)})."
+        )
+
     tp_array = np.array(tp_samples, dtype=float)
     results = []
 
-    # Walk forward through the data
-    for i in range(min_train_size, len(tp_array) - test_size + 1):
+    # Walk forward through the data with configurable stride
+    # Start at min_train_size and advance by fold_stride each iteration
+    for i in range(min_train_size, len(tp_array) - test_size + 1, fold_stride):
         train_end_idx = i
         test_start_idx = i
         test_end_idx = min(i + test_size, len(tp_array))
@@ -324,6 +351,8 @@ def compare_confidence_levels(
     tp_samples: List[float],
     backlog: int,
     min_train_size: int = 5,
+    test_size: int = 1,
+    fold_stride: int = 1,
     n_simulations: int = 10000
 ) -> Dict[str, BacktestSummary]:
     """
@@ -333,6 +362,8 @@ def compare_confidence_levels(
         tp_samples: List of historical throughput samples
         backlog: Number of items to forecast
         min_train_size: Minimum training size
+        test_size: Number of samples to use for testing
+        fold_stride: Number of periods to advance between forecasts
         n_simulations: Number of simulations
 
     Returns:
@@ -346,6 +377,8 @@ def compare_confidence_levels(
                 tp_samples,
                 backlog,
                 min_train_size=min_train_size,
+                test_size=test_size,
+                fold_stride=fold_stride,
                 confidence_level=level,
                 n_simulations=n_simulations
             )
