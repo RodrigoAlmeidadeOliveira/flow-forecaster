@@ -38,6 +38,7 @@ env/
 instance/
 .webassets-cache
 *.db
+*.db.backup.*
 
 # Environment variables
 .env
@@ -74,6 +75,11 @@ Desktop.ini
 tmp/
 temp/
 *.tmp
+
+# Load testing results
+load_test_results/
+*.csv
+*.html
 
 # Microsoft Office
 *.pptx
