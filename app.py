@@ -3260,7 +3260,12 @@ def train_cod_model():
             df[column] = pd.to_numeric(df[column], errors='coerce')
         df = df.dropna(subset=numeric_columns)
         forecaster = CoDForecaster()
-        forecaster.train_models(df, use_hyperparam_search=True, search_iterations=30)
+        search_iterations = 30 if request.json and request.json.get('full_search') else 12
+        forecaster.train_models(
+            df,
+            use_hyperparam_search=True,
+            search_iterations=search_iterations
+        )
     except ValueError as exc:
         return jsonify({'error': str(exc)}), 400
     except Exception as exc:
