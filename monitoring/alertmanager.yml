@@ -1,0 +1,79 @@
+global:
+  resolve_timeout: 5m
+  # SMTP configuration for email alerts
+  smtp_smarthost: 'smtp.gmail.com:587'
+  smtp_from: 'alerts@your-domain.com'
+  smtp_auth_username: 'your-email@gmail.com'
+  smtp_auth_password: 'your-app-password'
+  smtp_require_tls: true
+
+# Alert routing
+route:
+  group_by: ['alertname', 'cluster', 'service']
+  group_wait: 10s
+  group_interval: 10s
+  repeat_interval: 12h
+  receiver: 'default'
+
+  routes:
+    # Critical alerts go to multiple channels
+    - match:
+        severity: critical
+      receiver: 'critical'
+      continue: true
+
+    # Warning alerts
+    - match:
+        severity: warning
+      receiver: 'warning'
+
+# Receivers (notification channels)
+receivers:
+  # Default receiver
+  - name: 'default'
+    email_configs:
+      - to: 'team@your-domain.com'
+        headers:
+          Subject: '[Flow Forecaster] Alert: {{ .GroupLabels.alertname }}'
+
+  # Critical alerts
+  - name: 'critical'
+    email_configs:
+      - to: 'oncall@your-domain.com,team@your-domain.com'
+        headers:
+          Subject: '🚨 [CRITICAL] {{ .GroupLabels.alertname }}'
+
+    # Slack webhook (optional)
+    slack_configs:
+      - api_url: 'https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK'
+        channel: '#alerts-critical'
+        title: '🚨 Critical Alert'
+        text: '{{ range .Alerts }}{{ .Annotations.summary }}\n{{ .Annotations.description }}\n{{ end }}'
+        send_resolved: true
+
+    # PagerDuty (optional)
+    # pagerduty_configs:
+    #   - service_key: 'YOUR_PAGERDUTY_SERVICE_KEY'
+
+  # Warning alerts
+  - name: 'warning'
+    email_configs:
+      - to: 'team@your-domain.com'
+        headers:
+          Subject: '⚠️ [WARNING] {{ .GroupLabels.alertname }}'
+
+    slack_configs:
+      - api_url: 'https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK'
+        channel: '#alerts-warning'
+        title: '⚠️ Warning Alert'
+        text: '{{ range .Alerts }}{{ .Annotations.summary }}\n{{ .Annotations.description }}\n{{ end }}'
+        send_resolved: true
+
+# Inhibition rules (suppress certain alerts when others are firing)
+inhibit_rules:
+  # Suppress non-critical alerts when critical alerts are firing
+  - source_match:
+      severity: 'critical'
+    target_match:
+      severity: 'warning'
+    equal: ['alertname', 'instance']
