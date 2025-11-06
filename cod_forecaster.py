@@ -18,6 +18,17 @@ import warnings
 warnings.filterwarnings('ignore')
 
 
+def _to_native(value):
+    if isinstance(value, np.generic):
+        if isinstance(value, np.integer):
+            return int(value)
+        if isinstance(value, np.floating):
+            return float(value)
+        if isinstance(value, np.bool_):
+            return bool(value)
+    return value
+
+
 class CoDForecaster:
     """
     Machine Learning forecaster for Cost of Delay (CoD) estimation.
@@ -166,7 +177,7 @@ class CoDForecaster:
             )
             rf_search.fit(X_train_scaled, y_train)
             best_rf = rf_search.best_estimator_
-            best_params = rf_search.best_params_
+            best_params = {key: _to_native(val) for key, val in rf_search.best_params_.items()}
             print(f"Best RF params: {best_params}")
         else:
             best_rf = RandomForestRegressor(
