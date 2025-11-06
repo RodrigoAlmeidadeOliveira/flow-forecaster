@@ -3443,11 +3443,15 @@ a probabilidade de todas serem entregues no prazo é de <strong>1 em 2^n</strong
                     const select = $('#backtest-project');
                     select.empty().append('<option value="">Selecione um projeto...</option>');
 
-                    if (data.projects && data.projects.length > 0) {
-                        data.projects.forEach(project => {
+                    // API retorna array diretamente, não objeto com propriedade projects
+                    if (Array.isArray(data) && data.length > 0) {
+                        data.forEach(project => {
                             select.append(`<option value="${project.id}">${project.name}</option>`);
                         });
                     }
+                }).fail(function(xhr) {
+                    console.error('Erro ao carregar projetos:', xhr);
+                    alert('Erro ao carregar lista de projetos: ' + (xhr.responseJSON?.error || 'Erro desconhecido'));
                 });
             }
 

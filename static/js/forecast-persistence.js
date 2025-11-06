@@ -108,17 +108,29 @@ async function saveForecast() {
 // Load forecasts list from database
 async function loadForecasts() {
     try {
+        console.log('loadForecasts: Iniciando carregamento...');
         $('#loadingForecasts').show();
         $('#forecastsList').empty();
 
         const response = await fetch('/api/forecasts', { credentials: 'include' });
+        console.log('loadForecasts: Response status:', response.status);
+
         if (!response.ok) {
-            throw new Error('Erro ao carregar análises');
+            const errorText = await response.text();
+            console.error('loadForecasts: Erro HTTP', response.status, errorText);
+            throw new Error(`Erro ${response.status}: ${errorText}`);
         }
 
         const forecasts = await response.json();
+        console.log('loadForecasts: Forecasts recebidos:', forecasts.length, forecasts);
 
         $('#loadingForecasts').hide();
+
+        if (!Array.isArray(forecasts)) {
+            console.error('loadForecasts: Resposta não é um array:', forecasts);
+            $('#forecastsList').html('<p class="text-danger">Erro: resposta inválida da API.</p>');
+            return;
+        }
 
         if (forecasts.length === 0) {
             $('#forecastsList').html('<p class="text-muted">Nenhuma análise salva ainda.</p>');
@@ -162,11 +174,12 @@ async function loadForecasts() {
         html += '</div>';
 
         $('#forecastsList').html(html);
+        console.log('loadForecasts: Lista renderizada com sucesso');
 
     } catch (error) {
         console.error('Error loading forecasts:', error);
         $('#loadingForecasts').hide();
-        $('#forecastsList').html('<p class="text-danger">Erro ao carregar análises.</p>');
+        $('#forecastsList').html(`<p class="text-danger">Erro ao carregar análises: ${error.message}</p>`);
     }
 }
 
