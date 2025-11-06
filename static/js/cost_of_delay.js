@@ -6,6 +6,7 @@
 $(document).ready(function() {
     let featureImportanceChart = null;
     let lastPredictionResult = null;
+    let datasetState = null;
 
     // ===============================================
     // Helper Functions
@@ -33,6 +34,98 @@ $(document).ready(function() {
         console.log('Success:', message);
     }
 
+    function formatDateTime(isoString) {
+        if (!isoString) return '—';
+        const date = new Date(isoString);
+        if (Number.isNaN(date.getTime())) {
+            return isoString;
+        }
+        return date.toLocaleString('pt-BR');
+    }
+
+    function renderDatasetStatus(state) {
+        const statusEl = $('#codDatasetStatus');
+        const trainingMessageEl = $('#codTrainingMessage');
+        const trainButton = $('#trainCodModel');
+
+        let statusHtml = '';
+        let messageHtml = '';
+
+        trainButton.removeClass('btn-warning btn-success');
+
+        if (!state || !state.has_dataset) {
+            statusHtml = '<strong>Nenhum dataset carregado.</strong><br>Importe um CSV com os dados históricos para treinar o modelo personalizado.';
+            trainButton.prop('disabled', true);
+            trainingMessageEl.html('');
+            statusEl.html(statusHtml);
+            return;
+        }
+
+        const dataset = state.dataset || {};
+        const datasetName = dataset.name || dataset.original_filename || 'Dataset';
+
+        statusHtml += `<div><strong>${datasetName}</strong></div>`;
+        if (dataset.row_count !== undefined) {
+            statusHtml += `<div>Linhas válidas: ${dataset.row_count}</div>`;
+        }
+        if (dataset.created_at) {
+            statusHtml += `<div>Último upload: ${formatDateTime(dataset.created_at)}</div>`;
+        }
+        if (dataset.column_names && dataset.column_names.length) {
+            statusHtml += `<div><small>Colunas: ${dataset.column_names.join(', ')}</small></div>`;
+        }
+
+        if (state.has_model && state.model) {
+            statusHtml += '<hr class="my-2">';
+            statusHtml += `<div><strong>Treinado em:</strong> ${formatDateTime(state.model.trained_at)}</div>`;
+            if (state.model.sample_count) {
+                statusHtml += `<div>Amostras utilizadas: ${state.model.sample_count}</div>`;
+            }
+
+            if (state.model.metrics) {
+                statusHtml += '<ul class="mb-0">';
+                for (const [modelName, metrics] of Object.entries(state.model.metrics)) {
+                    statusHtml += `<li><strong>${modelName}</strong>: MAE ${formatCurrency(metrics.mae)} | R² ${formatNumber(metrics.r2, 3)}</li>`;
+                }
+                statusHtml += '</ul>';
+            }
+        }
+
+        trainButton.prop('disabled', false);
+
+        if (state.retrain_required) {
+            messageHtml = '<div class="alert alert-warning mb-0 mt-2">Re-treine o modelo para incorporar o novo dataset.</div>';
+            trainButton.addClass('btn-warning');
+        } else if (state.has_model) {
+            messageHtml = '<div class="alert alert-success mb-0 mt-2">Modelo personalizado treinado e pronto para uso.</div>';
+            trainButton.addClass('btn-success');
+        } else {
+            messageHtml = '<div class="alert alert-info mb-0 mt-2">Finalize o treinamento para habilitar o modelo personalizado.</div>';
+            trainButton.addClass('btn-warning');
+        }
+
+        statusEl.html(statusHtml);
+        trainingMessageEl.html(messageHtml);
+    }
+
+    function loadCodDatasetStatus() {
+        $('#codDatasetStatus').html('<span class="text-muted">Carregando informações...</span>');
+        $.ajax({
+            url: '/api/cod/dataset',
+            method: 'GET',
+            success: function(response) {
+                datasetState = response;
+                renderDatasetStatus(response);
+            },
+            error: function(xhr) {
+                $('#codDatasetStatus').html(
+                    '<div class="text-danger">Não foi possível carregar as informações: ' +
+                    (xhr.responseJSON?.error || 'Erro desconhecido') + '</div>'
+                );
+            }
+        });
+    }
+
     // ===============================================
     // Model Info
     // ===============================================
@@ -46,11 +139,16 @@ $(document).ready(function() {
             return;
         }
 
-        // Show panel with loading spinner
         panel.slideDown();
         $(this).text('Hide Model Details');
+        loadCodModelInfo();
+    });
 
-        // Fetch model info
+    function loadCodModelInfo() {
+        $('#model-info-content').html(
+            '<div class="text-center"><div class="spinner-border text-primary" role="status"><span class="sr-only">Loading...</span></div></div>'
+        );
+
         $.ajax({
             url: '/api/cod/model_info',
             method: 'GET',
@@ -64,13 +162,23 @@ $(document).ready(function() {
                 );
             }
         });
-    });
+    }
 
     function displayModelInfo(data) {
         if (!data.trained) {
-            $('#model-info-content').html(
-                '<div class="alert alert-warning">Model not trained yet. The model will be initialized when you make your first prediction.</div>'
-            );
+            let html = `<div class="alert alert-warning">${data.error || 'Modelo não treinado ainda.'}</div>`;
+
+            if (data.dataset) {
+                html += '<div class="mt-3">';
+                html += `<div><strong>Dataset carregado:</strong> ${data.dataset.name || data.dataset.original_filename}</div>`;
+                html += `<div>Linhas válidas: ${data.dataset.row_count}</div>`;
+                if (data.dataset.created_at) {
+                    html += `<div>Último upload: ${formatDateTime(data.dataset.created_at)}</div>`;
+                }
+                html += '</div>';
+            }
+
+            $('#model-info-content').html(html);
             return;
         }
 
@@ -108,10 +216,101 @@ $(document).ready(function() {
         html += '</ul>';
         html += '</div>';
 
+        html += '<div class="col-12 mt-3">';
+        html += `<div><strong>Fonte do modelo:</strong> ${data.source === 'custom' ? 'Personalizado (seus dados)' : 'Padrão (dados sintéticos)'}</div>`;
+        if (data.trained_at) {
+            html += `<div><strong>Treinado em:</strong> ${formatDateTime(data.trained_at)}</div>`;
+        }
+        if (data.sample_count) {
+            html += `<div><strong>Amostras utilizadas:</strong> ${data.sample_count}</div>`;
+        }
+        if (data.dataset) {
+            html += `<div><strong>Dataset:</strong> ${data.dataset.name || data.dataset.original_filename} (${data.dataset.row_count} linhas)</div>`;
+        }
+        html += '</div>';
+
         html += '</div>';
 
         $('#model-info-content').html(html);
     }
+
+    // ===============================================
+    // Dataset Management
+    // ===============================================
+
+    $('#codDatasetForm').on('submit', function(event) {
+        event.preventDefault();
+
+        const fileInput = $('#codDatasetFile')[0];
+        if (!fileInput || fileInput.files.length === 0) {
+            showError('Selecione um arquivo CSV para importar.');
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('file', fileInput.files[0]);
+        formData.append('name', $('#codDatasetName').val());
+
+        const uploadButton = $('#uploadCodDataset');
+        uploadButton.prop('disabled', true).text('Enviando...');
+        $('#trainCodModel').prop('disabled', true);
+        $('#codTrainingMessage').html('<span class="text-muted">Enviando dataset...</span>');
+
+        $.ajax({
+            url: '/api/cod/dataset',
+            method: 'POST',
+            data: formData,
+            processData: false,
+            contentType: false,
+            success: function(response) {
+                showSuccess(response.message || 'Dataset importado com sucesso.');
+                $('#codDatasetFile').val('');
+                loadCodDatasetStatus();
+            },
+            error: function(xhr) {
+                showError(xhr.responseJSON?.error || 'Falha ao importar o dataset.');
+                loadCodDatasetStatus();
+            },
+            complete: function() {
+                uploadButton.prop('disabled', false).text('⬆️ Importar CSV');
+            }
+        });
+    });
+
+    $('#trainCodModel').on('click', function() {
+        const button = $(this);
+        if (button.prop('disabled')) {
+            return;
+        }
+
+        button.prop('disabled', true).text('Treinando...');
+        $('#codTrainingMessage').html('<span class="text-muted">Treinando modelo, aguarde...</span>');
+
+        $.ajax({
+            url: '/api/cod/train',
+            method: 'POST',
+            success: function(response) {
+                showSuccess(response.message || 'Modelo treinado com sucesso.');
+                $('#codTrainingMessage').html('<div class="alert alert-success mt-2 mb-0">' + (response.message || 'Modelo treinado com sucesso.') + '</div>');
+                loadCodDatasetStatus();
+
+                if ($('#model-info-panel').is(':visible')) {
+                    loadCodModelInfo();
+                }
+            },
+            error: function(xhr) {
+                const errorMessage = xhr.responseJSON?.error || 'Falha ao treinar o modelo.';
+                showError(errorMessage);
+                $('#codTrainingMessage').html('<div class="alert alert-danger mt-2 mb-0">' + errorMessage + '</div>');
+                if (xhr.responseJSON?.retrain_required) {
+                    loadCodDatasetStatus();
+                }
+            },
+            complete: function() {
+                button.prop('disabled', false).text('🛠️ Treinar modelo com meus dados');
+            }
+        });
+    });
 
     // ===============================================
     // CoD Prediction
@@ -176,6 +375,9 @@ $(document).ready(function() {
             },
             error: function(xhr) {
                 showError('Falha na previsão: ' + (xhr.responseJSON?.error || 'Erro desconhecido'));
+                if (xhr.responseJSON?.retrain_required) {
+                    loadCodDatasetStatus();
+                }
             },
             complete: function() {
                 $('#predictCoD').prop('disabled', false).html('🔮 Predict Cost of Delay');
@@ -301,6 +503,9 @@ $(document).ready(function() {
             },
             error: function(xhr) {
                 showError('Falha ao obter feature importance: ' + (xhr.responseJSON?.error || 'Erro desconhecido'));
+                if (xhr.responseJSON?.retrain_required) {
+                    loadCodDatasetStatus();
+                }
             },
             complete: function() {
                 $('#showFeatureImportance').prop('disabled', false);
@@ -425,5 +630,6 @@ $(document).ready(function() {
     // Initialize
     // ===============================================
 
+    loadCodDatasetStatus();
     console.log('Cost of Delay interface initialized');
 });

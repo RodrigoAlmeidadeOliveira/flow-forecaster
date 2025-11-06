@@ -2,8 +2,8 @@
 <blockquote>
 <p>Guia completo para uso do Flow Forecaster: previsões probabilísticas de projetos com Machine Learning e Monte Carlo</p>
 </blockquote>
-<p><strong>Versão</strong>: 2.2
-<strong>Última atualização</strong>: Dezembro 2025
+<p><strong>Versão</strong>: 2.3
+<strong>Última atualização</strong>: Novembro 2025
 <strong>Acesso</strong>: https://flow-forecaster.fly.dev/</p>
 <hr />
 <h2 id="indice">📋 Índice</h2>
@@ -20,6 +20,7 @@
 <li><a href="#4-previsao-de-demanda">Previsão de Demanda (Inflow)</a></li>
 <li><a href="#5-analise-dependencias">Análise de Dependências</a></li>
 <li><a href="#6-graficos-historicos">Gráficos Históricos</a></li>
+<li><a href="#7-custo-de-atraso-cod">Custo de Atraso (CoD)</a></li>
 </ul>
 </li>
 <li><a href="#análise-de-custos">Análise de Custos</a></li>
@@ -41,7 +42,7 @@
 <li><strong>Análise de Custos</strong>: Estimativas baseadas em esforço e distribuição PERT-Beta</li>
 <li><strong>Análise de Deadline</strong>: Verificação de prazos assumindo throughput Monte Carlo e ML</li>
 </ul>
-<p><strong>Novo na versão 2.2</strong>: autenticação por usuário, isolamento de dados por conta e menu administrativo para instrutores acompanharem turmas.</p>
+<p><strong>Novo na versão 2.3</strong>: processamento assíncrono com Celery para executar simulações longas em segundo plano sem travar o navegador.</p>
 <h3 id="por-que-usar-previsoes-probabilisticas">Por que usar previsões probabilísticas?</h3>
 <p>Em vez de trabalhar com estimativas únicas ("o projeto termina em 10 semanas"), trabalhamos com <strong>distribuições de probabilidade</strong>:</p>
 <ul>
@@ -513,6 +514,104 @@ Explicação:
 </li>
 </ol>
 <p><strong>Dica</strong>: Se notar outliers isolados, considere removê-los ou registrá-los como riscos antes de rodar as simulações.</p>
+<hr />
+<h3 id="7-custo-de-atraso-cod">7️⃣ Custo de Atraso (CoD)</h3>
+<p><strong>O que faz</strong>: Estima o custo semanal de postergar um projeto com base em características como orçamento, duração, tamanho do time, valor de negócio e risco. A partir desta versão, cada usuário pode importar seus dados históricos em CSV, treinar um modelo próprio (Random Forest + Gradient Boosting) e reutilizá-lo nas previsões de CoD diretamente pela interface.</p>
+<p><strong>Quando usar o modelo personalizado</strong>: Sempre que houver dados históricos de projetos com custo de atraso conhecido (mínimo 10 linhas válidas). O sistema continua oferecendo um modelo padrão (treinado com dados sintéticos) para experimentação, mas o modo personalizado aumenta a aderência ao contexto da sua organização.</p>
+<h4 id="fluxo-rapido-cod">🚀 Fluxo rápido</h4>
+<ol>
+<li>
+<p>Acesse a aba <strong>💰 Cost of Delay</strong> e localize o card <strong>“0️⃣ Treine o Modelo com Seus Dados”</strong>.</p>
+</li>
+<li>
+<p>Importe um CSV no layout descrito abaixo e clique em <strong>“⬆️ Importar CSV”</strong>. O painel informará quantidade de linhas, colunas detectadas e data da última atualização.</p>
+</li>
+<li>
+<p>Clique em <strong>“🛠️ Treinar modelo com meus dados”</strong>. O backend valida o dataset, roda o treinamento e salva o modelo por usuário. Quando o processo terminar, o painel ficará verde e o botão exibirá o status “Modelo personalizado treinado”.</p>
+</li>
+<li>
+<p>Utilize os botões <strong>“🔮 Predict Cost of Delay”</strong>, <strong>“💵 Calculate Total Cost”</strong> e <strong>“📈 Show Feature Importance”</strong>. Se o dataset for alterado, a interface exibirá um alerta solicitando novo treinamento antes de liberar previsões.</p>
+</li>
+<li>
+<p>Consulte <strong>“Show Model Details”</strong> para ver métricas (MAE, R², MAPE), features utilizadas e a data de treinamento do seu modelo.</p>
+</li>
+</ol>
+<h4 id="layout-csv-cod">🧾 Layout do CSV</h4>
+<p>O arquivo deve conter as seguintes colunas (ordem livre, cabeçalho obrigatório):</p>
+<table>
+<thead>
+<tr>
+<th>Coluna</th>
+<th>Descrição</th>
+<th>Observações</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>budget_millions</code></td>
+<td>Orçamento total do projeto em milhões de reais</td>
+<td>Ex.: 2.5 (R$ 2.500.000)</td>
+</tr>
+<tr>
+<td><code>duration_weeks</code></td>
+<td>Duração prevista do projeto em semanas</td>
+<td>Inteiro &gt; 0</td>
+</tr>
+<tr>
+<td><code>team_size</code></td>
+<td>Tamanho médio da equipe</td>
+<td>Inteiro &gt; 0</td>
+</tr>
+<tr>
+<td><code>num_stakeholders</code></td>
+<td>Número de stakeholders relevantes</td>
+<td>Inteiro ≥ 0</td>
+</tr>
+<tr>
+<td><code>business_value</code></td>
+<td>Valor de negócio em escala 0-100</td>
+<td>Use a mesma régua aplicada internamente</td>
+</tr>
+<tr>
+<td><code>complexity</code></td>
+<td>Nível de complexidade (1-5)</td>
+<td>Inteiro</td>
+</tr>
+<tr>
+<td><code>project_type</code></td>
+<td>Categoria do projeto</td>
+<td>Opcional, mas recomendado (ERP, CRM, Mobile...)</td>
+</tr>
+<tr>
+<td><code>risk_level</code></td>
+<td>Nível de risco associado</td>
+<td>Inteiro (1-5) ou escala própria convertida para números</td>
+</tr>
+<tr>
+<td><code>cod_weekly</code></td>
+<td>Custo real de atraso por semana (R$)</td>
+<td>Valor alvo utilizado no treinamento. &gt; 0</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Regras gerais</strong>: mínimo de 10 linhas válidas; linhas com valores ausentes ou divisões por zero são descartadas automaticamente; os campos numéricos aceitam casas decimais.</p>
+<h4 id="exemplo-csv-cod">📁 Exemplo de CSV</h4>
+<p>O repositório inclui um dataset de demonstração em <code>data/cod_training_sample.csv</code>. Veja as primeiras linhas:</p>
+<div class="codehilite"><pre><span></span><code>budget_millions,duration_weeks,team_size,num_stakeholders,business_value,complexity,project_type,risk_level,cod_weekly
+5.72,9,11,5,59,2,Platform,1,113378.47
+5.00,35,4,2,50,2,Web,2,73516.53
+5.12,34,10,9,82,3,Data,1,241096.60
+6.18,29,11,4,58,3,ERP,1,157560.92
+3.56,30,11,14,47,4,ERP,5,151835.78
+</code></pre></div>
+<p>Use esse arquivo para testar o fluxo completo (upload ➜ treinamento ➜ previsão) antes de carregar dados reais.</p>
+<h4 id="boas-praticas-cod">✅ Boas práticas</h4>
+<ul>
+<li>Padronize escalas de <strong>business_value</strong>, <strong>complexity</strong> e <strong>risk_level</strong> entre projetos para manter o modelo consistente.</li>
+<li>Atualize o dataset sempre que novos projetos concluídos tiverem CoD apurado. Re-treine logo após a atualização (o sistema avisa se houver divergência).</li>
+<li>Faça download ou registro do resultado do treinamento (data, MAE, R²) para auditoria e comparação futura.</li>
+<li>Caso precise depurar previsões, utilize <strong>📈 Feature Importance</strong> para identificar quais variáveis estão influenciando o custo.</li>
+</ul>
 <hr />
 <h2 id="analise-de-custos">💰 Análise de Custos</h2>
 <p>A funcionalidade de análise de custos permite estimar o custo total do projeto baseado em esforço ou demanda. Combine-a com a <strong>Previsão de Demanda</strong> copiando o total previsto (média ou P90) para dimensionar o volume de itens e converter em valores monetários.</p>

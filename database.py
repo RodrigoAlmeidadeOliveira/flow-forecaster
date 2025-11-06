@@ -6,7 +6,7 @@ import os
 from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import sessionmaker, scoped_session
 from sqlalchemy.pool import QueuePool, NullPool
-from models import Base, Project, Forecast, Actual, User
+from models import Base, Project, Forecast, Actual, User, CoDTrainingDataset, CoDModel
 
 DATABASE_URL = os.environ.get('DATABASE_URL', 'sqlite:///forecaster.db')
 
@@ -60,6 +60,9 @@ def init_db():
 
 def ensure_schema():
     """Ensure existing databases include the latest columns."""
+    # Create any newly-introduced tables without dropping existing data
+    Base.metadata.create_all(engine)
+
     inspector = inspect(engine)
     table_names = set(inspector.get_table_names())
     if 'projects' not in table_names:

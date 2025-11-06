@@ -8,9 +8,12 @@ import json
 import base64
 import numpy as np
 import re
+import pickle
+import pandas as pd
+from pathlib import Path
 from datetime import datetime, timedelta
 from typing import Optional
-from flask import Flask, render_template, request, jsonify, redirect, url_for, flash
+from flask import Flask, render_template, request, jsonify, redirect, url_for, flash, send_file
 from flask_login import (
     LoginManager,
     login_user,
@@ -43,7 +46,7 @@ from cost_pert_beta import (
     calculate_effort_based_cost_with_percentiles
 )
 from database import get_session, close_session, init_db
-from models import Project, Forecast, Actual, User
+from models import Project, Forecast, Actual, User, CoDTrainingDataset, CoDModel
 from accuracy_metrics import (
     calculate_accuracy_metrics,
     calculate_time_series_metrics,
@@ -132,6 +135,17 @@ sys.stdout.flush()
 
 EMAIL_REGEX = re.compile(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
 ADMIN_ROLES = {'admin', 'instructor'}
+
+COD_REQUIRED_COLUMNS = {
+    'budget_millions',
+    'duration_weeks',
+    'team_size',
+    'num_stakeholders',
+    'business_value',
+    'complexity',
+    'cod_weekly',
+}
+COD_OPTIONAL_COLUMNS = {'project_type', 'risk_level'}
 
 
 def convert_to_native_types(obj):
@@ -2984,22 +2998,309 @@ def portfolio_prioritization():
 # Cost of Delay (CoD) API Endpoints
 # ============================================================================
 
-# Global CoD forecaster instance (lazy loading)
-_cod_forecaster = None
+# Global CoD forecaster caches
+_default_cod_forecaster = None
+_cod_forecasters_by_user = {}
 
-def get_cod_forecaster():
-    """Get or initialize the CoD forecaster."""
-    global _cod_forecaster
-    if _cod_forecaster is None:
-        _cod_forecaster = CoDForecaster()
-        # Try to auto-train with sample data if no real data available
+
+def _load_default_cod_forecaster():
+    """Load the shared default CoD forecaster (trained with synthetic data)."""
+    global _default_cod_forecaster
+    if _default_cod_forecaster is None:
+        _default_cod_forecaster = CoDForecaster()
         try:
             sample_data = generate_sample_cod_data(n_samples=100)
-            _cod_forecaster.train_models(sample_data)
+            _default_cod_forecaster.train_models(sample_data)
             print("CoD Forecaster initialized with sample data", flush=True)
-        except Exception as e:
-            print(f"Warning: Could not initialize CoD forecaster: {e}", flush=True)
-    return _cod_forecaster
+        except Exception as exc:
+            print(f"Warning: Could not initialize default CoD forecaster: {exc}", flush=True)
+    return _default_cod_forecaster
+
+
+def _load_user_cod_forecaster(user_id: int):
+    """Load a user-specific CoD forecaster from cache or database."""
+    if user_id in _cod_forecasters_by_user:
+        return _cod_forecasters_by_user[user_id]
+
+    session = get_session()
+    try:
+        cod_model = (
+            session.query(CoDModel)
+            .filter(CoDModel.user_id == user_id)
+            .one_or_none()
+        )
+        if cod_model and cod_model.model_blob:
+            try:
+                forecaster = pickle.loads(cod_model.model_blob)
+                _cod_forecasters_by_user[user_id] = forecaster
+                return forecaster
+            except Exception as exc:
+                print(f"Warning: Could not unpickle CoD model for user {user_id}: {exc}", flush=True)
+    finally:
+        session.close()
+
+    return None
+
+
+def invalidate_user_cod_cache(user_id: int):
+    """Remove a user-specific forecaster from the in-memory cache."""
+    _cod_forecasters_by_user.pop(user_id, None)
+
+
+def get_cod_forecaster():
+    """Return the appropriate CoD forecaster for the current context."""
+    user_id = getattr(current_user, 'id', None) if getattr(current_user, 'is_authenticated', False) else None
+
+    if user_id:
+        user_forecaster = _load_user_cod_forecaster(user_id)
+        if user_forecaster:
+            return user_forecaster
+
+    return _load_default_cod_forecaster()
+
+
+def get_user_cod_assets(user_id: int):
+    """Fetch persisted CoD dataset and model for a user."""
+    session = get_session()
+    try:
+        dataset = (
+            session.query(CoDTrainingDataset)
+            .filter(CoDTrainingDataset.user_id == user_id)
+            .order_by(CoDTrainingDataset.created_at.desc())
+            .first()
+        )
+        model = (
+            session.query(CoDModel)
+            .filter(CoDModel.user_id == user_id)
+            .one_or_none()
+        )
+        return dataset, model
+    finally:
+        session.close()
+
+
+def _normalize_cod_dataframe(df: pd.DataFrame) -> pd.DataFrame:
+    """Standardize column names for CoD datasets."""
+    df = df.copy()
+    df.columns = [str(col).strip() for col in df.columns]
+    rename_map = {}
+    lower_map = {col.lower(): col for col in df.columns}
+    for expected in COD_REQUIRED_COLUMNS.union(COD_OPTIONAL_COLUMNS):
+        lower_expected = expected.lower()
+        original = lower_map.get(lower_expected)
+        if original and original != expected:
+            rename_map[original] = expected
+    if rename_map:
+        df = df.rename(columns=rename_map)
+    return df
+
+
+def load_cod_dataframe(file_storage) -> pd.DataFrame:
+    """Load and validate a CSV file containing CoD training data."""
+    try:
+        df = pd.read_csv(file_storage)
+    except Exception as exc:
+        raise ValueError(f'Não foi possível ler o CSV: {exc}')
+
+    df = _normalize_cod_dataframe(df)
+    missing = COD_REQUIRED_COLUMNS.difference(df.columns)
+    if missing:
+        raise ValueError(f'Colunas obrigatórias ausentes: {", ".join(sorted(missing))}')
+
+    numeric_columns = [col for col in COD_REQUIRED_COLUMNS if col not in {'project_type'}]
+    for column in numeric_columns:
+        df[column] = pd.to_numeric(df[column], errors='coerce')
+
+    df = df.dropna(subset=numeric_columns)
+    df = df[df['team_size'] > 0]
+    df = df[df['duration_weeks'] > 0]
+    df = df[df['cod_weekly'] > 0]
+    df = df[df['num_stakeholders'] >= 0]
+
+    if 'project_type' in df.columns:
+        df['project_type'] = df['project_type'].fillna('Unknown').astype(str)
+
+    if 'risk_level' in df.columns:
+        df['risk_level'] = pd.to_numeric(df['risk_level'], errors='coerce')
+        df = df.dropna(subset=['risk_level'])
+
+    df = df.reset_index(drop=True)
+
+    if len(df) < 10:
+        raise ValueError('É necessário pelo menos 10 linhas válidas para treinar o modelo.')
+
+    return df
+
+
+@app.route('/api/cod/dataset', methods=['GET'])
+@login_required
+def cod_dataset_status():
+    """Return metadata about the user's CoD training dataset and model."""
+    user_id = current_user.id
+    dataset, model = get_user_cod_assets(user_id)
+
+    dataset_payload = dataset.to_dict() if dataset else None
+
+    has_model = bool(model and model.model_blob)
+    model_payload = None
+    if has_model:
+        model_payload = {
+            'id': model.id,
+            'trained_at': model.trained_at.isoformat() if model.trained_at else None,
+            'sample_count': model.sample_count,
+            'metrics': model.get_metrics(),
+            'feature_names': json.loads(model.feature_names) if model.feature_names else None,
+            'project_types': json.loads(model.project_types) if model.project_types else None,
+        }
+
+    retrain_required = False
+    if dataset and (not has_model or not model.trained_at or (dataset.created_at and dataset.created_at > model.trained_at)):
+        retrain_required = True
+
+    return jsonify({
+        'has_dataset': bool(dataset),
+        'dataset': dataset_payload,
+        'has_model': has_model,
+        'model': model_payload,
+        'retrain_required': retrain_required,
+        'active_model_source': 'custom' if has_model else 'default'
+    })
+
+
+@app.route('/api/cod/dataset', methods=['POST'])
+@login_required
+def upload_cod_dataset():
+    """Upload and persist a CoD training dataset for the logged-in user."""
+    if 'file' not in request.files:
+        return jsonify({'error': 'Envie um arquivo CSV com os dados.'}), 400
+
+    file = request.files['file']
+    if not file or not file.filename:
+        return jsonify({'error': 'Envie um arquivo CSV com os dados.'}), 400
+
+    dataset_name = request.form.get('name', '').strip()
+    if not dataset_name:
+        dataset_name = os.path.splitext(file.filename)[0]
+
+    try:
+        df = load_cod_dataframe(file)
+    except ValueError as exc:
+        return jsonify({'error': str(exc)}), 400
+
+    records = json.loads(df.to_json(orient='records'))
+    column_names = df.columns.tolist()
+
+    session = get_session()
+    dataset_payload = None
+    try:
+        dataset = (
+            session.query(CoDTrainingDataset)
+            .filter(CoDTrainingDataset.user_id == current_user.id)
+            .one_or_none()
+        )
+        if dataset is None:
+            dataset = CoDTrainingDataset(user_id=current_user.id)
+
+        dataset.name = dataset_name
+        dataset.original_filename = file.filename
+        dataset.data = json.dumps(records)
+        dataset.column_names = json.dumps(column_names)
+        dataset.row_count = len(records)
+        dataset.created_at = datetime.utcnow()
+
+        session.add(dataset)
+        session.commit()
+        dataset_payload = dataset.to_dict()
+    except Exception as exc:
+        session.rollback()
+        return jsonify({'error': f'Falha ao salvar dataset: {exc}'}), 500
+    finally:
+        session.close()
+
+    return jsonify({
+        'message': 'Dataset carregado com sucesso.',
+        'dataset': dataset_payload,
+        'retrain_required': True
+    })
+
+
+@app.route('/api/cod/train', methods=['POST'])
+@login_required
+def train_cod_model():
+    """Train and persist a user-specific CoD model."""
+    user_id = current_user.id
+    dataset, _ = get_user_cod_assets(user_id)
+
+    if not dataset:
+        return jsonify({'error': 'Nenhum dataset encontrado. Faça upload de um CSV antes de treinar.'}), 400
+
+    try:
+        records = json.loads(dataset.data)
+        df = pd.DataFrame(records)
+        df = _normalize_cod_dataframe(df)
+        numeric_columns = [col for col in COD_REQUIRED_COLUMNS if col not in {'project_type'}]
+        for column in numeric_columns:
+            df[column] = pd.to_numeric(df[column], errors='coerce')
+        df = df.dropna(subset=numeric_columns)
+        forecaster = CoDForecaster()
+        forecaster.train_models(df)
+    except ValueError as exc:
+        return jsonify({'error': str(exc)}), 400
+    except Exception as exc:
+        return jsonify({'error': f'Falha ao treinar o modelo: {exc}'}), 500
+
+    metrics_summary = {}
+    for model_name, model_data in forecaster.models.items():
+        metrics_summary[model_name] = {
+            'mae': float(model_data['mae']),
+            'rmse': float(model_data['rmse']),
+            'r2': float(model_data['r2']),
+            'mape': float(model_data['mape']),
+        }
+
+    feature_names_json = json.dumps(forecaster.feature_names)
+    project_types_json = json.dumps(forecaster.project_types)
+    model_blob = pickle.dumps(forecaster)
+
+    session = get_session()
+    try:
+        cod_model = (
+            session.query(CoDModel)
+            .filter(CoDModel.user_id == user_id)
+            .one_or_none()
+        )
+        if cod_model is None:
+            cod_model = CoDModel(user_id=user_id)
+
+        cod_model.model_blob = model_blob
+        cod_model.metrics = json.dumps(metrics_summary)
+        cod_model.sample_count = len(df)
+        cod_model.feature_names = feature_names_json
+        cod_model.project_types = project_types_json
+        cod_model.trained_at = datetime.utcnow()
+
+        session.add(cod_model)
+        session.commit()
+
+        model_payload = {
+            'trained_at': cod_model.trained_at.isoformat() if cod_model.trained_at else None,
+            'sample_count': cod_model.sample_count,
+            'metrics': metrics_summary,
+            'feature_names': forecaster.feature_names,
+            'project_types': forecaster.project_types,
+        }
+    except Exception as exc:
+        session.rollback()
+        return jsonify({'error': f'Falha ao salvar o modelo treinado: {exc}'}), 500
+    finally:
+        session.close()
+
+    _cod_forecasters_by_user[user_id] = forecaster
+
+    return jsonify({
+        'message': 'Modelo de CoD treinado com sucesso.',
+        'model': model_payload
+    })
 
 
 @app.route('/api/cod/predict', methods=['POST'])
@@ -3015,6 +3316,19 @@ def predict_cod():
         for field in required:
             if field not in data:
                 return jsonify({'error': f'Missing required field: {field}'}), 400
+
+        if getattr(current_user, 'is_authenticated', False):
+            dataset, model = get_user_cod_assets(current_user.id)
+            if dataset and (not model or not model.model_blob):
+                return jsonify({
+                    'error': 'Carregue e treine seu modelo de CoD antes de realizar previsões.',
+                    'retrain_required': True
+                }), 409
+            if dataset and model and model.trained_at and dataset.created_at and dataset.created_at > model.trained_at:
+                return jsonify({
+                    'error': 'Seu dataset foi atualizado. Re-treine o modelo para usar as previsões.',
+                    'retrain_required': True
+                }), 409
 
         # Get forecaster
         forecaster = get_cod_forecaster()
@@ -3057,6 +3371,13 @@ def calculate_total_cod():
 def cod_feature_importance():
     """Get feature importance for CoD model."""
     try:
+        if getattr(current_user, 'is_authenticated', False):
+            dataset, model = get_user_cod_assets(current_user.id)
+            if dataset and (not model or not model.model_blob):
+                return jsonify({'error': 'Modelo ainda não treinado com o dataset atual.', 'retrain_required': True}), 409
+            if dataset and model and model.trained_at and dataset.created_at and dataset.created_at > model.trained_at:
+                return jsonify({'error': 'Re-treine o modelo após atualizar o dataset.', 'retrain_required': True}), 409
+
         forecaster = get_cod_forecaster()
 
         if not forecaster.trained:
@@ -3081,6 +3402,26 @@ def cod_feature_importance():
 def cod_model_info():
     """Get information about the trained CoD model."""
     try:
+        dataset = None
+        model_record = None
+
+        if getattr(current_user, 'is_authenticated', False):
+            dataset, model_record = get_user_cod_assets(current_user.id)
+            if dataset and (not model_record or not model_record.model_blob):
+                return jsonify({
+                    'trained': False,
+                    'error': 'Modelo ainda não treinado com o dataset atual.',
+                    'retrain_required': True,
+                    'dataset': dataset.to_dict() if dataset else None
+                }), 200
+            if dataset and model_record and model_record.trained_at and dataset.created_at and dataset.created_at > model_record.trained_at:
+                return jsonify({
+                    'trained': False,
+                    'error': 'O dataset foi atualizado após o último treinamento. Re-treine o modelo.',
+                    'retrain_required': True,
+                    'dataset': dataset.to_dict()
+                }), 200
+
         forecaster = get_cod_forecaster()
 
         if not forecaster.trained:
@@ -3095,11 +3436,25 @@ def cod_model_info():
                 'mape': float(data['mape'])
             }
 
-        return jsonify({
+        source = 'custom' if model_record and model_record.model_blob else 'default'
+
+        response = {
             'trained': True,
             'models': models_info,
-            'features': forecaster.feature_names
-        })
+            'features': forecaster.feature_names,
+            'project_types': getattr(forecaster, 'project_types', []),
+            'source': source
+        }
+
+        if model_record:
+            response['trained_at'] = model_record.trained_at.isoformat() if model_record.trained_at else None
+            response['sample_count'] = model_record.sample_count
+            response['metrics_snapshot'] = model_record.get_metrics()
+
+        if dataset:
+            response['dataset'] = dataset.to_dict()
+
+        return jsonify(response)
 
     except Exception as e:
         import traceback

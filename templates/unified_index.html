@@ -409,6 +409,39 @@
                         </div>
                     </div>
 
+                    <!-- Dataset Upload & Training -->
+                    <div class="card mt-4">
+                        <div class="card-header bg-secondary text-white">
+                            <h5 class="mb-0">0️⃣ Treine o Modelo com Seus Dados</h5>
+                        </div>
+                        <div class="card-body">
+                            <form id="codDatasetForm" enctype="multipart/form-data">
+                                <div class="form-row align-items-end">
+                                    <div class="form-group col-md-4">
+                                        <label>Nome do Dataset</label>
+                                        <input type="text" class="form-control" id="codDatasetName" placeholder="Ex: Projetos 2024" />
+                                    </div>
+                                    <div class="form-group col-md-5">
+                                        <label>Arquivo CSV<span style="color:red">*</span></label>
+                                        <input type="file" class="form-control-file" id="codDatasetFile" accept=".csv" required />
+                                        <small class="form-text text-muted">
+                                            Inclua colunas: budget_millions, duration_weeks, team_size,
+                                            num_stakeholders, business_value, complexity e cod_weekly.
+                                        </small>
+                                    </div>
+                                    <div class="form-group col-md-3 text-md-right">
+                                        <button type="submit" class="btn btn-primary btn-block" id="uploadCodDataset">⬆️ Importar CSV</button>
+                                    </div>
+                                </div>
+                            </form>
+                            <div id="codDatasetStatus" class="alert alert-light border mt-3" role="alert">
+                                Nenhum dataset carregado ainda.
+                            </div>
+                            <button class="btn btn-success mt-2" id="trainCodModel" disabled>🛠️ Treinar modelo com meus dados</button>
+                            <div id="codTrainingMessage" class="mt-3"></div>
+                        </div>
+                    </div>
+
                     <!-- Project Input Form -->
                     <div class="card mt-4">
                         <div class="card-header bg-primary text-white">
