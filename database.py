@@ -1,18 +1,65 @@
 """
 Database initialization and session management for Flow Forecaster
+Supports both SQLite (development) and PostgreSQL (production)
 """
 import os
-from sqlalchemy import create_engine, inspect, text
+from sqlalchemy import create_engine, inspect, text, event
 from sqlalchemy.orm import sessionmaker, scoped_session
+from sqlalchemy.pool import QueuePool, NullPool
 from models import Base, Project, Forecast, Actual, User
 
 # Database configuration
-DB_PATH = os.environ.get('DATABASE_URL', 'sqlite:///forecaster.db')
-engine = create_engine(DB_PATH, echo=False)
+DATABASE_URL = os.environ.get('DATABASE_URL', 'sqlite:///forecaster.db')
+
+# Fix for Heroku (postgres:// → postgresql://)
+if DATABASE_URL.startswith('postgres://'):
+    DATABASE_URL = DATABASE_URL.replace('postgres://', 'postgresql://', 1)
+
+# Determine database type
+is_postgresql = DATABASE_URL.startswith('postgresql://')
+is_sqlite = DATABASE_URL.startswith('sqlite://')
+
+# Create engine with appropriate configuration
+if is_postgresql:
+    # PostgreSQL with connection pooling for production
+    engine = create_engine(
+        DATABASE_URL,
+        poolclass=QueuePool,
+        pool_size=20,              # 20 permanent connections
+        max_overflow=40,           # + 40 extra connections if needed
+        pool_pre_ping=True,        # Verify connections before using
+        pool_recycle=3600,         # Recycle connections after 1 hour
+        pool_timeout=30,           # Timeout waiting for connection
+        echo=False,
+        connect_args={
+            'connect_timeout': 10,
+            'application_name': 'flow-forecaster'
+        }
+    )
+    print(f"[DATABASE] PostgreSQL engine created with connection pooling")
+    print(f"[DATABASE] Pool size: 20, Max overflow: 40")
+
+elif is_sqlite:
+    # SQLite for development (no pooling needed)
+    engine = create_engine(
+        DATABASE_URL,
+        poolclass=NullPool,  # No pooling for SQLite
+        echo=False,
+        connect_args={'check_same_thread': False}
+    )
+    print(f"[DATABASE] SQLite engine created (development mode)")
+
+else:
+    # Fallback
+    engine = create_engine(DATABASE_URL, echo=False)
+    print(f"[DATABASE] Generic engine created for {DATABASE_URL}")
 
 # Session factory
 session_factory = sessionmaker(bind=engine)
 Session = scoped_session(session_factory)
+
+# Database path (for SQLite only)
+DB_PATH = DATABASE_URL
 
 
 def init_db():
@@ -110,12 +157,37 @@ def reset_db():
 
 
 # Initialize database on import
-db_file = DB_PATH.replace('sqlite:///', '').replace('sqlite:////', '/')
-if not os.path.exists(db_file) or os.path.getsize(db_file) == 0:
-    # Ensure directory exists
-    db_dir = os.path.dirname(db_file)
-    if db_dir and not os.path.exists(db_dir):
-        os.makedirs(db_dir, exist_ok=True)
-    init_db()
+if is_sqlite:
+    # SQLite: Check if file exists and initialize if needed
+    db_file = DB_PATH.replace('sqlite:///', '').replace('sqlite:////', '/')
+    if not os.path.exists(db_file) or os.path.getsize(db_file) == 0:
+        # Ensure directory exists
+        db_dir = os.path.dirname(db_file)
+        if db_dir and not os.path.exists(db_dir):
+            os.makedirs(db_dir, exist_ok=True)
+        print(f"[DATABASE] Initializing new SQLite database at {db_file}")
+        init_db()
+    else:
+        print(f"[DATABASE] Using existing SQLite database at {db_file}")
 
-ensure_schema()
+    # Ensure schema is up-to-date for SQLite
+    ensure_schema()
+
+elif is_postgresql:
+    # PostgreSQL: Tables should be managed by Alembic migrations
+    # But we'll ensure they exist for initial setup
+    try:
+        inspector = inspect(engine)
+        tables = inspector.get_table_names()
+        if not tables:
+            print(f"[DATABASE] No tables found in PostgreSQL, creating initial schema")
+            init_db()
+        else:
+            print(f"[DATABASE] Connected to PostgreSQL with {len(tables)} tables")
+    except Exception as e:
+        print(f"[DATABASE] Warning: Could not inspect PostgreSQL database: {e}")
+
+else:
+    # Other databases
+    print(f"[DATABASE] Initializing database at {DATABASE_URL}")
+    init_db()
