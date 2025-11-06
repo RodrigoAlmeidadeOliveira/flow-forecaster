@@ -8,7 +8,32 @@ from models import Base, Project, Forecast, Actual, User
 
 # Database configuration
 DB_PATH = os.environ.get('DATABASE_URL', 'sqlite:///forecaster.db')
-engine = create_engine(DB_PATH, echo=False)
+
+# PostgreSQL connection pool settings for production
+connect_args = {}
+pool_settings = {}
+
+if DB_PATH.startswith('postgres://') or DB_PATH.startswith('postgresql://'):
+    # PostgreSQL production settings
+    pool_settings = {
+        'pool_size': 5,
+        'max_overflow': 10,
+        'pool_pre_ping': True,  # Verify connections before using
+        'pool_recycle': 3600,   # Recycle connections after 1 hour
+    }
+    # Fix Heroku/Fly.io postgres:// URL (should be postgresql://)
+    if DB_PATH.startswith('postgres://'):
+        DB_PATH = DB_PATH.replace('postgres://', 'postgresql://', 1)
+else:
+    # SQLite settings
+    connect_args = {'check_same_thread': False}
+
+engine = create_engine(
+    DB_PATH,
+    echo=False,
+    connect_args=connect_args,
+    **pool_settings
+)
 
 # Session factory
 session_factory = sessionmaker(bind=engine)
@@ -27,6 +52,9 @@ def ensure_schema():
     table_names = set(inspector.get_table_names())
     if 'projects' not in table_names:
         return
+
+    # Detect database type
+    is_postgres = DB_PATH.startswith('postgresql://')
 
     existing_project_columns = {col['name'] for col in inspector.get_columns('projects')}
 
@@ -67,23 +95,45 @@ def ensure_schema():
 
         if 'users' in table_names:
             existing_user_columns = {col['name'] for col in inspector.get_columns('users')}
-            user_columns = [
-                (
-                    'registration_date',
-                    "ALTER TABLE users ADD COLUMN registration_date DATETIME",
-                    "UPDATE users SET registration_date = COALESCE(created_at, CURRENT_TIMESTAMP) WHERE registration_date IS NULL"
-                ),
-                (
-                    'access_expires_at',
-                    "ALTER TABLE users ADD COLUMN access_expires_at DATETIME",
+
+            if is_postgres:
+                # PostgreSQL-specific syntax
+                user_columns = [
                     (
-                        "UPDATE users "
-                        "SET access_expires_at = DATETIME("
-                        "COALESCE(registration_date, created_at, CURRENT_TIMESTAMP), '+365 days') "
-                        "WHERE access_expires_at IS NULL"
-                    )
-                ),
-            ]
+                        'registration_date',
+                        "ALTER TABLE users ADD COLUMN registration_date TIMESTAMP",
+                        "UPDATE users SET registration_date = COALESCE(created_at, CURRENT_TIMESTAMP) WHERE registration_date IS NULL"
+                    ),
+                    (
+                        'access_expires_at',
+                        "ALTER TABLE users ADD COLUMN access_expires_at TIMESTAMP",
+                        (
+                            "UPDATE users "
+                            "SET access_expires_at = COALESCE(registration_date, created_at, CURRENT_TIMESTAMP) + INTERVAL '365 days' "
+                            "WHERE access_expires_at IS NULL"
+                        )
+                    ),
+                ]
+            else:
+                # SQLite-specific syntax
+                user_columns = [
+                    (
+                        'registration_date',
+                        "ALTER TABLE users ADD COLUMN registration_date DATETIME",
+                        "UPDATE users SET registration_date = COALESCE(created_at, CURRENT_TIMESTAMP) WHERE registration_date IS NULL"
+                    ),
+                    (
+                        'access_expires_at',
+                        "ALTER TABLE users ADD COLUMN access_expires_at DATETIME",
+                        (
+                            "UPDATE users "
+                            "SET access_expires_at = DATETIME("
+                            "COALESCE(registration_date, created_at, CURRENT_TIMESTAMP), '+365 days') "
+                            "WHERE access_expires_at IS NULL"
+                        )
+                    ),
+                ]
+
             for column_name, ddl, hydration in user_columns:
                 if column_name not in existing_user_columns:
                     connection.execute(text(ddl))
@@ -110,12 +160,29 @@ def reset_db():
 
 
 # Initialize database on import
-db_file = DB_PATH.replace('sqlite:///', '').replace('sqlite:////', '/')
-if not os.path.exists(db_file) or os.path.getsize(db_file) == 0:
-    # Ensure directory exists
-    db_dir = os.path.dirname(db_file)
-    if db_dir and not os.path.exists(db_dir):
-        os.makedirs(db_dir, exist_ok=True)
-    init_db()
+if DB_PATH.startswith('sqlite'):
+    # SQLite: check if file exists
+    db_file = DB_PATH.replace('sqlite:///', '').replace('sqlite:////', '/')
+    if not os.path.exists(db_file) or os.path.getsize(db_file) == 0:
+        # Ensure directory exists
+        db_dir = os.path.dirname(db_file)
+        if db_dir and not os.path.exists(db_dir):
+            os.makedirs(db_dir, exist_ok=True)
+        init_db()
+else:
+    # PostgreSQL: just ensure schema exists (tables created externally or via init_db)
+    try:
+        # Test connection
+        with engine.connect() as conn:
+            result = conn.execute(text("SELECT 1"))
+            print(f"✓ Connected to PostgreSQL database successfully")
+    except Exception as e:
+        print(f"⚠ PostgreSQL connection error: {e}")
+        print(f"  DATABASE_URL: {DB_PATH[:50]}...")  # Print first 50 chars only
 
-ensure_schema()
+# Ensure schema is up to date (works for both SQLite and PostgreSQL)
+try:
+    ensure_schema()
+except Exception as e:
+    print(f"⚠ Schema update warning: {e}")
+    # Don't fail startup on schema update errors

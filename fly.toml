@@ -5,7 +5,8 @@ app = "flow-forecaster"
 primary_region = "gru"
 
 [env]
-  DATABASE_URL = "sqlite:////data/forecaster.db"
+  # DATABASE_URL is set as a secret (flyctl secrets set DATABASE_URL=...)
+  # Don't define it here or it will override the PostgreSQL connection
 
 [build]
 
