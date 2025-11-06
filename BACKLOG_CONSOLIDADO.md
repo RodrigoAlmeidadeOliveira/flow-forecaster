@@ -1,33 +1,42 @@
 # 📋 BACKLOG CONSOLIDADO - Flow Forecaster
-**Última Atualização:** 2025-11-06
+**Última Atualização:** 2025-11-06 (Revisado após análise de CoD)
 **Status:** Lista única consolidada de todas as pendências
+
+---
+
+## ✅ RECÉM IMPLEMENTADO (Confirmar funcionamento)
+
+### Sistema Completo de Custo de Atraso (CoD)
+**Status:** ✅ **IMPLEMENTADO COMPLETO** (commits fa45951, 0b0869d, a81a3bb)
+
+**O que foi implementado:**
+- ✅ `cod_forecaster.py` com Random Forest + Gradient Boosting
+- ✅ Features completas: budget, duration, team_size, stakeholders, business_value, complexity, risk_level, project_type
+- ✅ Feature engineering: budget_per_week, stakeholder_density, value_per_week, risk_complexity_score
+- ✅ K-Fold Cross-Validation (5 folds) + métricas (MAE, RMSE, R², MAPE)
+- ✅ Cálculo dinâmico: `custo_total = custo_semanal × semanas_atraso`
+- ✅ API completa: `/api/cod/predict`, `/api/cod/calculate_total`, `/api/cod/feature_importance`
+- ✅ UI com aba "💰 Cost of Delay" no menu principal
+- ✅ Visualização de resultados (weekly, daily, monthly CoD)
+- ✅ Calculadora de custo total de atraso
+- ✅ Gráfico de feature importance (horizontal bar chart)
+- ✅ Ensemble predictions com intervalos de confiança (95% CI)
+- ✅ Suite de testes completa (`test_cod_forecaster.py`)
+
+**Arquivos:**
+- `cod_forecaster.py` ✅
+- `test_cod_forecaster.py` ✅
+- `templates/index.html` (seção CoD) ✅
+- `static/js/cost_of_delay.js` ✅
+- `app.py` (endpoints CoD) ✅
+
+**Nota:** Features #4 e #5 do FEATURES_ML_ROADMAP.md foram marcadas como implementadas.
 
 ---
 
 ## 🔥 CRÍTICO / URGENTE (Máximo Impacto)
 
-### 1. Sistema Completo de Custo de Atraso (CoD)
-**Prioridade:** ⭐⭐⭐⭐⭐ | **Esforço:** 2-3 semanas | **Status:** ❌ Não implementado
-
-**Gap Identificado:** Features #4 e #5 do FEATURES_ML_ROADMAP.md ausentes
-
-**Implementação:**
-- [ ] Criar `cod_forecaster.py` com Random Forest para estimativa de CoD
-- [ ] Features: orçamento, stakeholders, tipo de projeto, duração predita
-- [ ] Cálculo dinâmico: `custo_total = custo_semanal × semanas_atraso`
-- [ ] UI para configurar fatores de CoD (impacto mercado, penalidades, etc.)
-- [ ] Visualização de impacto financeiro de atrasos
-- [ ] Integração com dependency analyzer
-- [ ] Dashboard de CoD por projeto/portfolio
-
-**Arquivos:**
-- `src/cod_forecaster.py` (novo)
-- `templates/cod_analysis.html` (novo)
-- `static/js/cod_charts.js` (novo)
-
----
-
-### 2. Análise de Cenários (What-If Analysis)
+### 1. Análise de Cenários (What-If Analysis)
 **Prioridade:** ⭐⭐⭐⭐⭐ | **Esforço:** 1-2 semanas | **Status:** ❌ Não implementado
 
 **Implementação:**
@@ -45,28 +54,32 @@
 
 ---
 
-### 3. Visualização de Feature Importance
-**Prioridade:** ⭐⭐⭐⭐ | **Esforço:** 3-5 dias | **Status:** 🟡 Existe mas não exposto
+### 2. Visualização de Feature Importance (ML Forecasting)
+**Prioridade:** ⭐⭐⭐⭐ | **Esforço:** 3-5 dias | **Status:** 🟡 Parcialmente implementado
 
-**Gap Identificado:** Feature #6 - código existe mas não está na UI
+**Gap Identificado:** Feature #6 - Feature importance existe para CoD (✅), falta para ML Forecasting
 
-**Implementação:**
-- [ ] Adicionar endpoint `/api/feature_importance`
-- [ ] Gráfico de barras horizontal mostrando importância de cada feature
-- [ ] Insights acionáveis automáticos (ex: "Reduzir mudanças de escopo diminui 30% do risco")
-- [ ] Feature importance por modelo (RF, XGBoost, etc.)
-- [ ] Integrar na aba de ML Forecasting
+**Já implementado:**
+- ✅ Feature importance para CoD: `/api/cod/feature_importance` + gráfico na aba CoD
+- ✅ Gráfico de barras horizontal na interface de CoD
+
+**O que falta:**
+- [ ] Adicionar endpoint `/api/ml/feature_importance` para modelos de throughput
+- [ ] Gráfico de feature importance na aba de ML Forecasting
+- [ ] Insights acionáveis automáticos (ex: "Lags de 3 semanas têm maior impacto")
+- [ ] Feature importance por modelo (RF, XGBoost, Ridge, etc.)
+- [ ] Comparação de importância entre modelos
 
 **Arquivos:**
 - `app.py` (adicionar endpoint)
 - `templates/ml_forecasting.html` (adicionar seção)
-- `static/js/feature_importance.js` (novo)
+- `ml_forecaster.py` (método get_feature_importance)
 
 ---
 
 ## 🟡 IMPORTANTE (Curto/Médio Prazo)
 
-### 4. Visualizações Avançadas
+### 3. Visualizações Avançadas
 **Prioridade:** ⭐⭐⭐⭐ | **Esforço:** 1 semana | **Status:** 🟡 Parcial
 
 **Gap Identificado:** Feature #12 - visualizações básicas existem, faltam avançadas
@@ -85,7 +98,7 @@
 
 ---
 
-### 5. Upload de Dados Históricos (CSV/Excel)
+### 4. Upload de Dados Históricos (CSV/Excel)
 **Prioridade:** ⭐⭐⭐⭐ | **Esforço:** 1 semana | **Status:** 🟡 DB existe, falta UI
 
 **Gap Identificado:** Feature #13 - estrutura de DB pronta, falta interface
@@ -106,7 +119,7 @@
 
 ---
 
-### 6. Integração com Jira
+### 5. Integração com Jira
 **Prioridade:** ⭐⭐⭐⭐⭐ | **Esforço:** 2-3 semanas | **Status:** ❌ Não implementado
 
 **Implementação:**
@@ -125,7 +138,7 @@
 
 ---
 
-### 7. Export para PDF e Excel
+### 6. Export para PDF e Excel
 **Prioridade:** ⭐⭐⭐⭐ | **Esforço:** 1 semana | **Status:** ❌ Não implementado
 
 **Implementação:**
@@ -143,7 +156,7 @@
 
 ---
 
-### 8. Dashboard de Portfolio (Multi-Projeto)
+### 7. Dashboard de Portfolio (Multi-Projeto)
 **Prioridade:** ⭐⭐⭐⭐ | **Esforço:** 2 semanas | **Status:** 🟡 Análise existe, falta dashboard
 
 **Implementação:**
@@ -161,7 +174,7 @@
 
 ---
 
-### 9. Otimização Matemática de Portfólio
+### 8. Otimização Matemática de Portfólio
 **Prioridade:** ⭐⭐⭐⭐ | **Esforço:** 2 semanas | **Status:** ❌ Não implementado
 
 **Gap Identificado:** Feature #18 - análise existe, falta solver
@@ -180,7 +193,7 @@
 
 ---
 
-### 10. Modelo de Sucesso do Projeto (Classificação)
+### 9. Modelo de Sucesso do Projeto (Classificação)
 **Prioridade:** ⭐⭐⭐⭐ | **Esforço:** 1-2 semanas | **Status:** ❌ Não implementado
 
 **Gap Identificado:** Feature #19 - ausente
@@ -201,7 +214,7 @@
 
 ## 🔬 AVANÇADO (Médio/Longo Prazo)
 
-### 11. Análise de Tendências Automática
+### 10. Análise de Tendências Automática
 **Prioridade:** ⭐⭐⭐ | **Esforço:** 3-4 semanas | **Status:** ❌ Não implementado
 
 **Implementação:**
@@ -218,7 +231,7 @@
 
 ---
 
-### 12. Clustering e Análise de Causas Raiz
+### 11. Clustering e Análise de Causas Raiz
 **Prioridade:** ⭐⭐⭐ | **Esforço:** 2 semanas | **Status:** ❌ Não implementado
 
 **Gap Identificado:** Feature #16
@@ -236,7 +249,7 @@
 
 ---
 
-### 13. Persistência e Versionamento de Modelos ML
+### 12. Persistência e Versionamento de Modelos ML
 **Prioridade:** ⭐⭐⭐ | **Esforço:** 1 semana | **Status:** 🟡 Cache existe, falta persistência
 
 **Gap Identificado:** Feature #20
@@ -255,7 +268,7 @@
 
 ---
 
-### 14. Forecast de Defeitos/Bugs
+### 13. Forecast de Defeitos/Bugs
 **Prioridade:** ⭐⭐⭐ | **Esforço:** 2 semanas | **Status:** ❌ Não implementado
 
 **Implementação:**
@@ -270,7 +283,7 @@
 
 ---
 
-### 15. Technical Debt Impact Analysis
+### 14. Technical Debt Impact Analysis
 **Prioridade:** ⭐⭐⭐ | **Esforço:** 2 semanas | **Status:** ❌ Não implementado
 
 **Implementação:**
@@ -284,7 +297,7 @@
 
 ---
 
-### 16. Correlação entre Riscos
+### 15. Correlação entre Riscos
 **Prioridade:** ⭐⭐ | **Esforço:** 1-2 semanas | **Status:** ❌ Não implementado
 
 **Implementação:**
@@ -298,7 +311,7 @@
 
 ---
 
-### 17. Rolling Wave Planning Support
+### 16. Rolling Wave Planning Support
 **Prioridade:** ⭐⭐ | **Esforço:** 2 semanas | **Status:** ❌ Não implementado
 
 **Implementação:**
@@ -311,7 +324,7 @@
 
 ---
 
-### 18. Probabilistic Roadmaps
+### 17. Probabilistic Roadmaps
 **Prioridade:** ⭐⭐⭐ | **Esforço:** 2-3 semanas | **Status:** ❌ Não implementado
 
 **Implementação:**
@@ -326,7 +339,7 @@
 
 ---
 
-### 19. Process Behavior Charts (XmR Charts)
+### 18. Process Behavior Charts (XmR Charts)
 **Prioridade:** ⭐⭐⭐ | **Esforço:** 1-2 semanas | **Status:** ❌ Não implementado
 
 **Solicitado pelo usuário - Controle estatístico de processo**
@@ -348,7 +361,7 @@
 
 ## 🏢 PLATAFORMA & INFRAESTRUTURA
 
-### 20. Autenticação Google OAuth2
+### 19. Autenticação Google OAuth2
 **Prioridade:** ⭐⭐⭐⭐⭐ | **Esforço:** 1 semana | **Status:** ❌ Não implementado
 
 **Solicitado pelo usuário - Obrigatório para multi-tenant**
@@ -368,7 +381,7 @@
 
 ---
 
-### 21. Sistema de Créditos e Monetização
+### 20. Sistema de Créditos e Monetização
 **Prioridade:** ⭐⭐⭐⭐ | **Esforço:** 2-3 semanas | **Status:** ❌ Não implementado
 
 **Solicitado pelo usuário - Modelo de negócio**
@@ -405,7 +418,7 @@
 
 ---
 
-### 22. Wizards e Onboarding Guiado
+### 21. Wizards e Onboarding Guiado
 **Prioridade:** ⭐⭐⭐ | **Esforço:** 2 semanas | **Status:** ❌ Não implementado
 
 **Implementação:**
@@ -423,7 +436,7 @@
 
 ---
 
-### 23. API REST Completa
+### 22. API REST Completa
 **Prioridade:** ⭐⭐⭐ | **Esforço:** 2 semanas | **Status:** 🟡 Parcial
 
 **Implementação:**
@@ -444,7 +457,7 @@
 
 **Contexto:** Base para pesquisa de doutorado usando process mining, telemetria e ML
 
-### 24. Integração com Azure DevOps (com Process Mining)
+### 23. Integração com Azure DevOps (com Process Mining)
 **Prioridade:** ⭐⭐⭐⭐ | **Esforço:** 3-4 semanas | **Status:** ❌ Não implementado
 
 **Implementação:**
@@ -477,7 +490,7 @@
 
 ---
 
-### 25. Integração com GitHub (com Process Mining)
+### 24. Integração com GitHub (com Process Mining)
 **Prioridade:** ⭐⭐⭐⭐ | **Esforço:** 3-4 semanas | **Status:** ❌ Não implementado
 
 **Implementação:**
@@ -508,7 +521,7 @@
 
 ---
 
-### 26. Process Mining Dashboard (P.R.I.O.R.I.S.)
+### 25. Process Mining Dashboard (P.R.I.O.R.I.S.)
 **Prioridade:** ⭐⭐⭐⭐ | **Esforço:** 4 semanas | **Status:** ❌ Não implementado
 
 **Implementação:**
@@ -529,7 +542,7 @@
 
 ---
 
-### 27. Machine Learning com Features de Processo
+### 26. Machine Learning com Features de Processo
 **Prioridade:** ⭐⭐⭐⭐ | **Esforço:** 4-6 semanas | **Status:** ❌ Não implementado
 
 **Implementação:**
@@ -559,7 +572,7 @@
 
 ---
 
-### 28. Arqueologia de Processos (Process Archaeology)
+### 27. Arqueologia de Processos (Process Archaeology)
 **Prioridade:** ⭐⭐⭐ | **Esforço:** 3-4 semanas | **Status:** ❌ Não implementado
 
 **Implementação:**
@@ -576,7 +589,7 @@
 
 ---
 
-### 29. Menu Separado P.R.I.O.R.I.S.
+### 28. Menu Separado P.R.I.O.R.I.S.
 **Prioridade:** ⭐⭐⭐⭐ | **Esforço:** 1 semana | **Status:** ❌ Não implementado
 
 **Implementação:**
@@ -596,20 +609,20 @@
 ## 📊 RESUMO EXECUTIVO
 
 ### Por Status:
-- ✅ **Implementado Completo:** 12 features (já existentes no projeto)
-- 🟡 **Implementado Parcial:** 7 features (precisam ser completadas)
-- ❌ **Não Implementado:** 29 features (backlog completo)
+- ✅ **Implementado Completo:** 13 features (incluindo CoD recém confirmado)
+- 🟡 **Implementado Parcial:** 6 features (precisam ser completadas)
+- ❌ **Não Implementado:** 28 features (backlog pendente)
 
 ### Por Prioridade:
-- 🔥 **CRÍTICO/URGENTE:** 3 features (0-4 semanas)
-- ⭐⭐⭐⭐⭐ **MUITO ALTA:** 10 features (1-3 meses)
+- 🔥 **CRÍTICO/URGENTE:** 2 features (0-4 semanas)
+- ⭐⭐⭐⭐⭐ **MUITO ALTA:** 9 features (1-3 meses)
 - ⭐⭐⭐⭐ **ALTA:** 8 features (2-4 meses)
 - ⭐⭐⭐ **MÉDIA:** 8 features (4-6 meses)
 - ⭐⭐ **BAIXA:** 4 features (6+ meses)
 
 ### Por Categoria:
-- **ML & Forecasting:** 8 features
-- **Visualizações:** 4 features
+- **ML & Forecasting:** 7 features (CoD ✅)
+- **Visualizações:** 3 features (CoD feature importance ✅)
 - **Integrações:** 4 features
 - **Plataforma:** 5 features
 - **P.R.I.O.R.I.S. (Doutorado):** 6 features
@@ -622,24 +635,25 @@
 
 ### **FASE 1 (0-2 meses) - Foundation**
 Implementar features críticas para viabilizar o produto:
-1. Sistema de CoD (#1)
-2. Google OAuth2 (#20)
-3. Sistema de Créditos e Pagamentos (#21)
-4. Análise de Cenários (#2)
-5. Feature Importance UI (#3)
+1. Google OAuth2 (#19)
+2. Sistema de Créditos e Pagamentos (#20)
+3. Análise de Cenários (#1)
+4. Feature Importance UI para ML Forecasting (#2)
+5. Visualizações Avançadas (#3)
 
 **Resultado:** Produto monetizável com features core completas
+**Nota:** CoD já implementado ✅
 
 ---
 
 ### **FASE 2 (2-4 meses) - Growth**
 Expandir funcionalidades e integrações:
-1. Integração Jira (#6)
-2. Upload de Dados (#5)
-3. Export PDF/Excel (#7)
-4. Dashboard Portfolio (#8)
-5. Visualizações Avançadas (#4)
-6. Modelo de Sucesso (#10)
+1. Integração Jira (#5)
+2. Upload de Dados (#4)
+3. Export PDF/Excel (#6)
+4. Dashboard Portfolio (#7)
+5. Modelo de Sucesso (#9)
+6. Wizards e Onboarding (#21)
 
 **Resultado:** Produto enterprise-ready com integrações principais
 
@@ -647,12 +661,12 @@ Expandir funcionalidades e integrações:
 
 ### **FASE 3 (4-6 meses) - Advanced**
 Features avançadas de otimização e ML:
-1. Otimização Matemática (#9)
-2. Análise de Tendências (#11)
-3. Process Behavior Charts (#19)
-4. Forecast de Defeitos (#14)
-5. Clustering e Causas Raiz (#12)
-6. API REST Completa (#23)
+1. Otimização Matemática (#8)
+2. Análise de Tendências (#10)
+3. Process Behavior Charts (#18)
+4. Forecast de Defeitos (#13)
+5. Clustering e Causas Raiz (#11)
+6. API REST Completa (#22)
 
 **Resultado:** Plataforma completa e diferenciada
 
@@ -660,12 +674,12 @@ Features avançadas de otimização e ML:
 
 ### **FASE 4 (6-12 meses) - P.R.I.O.R.I.S.**
 Funcionalidades de pesquisa (doutorado):
-1. Azure DevOps com Process Mining (#24)
-2. GitHub com Process Mining (#25)
-3. Process Mining Dashboard (#26)
-4. ML com Features de Processo (#27)
-5. Arqueologia de Processos (#28)
-6. Menu Separado P.R.I.O.R.I.S. (#29)
+1. Azure DevOps com Process Mining (#23)
+2. GitHub com Process Mining (#24)
+3. Process Mining Dashboard (#25)
+4. ML com Features de Processo (#26)
+5. Arqueologia de Processos (#27)
+6. Menu Separado P.R.I.O.R.I.S. (#28)
 
 **Resultado:** Base para publicações acadêmicas e diferencial científico
 
@@ -673,10 +687,11 @@ Funcionalidades de pesquisa (doutorado):
 
 ## 📝 OBSERVAÇÕES
 
-### Melhorias Identificadas em Análises Anteriores:
-- ✅ Fold stride no backtesting (recém implementado)
-- ✅ Forecast vs Actual Tracking (recém implementado)
-- ✅ Persistência e Histórico (recém implementado)
+### Melhorias Implementadas Recentemente:
+- ✅ **Sistema Completo de Cost of Delay (CoD)** - commits fa45951, 0b0869d, a81a3bb
+- ✅ Fold stride no backtesting - commit 857b60b
+- ✅ Forecast vs Actual Tracking - implementado
+- ✅ Persistência e Histórico - implementado
 
 ### Dependências Críticas:
 - **OAuth2** deve ser implementado antes do sistema de créditos
@@ -693,4 +708,5 @@ Funcionalidades de pesquisa (doutorado):
 ---
 
 **Documento gerado por:** Claude Code (Sonnet 4.5)
-**Baseado em:** FEATURES_ML_ROADMAP.md + análises de 27/10 e 05/11 + requisitos do usuário
+**Baseado em:** FEATURES_ML_ROADMAP.md + análises de 27/10, 05/11 e 06/11 + requisitos do usuário
+**Última revisão:** 06/11/2025 - Confirmado implementação completa de CoD (✅)
