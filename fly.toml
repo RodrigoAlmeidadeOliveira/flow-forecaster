@@ -1,35 +1,97 @@
-# fly.toml app configuration file generated for flow-forecaster
-# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+# fly.toml app configuration file for Flow Forecaster
+# Updated for async architecture with Celery workers
 
 app = "flow-forecaster"
 primary_region = "gru"
 
-[env]
-  DATABASE_URL = "sqlite:////data/forecaster.db"
+# Kill signal for graceful shutdown
+kill_signal = "SIGTERM"
+kill_timeout = "30s"
 
 [build]
+  # Use Dockerfile for build
 
+[env]
+  # Application settings
+  FLASK_APP = "app.py"
+  FLASK_ENV = "production"
+
+  # Database will be set by fly postgres attach
+  # DATABASE_URL is automatically set by Fly.io when attaching Postgres
+
+  # Redis configuration (will be set after creating Redis)
+  # CELERY_BROKER_URL and CELERY_RESULT_BACKEND will be configured via secrets
+
+  # Celery settings
+  CELERY_TASK_SERIALIZER = "json"
+  CELERY_RESULT_SERIALIZER = "json"
+  CELERY_ACCEPT_CONTENT = '["json"]'
+  CELERY_TIMEZONE = "America/Sao_Paulo"
+
+  # Performance settings
+  WORKERS = "4"
+  WORKER_CONNECTIONS = "1000"
+
+# Web process (Flask/Gunicorn)
+[processes]
+  web = "gunicorn wsgi:application --bind 0.0.0.0:8080 --workers 4 --timeout 120 --worker-class gevent --worker-connections 1000 --access-logfile - --error-logfile -"
+  worker = "celery -A celery_app worker --loglevel=info --concurrency=4 --max-tasks-per-child=1000"
+
+# HTTP service configuration
 [http_service]
   internal_port = 8080
   force_https = true
   auto_stop_machines = "stop"
   auto_start_machines = true
   min_machines_running = 0
-  processes = ["app"]
+  processes = ["web"]
 
-  # Increase timeouts for long-running Monte Carlo simulations
+  [http_service.concurrency]
+    type = "requests"
+    soft_limit = 200
+    hard_limit = 250
+
   [http_service.http_options]
-    response_timeout = 300  # 5 minutes for simulation processing
+    response_timeout = 300  # 5 minutes for async task submission
+    idle_timeout = 60
 
+# Health checks for web process
+[[http_service.checks]]
+  grace_period = "30s"
+  interval = "15s"
+  method = "GET"
+  timeout = "5s"
+  path = "/api/async/health"
+
+  [http_service.checks.headers]
+    User-Agent = "Fly-Health-Check"
+
+# VM resources for web machines
+[[vm]]
+  memory = '512mb'
+  cpu_kind = 'shared'
+  cpus = 1
+  processes = ["web"]
+
+# VM resources for worker machines
 [[vm]]
   memory = '1gb'
   cpu_kind = 'shared'
   cpus = 1
+  processes = ["worker"]
 
+# Metrics for monitoring
+[metrics]
+  port = 9091
+  path = "/metrics"
+
+# Static file serving
 [[statics]]
   guest_path = "/app/static"
   url_prefix = "/static/"
 
-[mounts]
-  source = "flow_forecaster_data"
-  destination = "/data"
+# Persistent volume for SQLite (fallback, but we'll use PostgreSQL)
+# Can be removed if fully migrated to PostgreSQL
+# [mounts]
+#   source = "flow_forecaster_data"
+#   destination = "/data"
