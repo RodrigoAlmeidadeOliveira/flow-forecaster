@@ -2975,9 +2975,20 @@ def backtest_project():
 
         # Calculate metrics for response
         results = summary.to_dict()
+
+        # Calculate accuracy from error_pct (accuracy = 1 - |error|/100)
+        # If error is 10%, accuracy is 90%
+        if results['results']:
+            accuracies = [max(0, 1 - abs(r['error_pct']) / 100) for r in results['results']]
+            avg_accuracy = sum(accuracies) / len(accuracies)
+            avg_error_pct = sum(abs(r['error_pct']) for r in results['results']) / len(results['results'])
+        else:
+            avg_accuracy = 0
+            avg_error_pct = 0
+
         metrics = {
-            'avg_accuracy': sum(r['accuracy'] for r in results['results']) / len(results['results']) if results['results'] else 0,
-            'avg_error_pct': sum(abs(r['error_pct']) for r in results['results']) / len(results['results']) if results['results'] else 0,
+            'avg_accuracy': round(avg_accuracy, 3),
+            'avg_error_pct': round(avg_error_pct, 2),
         }
 
         response = {
