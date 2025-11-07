@@ -142,6 +142,11 @@
                 <p class="text-white-50">Gerenciar portfólios de projetos e executar simulações</p>
             </div>
             <div class="col-auto">
+                {% if current_user.is_authenticated and current_user.role in ['admin', 'instructor'] %}
+                <button id="admin-update-btn" class="btn btn-warning me-2" onclick="updatePortfolioValuesAdmin()">
+                    <i class="fas fa-wrench"></i> [ADMIN] Atualizar Valores
+                </button>
+                {% endif %}
                 <a href="/" class="btn btn-light">
                     <i class="fas fa-home"></i> Voltar
                 </a>
@@ -324,5 +329,42 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="{{ url_for('static', filename='js/portfolio_manager.js') }}"></script>
+
+    <script>
+        // Admin function to update portfolio values
+        async function updatePortfolioValuesAdmin() {
+            if (!confirm('⚠️ Isso atualizará os valores de business_value e risk_level de todos os projetos.\n\nDeseja continuar?')) {
+                return;
+            }
+
+            const btn = document.getElementById('admin-update-btn');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Atualizando...';
+
+            try {
+                const response = await fetch('/admin/update-portfolio-values', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include'
+                });
+
+                const data = await response.json();
+
+                if (response.ok && data.success) {
+                    alert('✅ Valores atualizados com sucesso!\n\n' + data.updates.join('\n') +
+                          '\n\nRecarregue a página para ver as mudanças.');
+                    window.location.reload();
+                } else {
+                    throw new Error(data.error || 'Erro desconhecido');
+                }
+            } catch (error) {
+                console.error('Error updating portfolio values:', error);
+                alert('❌ Erro ao atualizar valores: ' + error.message);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-wrench"></i> [ADMIN] Atualizar Valores';
+            }
+        }
+    </script>
 </body>
 </html>
