@@ -47,15 +47,6 @@ function renderError(message) {
 
 function renderPortfolioDashboard(data) {
     const html = `
-        <!-- Admin Button (only visible for admins) -->
-        <div class="row mb-3">
-            <div class="col-12 text-right">
-                <button id="admin-update-portfolio-btn" class="btn btn-sm btn-warning" onclick="updatePortfolioValuesAdmin()" style="display: none;">
-                    <i class="fas fa-wrench"></i> [ADMIN] Atualizar Valores de Portfólio
-                </button>
-            </div>
-        </div>
-
         <!-- Summary Cards -->
         <div class="row mb-4">
             <div class="col-md-3">
@@ -106,11 +97,6 @@ function renderPortfolioDashboard(data) {
     `;
 
     $('#portfolio-content').html(html);
-
-    // Show admin button if user is admin (check if user_role variable exists)
-    if (typeof user_role !== 'undefined' && (user_role === 'admin' || user_role === 'instructor')) {
-        $('#admin-update-portfolio-btn').show();
-    }
 }
 
 function renderAlerts(alerts) {
@@ -322,42 +308,3 @@ function renderProjectList(projects, colorClass) {
     return html;
 }
 
-/**
- * Admin function to update portfolio values
- * Distributes projects across the prioritization matrix quadrants
- */
-async function updatePortfolioValuesAdmin() {
-    if (!confirm('⚠️ Isso atualizará os valores de business_value e risk_level de todos os projetos.\n\nDeseja continuar?')) {
-        return;
-    }
-
-    const btn = $('#admin-update-portfolio-btn');
-    btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Atualizando...');
-
-    try {
-        const response = await fetch('/admin/update-portfolio-values', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include'
-        });
-
-        const data = await response.json();
-
-        if (response.ok && data.success) {
-            alert('✅ Valores atualizados com sucesso!\n\n' + data.updates.join('\n'));
-
-            // Reload dashboard to show updated values
-            loadPortfolioDashboard();
-        } else {
-            throw new Error(data.error || 'Erro desconhecido');
-        }
-    } catch (error) {
-        console.error('Error updating portfolio values:', error);
-        alert('❌ Erro ao atualizar valores: ' + error.message);
-    } finally {
-        btn.prop('disabled', false).html('<i class="fas fa-wrench"></i> [ADMIN] Atualizar Valores de Portfólio');
-    }
-}
-
-// Export to global scope
-window.updatePortfolioValuesAdmin = updatePortfolioValuesAdmin;
