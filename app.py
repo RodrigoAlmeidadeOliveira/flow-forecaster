@@ -46,6 +46,7 @@ from cost_pert_beta import (
     calculate_effort_based_cost_with_percentiles
 )
 from database import get_session, close_session, init_db
+from models import Project, Forecast, Actual, User, Portfolio, PortfolioProject, SimulationRun
 from models import Project, Forecast, Actual, User, CoDTrainingDataset, CoDModel
 from accuracy_metrics import (
     calculate_accuracy_metrics,
@@ -2130,6 +2131,441 @@ def handle_project(project_id):
         session.close()
 
 
+# ============================================================================
+# PORTFOLIO API ENDPOINTS
+# ============================================================================
+
+@app.route('/api/portfolios', methods=['GET', 'POST'])
+@login_required
+def handle_portfolios():
+    """List portfolios or create a new portfolio"""
+    session = get_session()
+    try:
+        if request.method == 'GET':
+            # Get all portfolios for current user
+            portfolios = session.query(Portfolio).filter(
+                Portfolio.user_id == current_user.id
+            ).order_by(Portfolio.created_at.desc()).all()
+
+            return jsonify([p.to_dict() for p in portfolios])
+
+        elif request.method == 'POST':
+            data = request.json or {}
+
+            # Create new portfolio
+            portfolio = Portfolio(
+                user_id=current_user.id,
+                name=data.get('name', 'New Portfolio'),
+                description=data.get('description'),
+                status=data.get('status', 'active'),
+                portfolio_type=data.get('portfolio_type', 'standard'),
+                total_budget=data.get('total_budget'),
+                total_capacity=data.get('total_capacity'),
+                start_date=data.get('start_date'),
+                target_end_date=data.get('target_end_date'),
+                owner=data.get('owner'),
+                sponsor=data.get('sponsor'),
+                tags=json.dumps(data.get('tags', []))
+            )
+
+            session.add(portfolio)
+            session.commit()
+
+            return jsonify(portfolio.to_dict()), 201
+
+    except Exception as e:
+        session.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        session.close()
+
+
+@app.route('/api/portfolios/<int:portfolio_id>', methods=['GET', 'PUT', 'DELETE'])
+@login_required
+def handle_portfolio(portfolio_id):
+    """Get, update, or delete a specific portfolio"""
+    session = get_session()
+    try:
+        # Get portfolio (scoped to user)
+        portfolio = session.query(Portfolio).filter(
+            Portfolio.id == portfolio_id,
+            Portfolio.user_id == current_user.id
+        ).one_or_none()
+
+        if not portfolio:
+            return jsonify({'error': 'Portfolio not found'}), 404
+
+        if request.method == 'GET':
+            return jsonify(portfolio.to_dict(include_projects=True))
+
+        elif request.method == 'PUT':
+            data = request.json or {}
+
+            # Update fields
+            if 'name' in data:
+                portfolio.name = data['name']
+            if 'description' in data:
+                portfolio.description = data['description']
+            if 'status' in data:
+                portfolio.status = data['status']
+            if 'portfolio_type' in data:
+                portfolio.portfolio_type = data['portfolio_type']
+            if 'total_budget' in data:
+                portfolio.total_budget = data['total_budget']
+            if 'total_capacity' in data:
+                portfolio.total_capacity = data['total_capacity']
+            if 'start_date' in data:
+                portfolio.start_date = data['start_date']
+            if 'target_end_date' in data:
+                portfolio.target_end_date = data['target_end_date']
+            if 'owner' in data:
+                portfolio.owner = data['owner']
+            if 'sponsor' in data:
+                portfolio.sponsor = data['sponsor']
+            if 'tags' in data:
+                portfolio.tags = json.dumps(data['tags'])
+
+            portfolio.updated_at = datetime.utcnow()
+            session.commit()
+            return jsonify(portfolio.to_dict())
+
+        elif request.method == 'DELETE':
+            session.delete(portfolio)
+            session.commit()
+            return '', 204
+
+    except Exception as e:
+        session.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        session.close()
+
+
+@app.route('/api/portfolios/<int:portfolio_id>/projects', methods=['GET', 'POST'])
+@login_required
+def handle_portfolio_projects(portfolio_id):
+    """List projects in portfolio or add a project to portfolio"""
+    session = get_session()
+    try:
+        # Verify portfolio ownership
+        portfolio = session.query(Portfolio).filter(
+            Portfolio.id == portfolio_id,
+            Portfolio.user_id == current_user.id
+        ).one_or_none()
+
+        if not portfolio:
+            return jsonify({'error': 'Portfolio not found'}), 404
+
+        if request.method == 'GET':
+            # Get all active projects in this portfolio
+            portfolio_projects = session.query(PortfolioProject).filter(
+                PortfolioProject.portfolio_id == portfolio_id,
+                PortfolioProject.is_active == True
+            ).all()
+
+            return jsonify([pp.to_dict() for pp in portfolio_projects])
+
+        elif request.method == 'POST':
+            data = request.json or {}
+            project_id = data.get('project_id')
+
+            if not project_id:
+                return jsonify({'error': 'project_id is required'}), 400
+
+            # Verify project exists and belongs to user
+            project = session.query(Project).filter(
+                Project.id == project_id,
+                Project.user_id == current_user.id
+            ).one_or_none()
+
+            if not project:
+                return jsonify({'error': 'Project not found'}), 404
+
+            # Check if project already in portfolio
+            existing = session.query(PortfolioProject).filter(
+                PortfolioProject.portfolio_id == portfolio_id,
+                PortfolioProject.project_id == project_id,
+                PortfolioProject.is_active == True
+            ).one_or_none()
+
+            if existing:
+                return jsonify({'error': 'Project already in portfolio'}), 400
+
+            # Add project to portfolio
+            portfolio_project = PortfolioProject(
+                portfolio_id=portfolio_id,
+                project_id=project_id,
+                portfolio_priority=data.get('portfolio_priority', 3),
+                budget_allocated=data.get('budget_allocated'),
+                capacity_allocated=data.get('capacity_allocated'),
+                cod_weekly=data.get('cod_weekly'),
+                business_value_score=data.get('business_value_score', 50),
+                time_criticality_score=data.get('time_criticality_score', 50),
+                risk_reduction_score=data.get('risk_reduction_score', 50),
+                depends_on=json.dumps(data.get('depends_on', [])),
+                blocks=json.dumps(data.get('blocks', []))
+            )
+
+            # Calculate WSJF if duration is available
+            if project.target_end_date and project.start_date:
+                # Simple WSJF = (BV + TC + RR) / Duration
+                bv = portfolio_project.business_value_score
+                tc = portfolio_project.time_criticality_score
+                rr = portfolio_project.risk_reduction_score
+                # For now, use a simple estimate - this can be improved
+                portfolio_project.wsjf_score = (bv + tc + rr) / 10.0
+
+            session.add(portfolio_project)
+            session.commit()
+
+            return jsonify(portfolio_project.to_dict()), 201
+
+    except Exception as e:
+        session.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        session.close()
+
+
+@app.route('/api/portfolios/<int:portfolio_id>/projects/<int:project_id>', methods=['PUT', 'DELETE'])
+@login_required
+def handle_portfolio_project(portfolio_id, project_id):
+    """Update or remove a project from portfolio"""
+    session = get_session()
+    try:
+        # Verify portfolio ownership
+        portfolio = session.query(Portfolio).filter(
+            Portfolio.id == portfolio_id,
+            Portfolio.user_id == current_user.id
+        ).one_or_none()
+
+        if not portfolio:
+            return jsonify({'error': 'Portfolio not found'}), 404
+
+        # Get portfolio project
+        portfolio_project = session.query(PortfolioProject).filter(
+            PortfolioProject.portfolio_id == portfolio_id,
+            PortfolioProject.project_id == project_id,
+            PortfolioProject.is_active == True
+        ).one_or_none()
+
+        if not portfolio_project:
+            return jsonify({'error': 'Project not in portfolio'}), 404
+
+        if request.method == 'PUT':
+            data = request.json or {}
+
+            # Update fields
+            if 'portfolio_priority' in data:
+                portfolio_project.portfolio_priority = data['portfolio_priority']
+            if 'budget_allocated' in data:
+                portfolio_project.budget_allocated = data['budget_allocated']
+            if 'capacity_allocated' in data:
+                portfolio_project.capacity_allocated = data['capacity_allocated']
+            if 'cod_weekly' in data:
+                portfolio_project.cod_weekly = data['cod_weekly']
+            if 'business_value_score' in data:
+                portfolio_project.business_value_score = data['business_value_score']
+            if 'time_criticality_score' in data:
+                portfolio_project.time_criticality_score = data['time_criticality_score']
+            if 'risk_reduction_score' in data:
+                portfolio_project.risk_reduction_score = data['risk_reduction_score']
+            if 'depends_on' in data:
+                portfolio_project.depends_on = json.dumps(data['depends_on'])
+            if 'blocks' in data:
+                portfolio_project.blocks = json.dumps(data['blocks'])
+
+            # Recalculate WSJF
+            bv = portfolio_project.business_value_score
+            tc = portfolio_project.time_criticality_score
+            rr = portfolio_project.risk_reduction_score
+            portfolio_project.wsjf_score = (bv + tc + rr) / 10.0
+
+            session.commit()
+            return jsonify(portfolio_project.to_dict())
+
+        elif request.method == 'DELETE':
+            # Soft delete - mark as inactive
+            portfolio_project.is_active = False
+            portfolio_project.removed_at = datetime.utcnow()
+            session.commit()
+            return '', 204
+
+    except Exception as e:
+        session.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        session.close()
+
+
+@app.route('/api/portfolios/<int:portfolio_id>/simulate', methods=['POST'])
+@login_required
+def simulate_portfolio(portfolio_id):
+    """
+    Run Monte Carlo simulation for a portfolio.
+    Simulates completion time for all projects in the portfolio.
+    """
+    session = get_session()
+    try:
+        # Import here to avoid circular dependencies
+        from portfolio_simulator import (
+            ProjectForecastInput,
+            simulate_portfolio_parallel,
+            simulate_portfolio_sequential,
+            compare_execution_strategies
+        )
+
+        # Verify portfolio ownership
+        portfolio = session.query(Portfolio).filter(
+            Portfolio.id == portfolio_id,
+            Portfolio.user_id == current_user.id
+        ).one_or_none()
+
+        if not portfolio:
+            return jsonify({'error': 'Portfolio not found'}), 404
+
+        # Get simulation parameters
+        data = request.json or {}
+        n_simulations = data.get('n_simulations', 10000)
+        confidence_level = data.get('confidence_level', 'P85')
+        execution_mode = data.get('execution_mode', 'parallel')  # parallel, sequential, compare
+
+        # Get all active projects in portfolio
+        portfolio_projects = session.query(PortfolioProject).filter(
+            PortfolioProject.portfolio_id == portfolio_id,
+            PortfolioProject.is_active == True
+        ).all()
+
+        if not portfolio_projects:
+            return jsonify({'error': 'No projects in portfolio'}), 400
+
+        # Prepare project forecast inputs
+        project_inputs = []
+        for pp in portfolio_projects:
+            project = pp.project
+
+            # Get most recent forecast for this project (to get tp_samples)
+            latest_forecast = session.query(Forecast).filter(
+                Forecast.project_id == project.id
+            ).order_by(Forecast.created_at.desc()).first()
+
+            if not latest_forecast:
+                # Skip projects without forecasts
+                continue
+
+            # Extract throughput samples from forecast
+            input_data = json.loads(latest_forecast.input_data)
+            tp_samples = input_data.get('tp_samples', [])
+
+            if not tp_samples:
+                continue
+
+            # Get backlog from latest forecast or use a default
+            backlog = latest_forecast.backlog or 10
+
+            project_input = ProjectForecastInput(
+                project_id=project.id,
+                project_name=project.name,
+                backlog=backlog,
+                tp_samples=tp_samples,
+                priority=pp.portfolio_priority,
+                cod_weekly=pp.cod_weekly,
+                wsjf_score=pp.wsjf_score,
+                depends_on=json.loads(pp.depends_on) if pp.depends_on else []
+            )
+
+            project_inputs.append(project_input)
+
+        if not project_inputs:
+            return jsonify({'error': 'No projects with forecast data found'}), 400
+
+        # Run simulation based on execution mode
+        if execution_mode == 'compare':
+            result = compare_execution_strategies(project_inputs, n_simulations)
+        elif execution_mode == 'sequential':
+            sim_result = simulate_portfolio_sequential(project_inputs, n_simulations, confidence_level)
+            result = sim_result.to_dict()
+        else:  # parallel
+            sim_result = simulate_portfolio_parallel(project_inputs, n_simulations, confidence_level)
+            result = sim_result.to_dict()
+
+        # Save simulation run to database
+        simulation_run = SimulationRun(
+            portfolio_id=portfolio_id,
+            user_id=current_user.id,
+            simulation_name=data.get('simulation_name', f'Simulation {datetime.utcnow().strftime("%Y-%m-%d %H:%M")}'),
+            simulation_type='portfolio_completion',
+            description=data.get('description'),
+            n_simulations=n_simulations,
+            confidence_level=confidence_level,
+            input_data=json.dumps({
+                'execution_mode': execution_mode,
+                'projects': [
+                    {
+                        'project_id': pi.project_id,
+                        'project_name': pi.project_name,
+                        'backlog': pi.backlog
+                    }
+                    for pi in project_inputs
+                ]
+            }),
+            results_data=json.dumps(result),
+            portfolio_completion_p50=result.get('completion_forecast', {}).get('p50_weeks') if execution_mode != 'compare' else result.get('parallel', {}).get('completion_forecast', {}).get('p50_weeks'),
+            portfolio_completion_p85=result.get('completion_forecast', {}).get('p85_weeks') if execution_mode != 'compare' else result.get('parallel', {}).get('completion_forecast', {}).get('p85_weeks'),
+            portfolio_completion_p95=result.get('completion_forecast', {}).get('p95_weeks') if execution_mode != 'compare' else result.get('parallel', {}).get('completion_forecast', {}).get('p95_weeks'),
+            total_cost_of_delay=result.get('cost_of_delay', {}).get('total_cod') if execution_mode != 'compare' else result.get('parallel', {}).get('cost_of_delay', {}).get('total_cod'),
+            critical_path_projects=json.dumps(result.get('critical_path', {}).get('projects', [])) if execution_mode != 'compare' else json.dumps(result.get('parallel', {}).get('critical_path', {}).get('projects', [])),
+            risk_score=result.get('risk', {}).get('score') if execution_mode != 'compare' else result.get('parallel', {}).get('risk', {}).get('score'),
+            high_risk_projects_count=len(result.get('risk', {}).get('high_risk_projects', [])) if execution_mode != 'compare' else len(result.get('parallel', {}).get('risk', {}).get('high_risk_projects', [])),
+            status='completed',
+            created_by=current_user.name
+        )
+
+        session.add(simulation_run)
+        session.commit()
+
+        # Add simulation_run_id to result
+        result['simulation_run_id'] = simulation_run.id
+
+        return jsonify(result), 200
+
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+    except Exception as e:
+        session.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        session.close()
+
+
+@app.route('/api/portfolios/<int:portfolio_id>/simulations', methods=['GET'])
+@login_required
+def get_portfolio_simulations(portfolio_id):
+    """Get all simulation runs for a portfolio"""
+    session = get_session()
+    try:
+        # Verify portfolio ownership
+        portfolio = session.query(Portfolio).filter(
+            Portfolio.id == portfolio_id,
+            Portfolio.user_id == current_user.id
+        ).one_or_none()
+
+        if not portfolio:
+            return jsonify({'error': 'Portfolio not found'}), 404
+
+        # Get all simulation runs
+        simulations = session.query(SimulationRun).filter(
+            SimulationRun.portfolio_id == portfolio_id
+        ).order_by(SimulationRun.created_at.desc()).all()
+
+        return jsonify([s.to_dict() for s in simulations])
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        session.close()
+
+
 @app.route('/api/forecasts', methods=['GET', 'POST'])
 @login_required
 def handle_forecasts():
@@ -2361,6 +2797,24 @@ def backtesting_page():
         <body>
             <h1>Template Error</h1>
             <p>Error loading Backtesting template: {str(e)}</p>
+        </body>
+        </html>
+        """, 500
+
+
+@app.route('/portfolio')
+@login_required
+def portfolio_manager_page():
+    """Render the Portfolio Manager page"""
+    try:
+        return render_template('portfolio_manager.html')
+    except Exception as e:
+        return f"""
+        <html>
+        <head><title>Portfolio Manager - Error</title></head>
+        <body>
+            <h1>Template Error</h1>
+            <p>Error loading Portfolio Manager template: {str(e)}</p>
         </body>
         </html>
         """, 500
