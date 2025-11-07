@@ -11,6 +11,10 @@ primary_region = 'gru'
   CELERY_CONCURRENCY = '2'
   GUNICORN_TIMEOUT = '120'
 
+[processes]
+  web = ''
+  worker = ''
+
 [build]
 
 [http_service]
