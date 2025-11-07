@@ -465,3 +465,99 @@ class CoDModel(Base):
 
     def get_metrics(self):
         return json.loads(self.metrics) if self.metrics else None
+
+
+class PortfolioRisk(Base):
+    """Portfolio-level risk tracking and management"""
+    __tablename__ = 'portfolio_risks'
+
+    id = Column(Integer, primary_key=True)
+    portfolio_id = Column(Integer, ForeignKey('portfolios.id'), nullable=False, index=True)
+    project_id = Column(Integer, ForeignKey('projects.id'), nullable=True, index=True)  # If risk is project-specific
+
+    # Risk identification
+    risk_title = Column(String(200), nullable=False)
+    risk_description = Column(Text, nullable=True)
+    risk_category = Column(String(50), default='general')  # technical, resource, schedule, budget, compliance, external, strategic
+
+    # Risk assessment (using 1-5 scale for simplicity)
+    probability = Column(Integer, nullable=False, default=3)  # 1 (very low) to 5 (very high)
+    impact = Column(Integer, nullable=False, default=3)  # 1 (very low) to 5 (very high)
+    risk_score = Column(Integer, nullable=True)  # probability * impact (1-25)
+
+    # Risk management
+    status = Column(String(50), default='identified')  # identified, assessed, mitigated, accepted, occurred, closed
+    owner = Column(String(200), nullable=True)  # Person responsible for managing this risk
+    mitigation_plan = Column(Text, nullable=True)  # How to reduce probability
+    contingency_plan = Column(Text, nullable=True)  # What to do if risk occurs
+
+    # Cost estimation
+    estimated_cost_if_occurs = Column(Float, nullable=True)  # Financial impact if risk occurs
+    mitigation_cost = Column(Float, nullable=True)  # Cost to implement mitigation
+
+    # Dates
+    identified_date = Column(DateTime, default=datetime.utcnow)
+    target_resolution_date = Column(DateTime, nullable=True)
+    last_reviewed_date = Column(DateTime, nullable=True)
+    occurred_date = Column(DateTime, nullable=True)  # If risk actually occurred
+    closed_date = Column(DateTime, nullable=True)
+
+    # Metadata
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_by = Column(String(100), nullable=True)
+
+    # Relationships
+    portfolio = relationship('Portfolio', backref='risks')
+    project = relationship('Project', backref='portfolio_risks')
+
+    def calculate_risk_score(self):
+        """Calculate risk score as probability * impact"""
+        if self.probability and self.impact:
+            self.risk_score = self.probability * self.impact
+        return self.risk_score
+
+    def get_risk_level(self):
+        """Get risk level based on score"""
+        if not self.risk_score:
+            self.calculate_risk_score()
+
+        if self.risk_score >= 20:
+            return 'critical'  # 20-25
+        elif self.risk_score >= 15:
+            return 'high'      # 15-19
+        elif self.risk_score >= 10:
+            return 'medium'    # 10-14
+        elif self.risk_score >= 5:
+            return 'low'       # 5-9
+        else:
+            return 'very_low'  # 1-4
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'portfolio_id': self.portfolio_id,
+            'project_id': self.project_id,
+            'project_name': self.project.name if self.project else None,
+            'risk_title': self.risk_title,
+            'risk_description': self.risk_description,
+            'risk_category': self.risk_category,
+            'probability': self.probability,
+            'impact': self.impact,
+            'risk_score': self.risk_score,
+            'risk_level': self.get_risk_level(),
+            'status': self.status,
+            'owner': self.owner,
+            'mitigation_plan': self.mitigation_plan,
+            'contingency_plan': self.contingency_plan,
+            'estimated_cost_if_occurs': self.estimated_cost_if_occurs,
+            'mitigation_cost': self.mitigation_cost,
+            'identified_date': self.identified_date.isoformat() if self.identified_date else None,
+            'target_resolution_date': self.target_resolution_date.isoformat() if self.target_resolution_date else None,
+            'last_reviewed_date': self.last_reviewed_date.isoformat() if self.last_reviewed_date else None,
+            'occurred_date': self.occurred_date.isoformat() if self.occurred_date else None,
+            'closed_date': self.closed_date.isoformat() if self.closed_date else None,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
+            'created_by': self.created_by
+        }
