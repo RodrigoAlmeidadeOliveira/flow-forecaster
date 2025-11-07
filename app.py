@@ -3468,6 +3468,24 @@ def portfolio_dashboard_page():
         """, 500
 
 
+@app.route('/portfolio/risks')
+@login_required
+def portfolio_risks_page():
+    """Render the Portfolio Risk Management page"""
+    try:
+        return render_template('portfolio_risks.html')
+    except Exception as e:
+        return f"""
+        <html>
+        <head><title>Portfolio Risks - Error</title></head>
+        <body>
+            <h1>Template Error</h1>
+            <p>Error loading Portfolio Risks template: {str(e)}</p>
+        </body>
+        </html>
+        """, 500
+
+
 @app.route('/api/actuals', methods=['GET', 'POST'])
 @login_required
 def handle_actuals():
