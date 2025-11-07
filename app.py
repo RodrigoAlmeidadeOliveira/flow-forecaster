@@ -2736,6 +2736,185 @@ def calculate_project_delay_impact(portfolio_id):
         session.close()
 
 
+@app.route('/api/portfolios/<int:portfolio_id>/dashboard', methods=['GET'])
+@login_required
+def get_portfolio_dashboard(portfolio_id):
+    """
+    Get comprehensive dashboard data for a portfolio.
+    Includes metrics, health indicators, alerts, timeline, and resource allocation.
+    """
+    session = get_session()
+    try:
+        from portfolio_dashboard import (
+            ProjectMetrics,
+            PortfolioDashboard,
+            calculate_portfolio_health,
+            generate_intelligent_alerts,
+            generate_timeline_events,
+            calculate_resource_timeline
+        )
+
+        # Verify portfolio ownership
+        portfolio = session.query(Portfolio).filter(
+            Portfolio.id == portfolio_id,
+            Portfolio.user_id == current_user.id
+        ).one_or_none()
+
+        if not portfolio:
+            return jsonify({'error': 'Portfolio not found'}), 404
+
+        # Get all projects in portfolio
+        portfolio_projects = session.query(PortfolioProject).filter(
+            PortfolioProject.portfolio_id == portfolio_id,
+            PortfolioProject.is_active == True
+        ).all()
+
+        # Build project metrics
+        project_metrics = []
+        total_items_completed = 0
+        total_items_remaining = 0
+        earliest_start = None
+        latest_end = None
+        total_cod = 0.0
+
+        for pp in portfolio_projects:
+            project = pp.project
+
+            # Get latest forecast
+            latest_forecast = session.query(Forecast).filter(
+                Forecast.project_id == project.id
+            ).order_by(Forecast.created_at.desc()).first()
+
+            if not latest_forecast:
+                continue
+
+            # Calculate metrics
+            items_completed = latest_forecast.backlog - (latest_forecast.backlog * (1 - (latest_forecast.scope_completion_pct or 0) / 100))
+            items_remaining = latest_forecast.backlog - items_completed
+            completion_pct = (latest_forecast.scope_completion_pct or 0)
+
+            # Estimate durations
+            duration_p50 = latest_forecast.projected_weeks_p85 or 10
+            duration_p85 = duration_p50 * 1.3
+            duration_p95 = duration_p50 * 1.5
+
+            # Determine if on track
+            on_track = True
+            if project.target_end_date and latest_forecast.projected_weeks_p85:
+                # Simple check: would need actual date comparison
+                on_track = latest_forecast.can_meet_deadline if latest_forecast.can_meet_deadline is not None else True
+
+            # Calculate projected end date
+            projected_end = None
+            if project.start_date and latest_forecast.projected_weeks_p85:
+                try:
+                    from datetime import datetime, timedelta
+                    start = datetime.strptime(project.start_date, '%d/%m/%Y')
+                    end = start + timedelta(weeks=latest_forecast.projected_weeks_p85)
+                    projected_end = end.strftime('%d/%m/%Y')
+                except:
+                    pass
+
+            # Update earliest/latest
+            if project.start_date:
+                if not earliest_start or project.start_date < earliest_start:
+                    earliest_start = project.start_date
+
+            if project.target_end_date:
+                if not latest_end or project.target_end_date > latest_end:
+                    latest_end = project.target_end_date
+
+            # CoD
+            if pp.cod_weekly:
+                total_cod += pp.cod_weekly * duration_p85
+
+            metrics = ProjectMetrics(
+                project_id=project.id,
+                project_name=project.name,
+                status=project.status,
+                estimated_duration_p50=duration_p50,
+                estimated_duration_p85=duration_p85,
+                estimated_duration_p95=duration_p95,
+                items_completed=int(items_completed),
+                items_remaining=int(items_remaining),
+                completion_pct=completion_pct,
+                cod_weekly=pp.cod_weekly,
+                wsjf_score=pp.wsjf_score,
+                start_date=project.start_date,
+                target_end_date=project.target_end_date,
+                projected_end_date=projected_end,
+                on_track=on_track,
+                risk_level=project.risk_level,
+                capacity_allocated=pp.capacity_allocated or project.capacity_allocated,
+                budget_allocated=pp.budget_allocated,
+                priority=pp.portfolio_priority
+            )
+
+            project_metrics.append(metrics)
+            total_items_completed += int(items_completed)
+            total_items_remaining += int(items_remaining)
+
+        # Calculate health
+        health = calculate_portfolio_health(
+            project_metrics,
+            portfolio.total_capacity,
+            portfolio.total_budget
+        )
+
+        # Generate alerts
+        alerts = generate_intelligent_alerts(
+            project_metrics,
+            health,
+            portfolio.total_capacity,
+            portfolio.total_budget
+        )
+
+        # Generate timeline events
+        timeline_events = generate_timeline_events(project_metrics)
+
+        # Calculate resource timeline
+        resource_timeline = []
+        if portfolio.total_capacity:
+            resource_timeline = calculate_resource_timeline(
+                project_metrics,
+                portfolio.total_capacity,
+                weeks=12
+            )
+
+        # Calculate duration
+        current_duration = 0
+        projected_duration = max([p.estimated_duration_p85 for p in project_metrics]) if project_metrics else 0
+
+        # Create dashboard
+        dashboard = PortfolioDashboard(
+            portfolio_id=portfolio.id,
+            portfolio_name=portfolio.name,
+            total_projects=len(portfolio_projects),
+            active_projects=len([p for p in project_metrics if p.status == 'active']),
+            completed_projects=len([p for p in project_metrics if p.status == 'completed']),
+            earliest_start=earliest_start,
+            latest_end=latest_end,
+            current_duration_weeks=current_duration,
+            projected_duration_weeks=projected_duration,
+            total_cod=total_cod if total_cod > 0 else None,
+            health=health,
+            projects=project_metrics,
+            alerts=alerts,
+            timeline_events=timeline_events,
+            resource_timeline=resource_timeline,
+            avg_completion_pct=sum(p.completion_pct for p in project_metrics) / len(project_metrics) if project_metrics else 0,
+            total_items_completed=total_items_completed,
+            total_items_remaining=total_items_remaining
+        )
+
+        return jsonify(dashboard.to_dict()), 200
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        session.close()
+
+
 @app.route('/api/forecasts', methods=['GET', 'POST'])
 @login_required
 def handle_forecasts():
@@ -2985,6 +3164,24 @@ def portfolio_manager_page():
         <body>
             <h1>Template Error</h1>
             <p>Error loading Portfolio Manager template: {str(e)}</p>
+        </body>
+        </html>
+        """, 500
+
+
+@app.route('/portfolio/dashboard')
+@login_required
+def portfolio_dashboard_page():
+    """Render the Portfolio Dashboard page"""
+    try:
+        return render_template('portfolio_dashboard.html')
+    except Exception as e:
+        return f"""
+        <html>
+        <head><title>Portfolio Dashboard - Error</title></head>
+        <body>
+            <h1>Template Error</h1>
+            <p>Error loading Portfolio Dashboard template: {str(e)}</p>
         </body>
         </html>
         """, 500
