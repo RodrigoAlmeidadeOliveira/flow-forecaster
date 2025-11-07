@@ -3791,6 +3791,24 @@ def portfolio_risks_page():
         """, 500
 
 
+@app.route('/portfolio/optimize')
+@login_required
+def portfolio_optimization_page():
+    """Render the Portfolio Optimization page"""
+    try:
+        return render_template('portfolio_optimization.html')
+    except Exception as e:
+        return f"""
+        <html>
+        <head><title>Portfolio Optimization - Error</title></head>
+        <body>
+            <h1>Template Error</h1>
+            <p>Error loading Portfolio Optimization template: {str(e)}</p>
+        </body>
+        </html>
+        """, 500
+
+
 @app.route('/api/actuals', methods=['GET', 'POST'])
 @login_required
 def handle_actuals():
