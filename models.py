@@ -327,21 +327,6 @@ class PortfolioProject(Base):
     # Relationships
     portfolio = relationship('Portfolio', back_populates='portfolio_projects')
     project = relationship('Project', backref='portfolio_memberships')
-class CoDTrainingDataset(Base):
-    """Persisted Cost of Delay training datasets per user."""
-    __tablename__ = 'cod_training_datasets'
-
-    id = Column(Integer, primary_key=True)
-    user_id = Column(Integer, ForeignKey('users.id'), nullable=False, index=True)
-    name = Column(String(200), nullable=True)
-    original_filename = Column(String(255), nullable=False)
-    data = Column(Text, nullable=False)  # JSON array of records
-    column_names = Column(Text, nullable=False)  # JSON array of column names
-    row_count = Column(Integer, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
-
-    user = relationship('User', back_populates='cod_datasets')
-
     def to_dict(self):
         return {
             'id': self.id,
