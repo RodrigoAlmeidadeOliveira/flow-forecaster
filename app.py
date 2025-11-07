@@ -2477,7 +2477,13 @@ def simulate_portfolio(portfolio_id):
             project_inputs.append(project_input)
 
         if not project_inputs:
-            return jsonify({'error': 'No projects with forecast data found'}), 400
+            return jsonify({
+                'error': (
+                    'Nenhum projeto do portfólio possui forecasts salvos. '
+                    'Execute pelo menos uma previsão (Monte Carlo ou ML) e salve o resultado '
+                    'para cada projeto antes de simular o portfólio.'
+                )
+            }), 400
 
         # Run simulation based on execution mode
         if execution_mode == 'compare':
@@ -4140,6 +4146,110 @@ try:
 except ImportError as e:
     logger.warning(f"Celery/Async endpoints not available: {e}")
     logger.warning("Application will run in synchronous mode only")
+
+# ============================================================================
+# ADMIN: Update Portfolio Values (Temporary Endpoint)
+# ============================================================================
+
+@app.route('/admin/update-portfolio-values', methods=['POST'])
+@login_required
+def admin_update_portfolio_values():
+    """
+    Endpoint temporário para atualizar business_value e risk_level dos projetos.
+    Distribui os projetos entre os quadrantes da matriz de priorização.
+    **ADMIN ONLY**
+    """
+    if not current_user_is_admin():
+        return jsonify({'error': 'Acesso negado. Apenas administradores.'}), 403
+
+    db_session = get_session()
+    try:
+        results = []
+
+        # Quick Wins (Alto Valor / Baixo Risco)
+        proj = db_session.query(Project).filter(Project.name == 'prj-01').first()
+        if proj:
+            proj.business_value = 75
+            proj.risk_level = 'low'
+            results.append(f"✓ {proj.name}: 75/low [Quick Wins]")
+
+        proj = db_session.query(Project).filter(Project.name == 'prj03').first()
+        if proj:
+            proj.business_value = 80
+            proj.risk_level = 'medium'
+            results.append(f"✓ {proj.name}: 80/medium [Quick Wins]")
+
+        # Strategic Bets (Alto Valor / Alto Risco)
+        proj = db_session.query(Project).filter(
+            Project.name.like('DESENVOLVIMENTO DE APP MOBILE%')
+        ).first()
+        if proj:
+            proj.business_value = 70
+            proj.risk_level = 'high'
+            results.append(f"✓ {proj.name}: 70/high [Strategic Bets]")
+
+        proj = db_session.query(Project).filter(
+            Project.name.like('TRANSFORMAÇÃO DIGITAL%')
+        ).first()
+        if proj:
+            proj.business_value = 85
+            proj.risk_level = 'critical'
+            results.append(f"✓ {proj.name}: 85/critical [Strategic Bets]")
+
+        # Fill-ins (Baixo Valor / Baixo Risco)
+        defaults = db_session.query(Project).filter(Project.name == 'Default Project').all()
+        if defaults:
+            defaults[0].business_value = 40
+            defaults[0].risk_level = 'low'
+            results.append(f"✓ Default Project #1: 40/low [Fill-ins]")
+
+            for i in range(1, len(defaults)):
+                defaults[i].business_value = 45
+                defaults[i].risk_level = 'medium'
+                results.append(f"✓ Default Project #{i+1}: 45/medium [Fill-ins]")
+
+        proj = db_session.query(Project).filter(Project.name == 'projeto-performance').first()
+        if proj:
+            proj.business_value = 50
+            proj.risk_level = 'medium'
+            results.append(f"✓ {proj.name}: 50/medium [Fill-ins]")
+
+        db_session.commit()
+
+        # Retornar distribuição final
+        all_projects = db_session.query(Project).all()
+        distribution = {
+            'quick_wins': [],
+            'strategic_bets': [],
+            'fill_ins': [],
+            'avoid': []
+        }
+
+        for p in all_projects:
+            info = {'name': p.name, 'value': p.business_value, 'risk': p.risk_level}
+            if p.business_value >= 60 and p.risk_level in ['low', 'medium']:
+                distribution['quick_wins'].append(info)
+            elif p.business_value >= 60 and p.risk_level in ['high', 'critical']:
+                distribution['strategic_bets'].append(info)
+            elif p.business_value < 60 and p.risk_level in ['low', 'medium']:
+                distribution['fill_ins'].append(info)
+            else:
+                distribution['avoid'].append(info)
+
+        return jsonify({
+            'success': True,
+            'message': 'Valores de portfólio atualizados com sucesso!',
+            'updates': results,
+            'distribution': distribution
+        })
+
+    except Exception as e:
+        db_session.rollback()
+        logger.error(f"Erro ao atualizar valores de portfólio: {e}")
+        return jsonify({'error': str(e)}), 500
+    finally:
+        close_session()
+
 
 # ============================================================================
 # Log all registered routes
