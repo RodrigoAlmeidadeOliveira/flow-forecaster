@@ -4251,6 +4251,60 @@ def admin_update_portfolio_values():
         close_session()
 
 
+@app.route('/admin/fix-sequences', methods=['POST'])
+@login_required
+def admin_fix_sequences():
+    """
+    Endpoint para corrigir sequences do PostgreSQL após migração do SQLite.
+    Atualiza os sequences para começar após o maior ID existente em cada tabela.
+    **ADMIN ONLY**
+    """
+    if not current_user_is_admin():
+        return jsonify({'error': 'Acesso negado. Apenas administradores.'}), 403
+
+    db_session = get_session()
+    try:
+        from sqlalchemy import text
+        results = []
+
+        # Fix sequences for each table
+        sequences = {
+            'users_id_seq': 'users',
+            'projects_id_seq': 'projects',
+            'forecasts_id_seq': 'forecasts',
+            'actuals_id_seq': 'actuals'
+        }
+
+        for seq_name, table_name in sequences.items():
+            try:
+                # Get max ID
+                max_id_query = text(f"SELECT COALESCE(MAX(id), 1) FROM {table_name}")
+                max_id = db_session.execute(max_id_query).scalar()
+
+                # Set sequence to max_id
+                setval_query = text(f"SELECT setval('{seq_name}', {max_id})")
+                new_value = db_session.execute(setval_query).scalar()
+
+                results.append(f"✓ {seq_name}: ajustado para {new_value}")
+            except Exception as e:
+                results.append(f"✗ {seq_name}: erro - {str(e)}")
+
+        db_session.commit()
+
+        return jsonify({
+            'success': True,
+            'message': 'Sequences atualizados com sucesso!',
+            'updates': results
+        })
+
+    except Exception as e:
+        db_session.rollback()
+        logger.error(f"Erro ao corrigir sequences: {e}")
+        return jsonify({'error': str(e)}), 500
+    finally:
+        close_session()
+
+
 # ============================================================================
 # Log all registered routes
 # ============================================================================
