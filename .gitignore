@@ -38,6 +38,7 @@ env/
 instance/
 .webassets-cache
 *.db
+*.db.backup.*
 
 # Environment variables
 .env
@@ -69,11 +70,22 @@ Desktop.ini
 *.bak
 *.backup
 *~
+backups/
+*.sql
+*.sql.gz
+*_backup_*.sql
+postgres_backup.sql
+forecaster_from_flyio*.db
 
 # Temporary files
 tmp/
 temp/
 *.tmp
+
+# Load testing results
+load_test_results/
+*.csv
+*.html
 
 # Microsoft Office
 *.pptx
@@ -87,3 +99,4 @@ temp/
 
 # PDF generated files (keep source, ignore compiled)
 # workshop/*.pdf
+dump.rdb

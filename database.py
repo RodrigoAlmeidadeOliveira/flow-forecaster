@@ -1,28 +1,71 @@
 """
 Database initialization and session management for Flow Forecaster
+Supports both SQLite (development) and PostgreSQL (production)
 """
 import os
 from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import sessionmaker, scoped_session
-from models import Base, Project, Forecast, Actual, User
+from sqlalchemy.pool import QueuePool, NullPool
+from models import Base, Project, Forecast, Actual, User, CoDTrainingDataset, CoDModel
+from logger import get_logger
 
-# Database configuration
-DB_PATH = os.environ.get('DATABASE_URL', 'sqlite:///forecaster.db')
-engine = create_engine(DB_PATH, echo=False)
+logger = get_logger('database')
 
-# Session factory
+DATABASE_URL = os.environ.get('DATABASE_URL', 'sqlite:///forecaster.db')
+
+# Normalize legacy connection string prefix for compatibility with Fly.io/Heroku
+if DATABASE_URL.startswith('postgres://'):
+    DATABASE_URL = DATABASE_URL.replace('postgres://', 'postgresql://', 1)
+
+is_postgresql = DATABASE_URL.startswith('postgresql://')
+is_sqlite = DATABASE_URL.startswith('sqlite://')
+
+if is_postgresql:
+    engine = create_engine(
+        DATABASE_URL,
+        poolclass=QueuePool,
+        pool_size=20,
+        max_overflow=40,
+        pool_pre_ping=True,
+        pool_recycle=3600,
+        pool_timeout=30,
+        echo=False,
+        connect_args={
+            'connect_timeout': 10,
+            'application_name': 'flow-forecaster',
+        },
+    )
+    logger.info("PostgreSQL engine created with connection pooling")
+    logger.info("Pool size: 20, Max overflow: 40")
+elif is_sqlite:
+    engine = create_engine(
+        DATABASE_URL,
+        poolclass=NullPool,
+        echo=False,
+        connect_args={'check_same_thread': False},
+    )
+    logger.info("SQLite engine created (development mode)")
+else:
+    engine = create_engine(DATABASE_URL, echo=False)
+    logger.info(f"Generic engine created for {DATABASE_URL}")
+
 session_factory = sessionmaker(bind=engine)
 Session = scoped_session(session_factory)
 
+DB_PATH = DATABASE_URL  # Maintains backwards compatibility for existing code paths
+
 
 def init_db():
-    """Initialize database, create all tables"""
+    """Initialize database, create all tables."""
     Base.metadata.create_all(engine)
-    print(f"Database initialized at {DB_PATH}")
+    logger.info(f"Database initialized at {DB_PATH}")
 
 
 def ensure_schema():
-    """Ensure existing databases include the latest columns"""
+    """Ensure existing databases include the latest columns."""
+    # Create any newly-introduced tables without dropping existing data
+    Base.metadata.create_all(engine)
+
     inspector = inspect(engine)
     table_names = set(inspector.get_table_names())
     if 'projects' not in table_names:
@@ -67,23 +110,43 @@ def ensure_schema():
 
         if 'users' in table_names:
             existing_user_columns = {col['name'] for col in inspector.get_columns('users')}
-            user_columns = [
-                (
-                    'registration_date',
-                    "ALTER TABLE users ADD COLUMN registration_date DATETIME",
-                    "UPDATE users SET registration_date = COALESCE(created_at, CURRENT_TIMESTAMP) WHERE registration_date IS NULL"
-                ),
-                (
-                    'access_expires_at',
-                    "ALTER TABLE users ADD COLUMN access_expires_at DATETIME",
+
+            if is_postgresql:
+                user_columns = [
                     (
-                        "UPDATE users "
-                        "SET access_expires_at = DATETIME("
-                        "COALESCE(registration_date, created_at, CURRENT_TIMESTAMP), '+365 days') "
-                        "WHERE access_expires_at IS NULL"
-                    )
-                ),
-            ]
+                        'registration_date',
+                        "ALTER TABLE users ADD COLUMN registration_date TIMESTAMP",
+                        "UPDATE users SET registration_date = COALESCE(created_at, CURRENT_TIMESTAMP) WHERE registration_date IS NULL",
+                    ),
+                    (
+                        'access_expires_at',
+                        "ALTER TABLE users ADD COLUMN access_expires_at TIMESTAMP",
+                        (
+                            "UPDATE users "
+                            "SET access_expires_at = COALESCE(registration_date, created_at, CURRENT_TIMESTAMP) + INTERVAL '365 days' "
+                            "WHERE access_expires_at IS NULL"
+                        ),
+                    ),
+                ]
+            else:
+                user_columns = [
+                    (
+                        'registration_date',
+                        "ALTER TABLE users ADD COLUMN registration_date DATETIME",
+                        "UPDATE users SET registration_date = COALESCE(created_at, CURRENT_TIMESTAMP) WHERE registration_date IS NULL",
+                    ),
+                    (
+                        'access_expires_at',
+                        "ALTER TABLE users ADD COLUMN access_expires_at DATETIME",
+                        (
+                            "UPDATE users "
+                            "SET access_expires_at = DATETIME("
+                            "COALESCE(registration_date, created_at, CURRENT_TIMESTAMP), '+365 days') "
+                            "WHERE access_expires_at IS NULL"
+                        ),
+                    ),
+                ]
+
             for column_name, ddl, hydration in user_columns:
                 if column_name not in existing_user_columns:
                     connection.execute(text(ddl))
@@ -93,29 +156,59 @@ def ensure_schema():
 
 
 def get_session():
-    """Get a new database session"""
+    """Get a new database session."""
     return Session()
 
 
 def close_session():
-    """Close the current session"""
+    """Close the current session."""
     Session.remove()
 
 
 def reset_db():
-    """Drop all tables and recreate (WARNING: destroys all data)"""
+    """Drop all tables and recreate (WARNING: destroys all data)."""
     Base.metadata.drop_all(engine)
     Base.metadata.create_all(engine)
-    print("Database reset complete")
+    logger.warning("Database reset complete")
 
 
-# Initialize database on import
-db_file = DB_PATH.replace('sqlite:///', '').replace('sqlite:////', '/')
-if not os.path.exists(db_file) or os.path.getsize(db_file) == 0:
-    # Ensure directory exists
-    db_dir = os.path.dirname(db_file)
-    if db_dir and not os.path.exists(db_dir):
-        os.makedirs(db_dir, exist_ok=True)
+if is_sqlite:
+    db_file = DB_PATH.replace('sqlite:///', '').replace('sqlite:////', '/')
+    if not os.path.exists(db_file) or os.path.getsize(db_file) == 0:
+        db_dir = os.path.dirname(db_file)
+        if db_dir and not os.path.exists(db_dir):
+            os.makedirs(db_dir, exist_ok=True)
+        logger.info(f"Initializing new SQLite database at {db_file}")
+        init_db()
+    else:
+        logger.info(f"Using existing SQLite database at {db_file}")
+
+    try:
+        ensure_schema()
+    except Exception as exc:
+        logger.warning(f"SQLite schema update warning: {exc}")
+
+elif is_postgresql:
+    try:
+        inspector = inspect(engine)
+        tables = inspector.get_table_names()
+        if not tables:
+            logger.info("No tables found in PostgreSQL, creating initial schema")
+            init_db()
+        else:
+            logger.info(f"Connected to PostgreSQL with {len(tables)} tables")
+    except Exception as exc:
+        logger.warning(f"Could not inspect PostgreSQL database: {exc}")
+
+    try:
+        ensure_schema()
+    except Exception as exc:
+        logger.warning(f"PostgreSQL schema update warning: {exc}")
+
+else:
+    logger.info(f"Initializing database at {DATABASE_URL}")
     init_db()
-
-ensure_schema()
+    try:
+        ensure_schema()
+    except Exception as exc:
+        logger.warning(f"Schema update warning for {DATABASE_URL}: {exc}")

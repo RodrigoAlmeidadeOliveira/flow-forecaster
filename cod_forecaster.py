@@ -9,13 +9,24 @@ from typing import Dict, List, Optional, Tuple
 from datetime import datetime
 
 from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
-from sklearn.model_selection import train_test_split, GridSearchCV, KFold
+from sklearn.model_selection import train_test_split, RandomizedSearchCV
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 from sklearn.preprocessing import StandardScaler
 from sklearn.pipeline import Pipeline
 
 import warnings
 warnings.filterwarnings('ignore')
+
+
+def _to_native(value):
+    if isinstance(value, np.generic):
+        if isinstance(value, np.integer):
+            return int(value)
+        if isinstance(value, np.floating):
+            return float(value)
+        if isinstance(value, np.bool_):
+            return bool(value)
+    return value
 
 
 class CoDForecaster:
@@ -102,7 +113,13 @@ class CoDForecaster:
 
         return features, y
 
-    def train_models(self, projects_df: pd.DataFrame):
+    def train_models(
+        self,
+        projects_df: pd.DataFrame,
+        use_hyperparam_search: bool = False,
+        search_iterations: int = 20,
+        random_state: int = 42,
+    ):
         """
         Train multiple CoD prediction models.
 
@@ -123,84 +140,141 @@ class CoDForecaster:
 
         # Split data
         X_train, X_test, y_train, y_test = train_test_split(
-            X, y, test_size=0.2, random_state=42, shuffle=True
+            X, y, test_size=0.2, random_state=random_state, shuffle=True
         )
 
-        # Scale features
+        # Scale features (fit on training set first)
+        self.scaler = StandardScaler()
         X_train_scaled = self.scaler.fit_transform(X_train)
         X_test_scaled = self.scaler.transform(X_test)
 
         # Model configurations
-        models_config = {
-            'RandomForest': RandomForestRegressor(
+        models_results = {}
+
+        # Random Forest with optional hyperparameter search
+        print("\nRandomForest - Training:")
+        print("-" * 60)
+        rf_base = RandomForestRegressor(random_state=random_state, n_jobs=1)
+
+        if use_hyperparam_search:
+            param_distributions = {
+                'n_estimators': np.arange(150, 401, 10),
+                'max_depth': [None] + list(range(6, 21)),
+                'min_samples_split': np.arange(2, 11),
+                'min_samples_leaf': np.arange(1, 6),
+                'max_features': ['auto', 'sqrt', 0.5, 0.7, 0.9],
+                'bootstrap': [True, False],
+            }
+            rf_search = RandomizedSearchCV(
+                estimator=rf_base,
+                param_distributions=param_distributions,
+                n_iter=search_iterations,
+                cv=self.n_splits,
+                scoring='neg_mean_absolute_error',
+                n_jobs=1,
+                random_state=random_state,
+                verbose=1,
+            )
+            rf_search.fit(X_train_scaled, y_train)
+            best_rf = rf_search.best_estimator_
+            best_params = {key: _to_native(val) for key, val in rf_search.best_params_.items()}
+            print(f"Best RF params: {best_params}")
+        else:
+            best_rf = RandomForestRegressor(
                 n_estimators=200,
                 max_depth=10,
                 min_samples_split=3,
                 min_samples_leaf=2,
-                random_state=42,
-                n_jobs=-1
-            ),
-            'GradientBoosting': GradientBoostingRegressor(
-                n_estimators=150,
-                max_depth=8,
-                learning_rate=0.1,
-                random_state=42
+                random_state=random_state,
+                n_jobs=1,
             )
+            best_rf.fit(X_train_scaled, y_train)
+            best_params = {
+                'n_estimators': 200,
+                'max_depth': 10,
+                'min_samples_split': 3,
+                'min_samples_leaf': 2,
+                'random_state': random_state,
+                'n_jobs': 1,
+            }
+
+        y_pred_rf = best_rf.predict(X_test_scaled)
+        rf_mae = mean_absolute_error(y_test, y_pred_rf)
+        rf_rmse = np.sqrt(mean_squared_error(y_test, y_pred_rf))
+        rf_r2 = r2_score(y_test, y_pred_rf)
+        rf_mape = np.mean(np.abs((y_test - y_pred_rf) / y_test)) * 100
+
+        print("\nRandomForest Test Set Performance:")
+        print(f"  MAE:  R$ {rf_mae:,.0f}/semana")
+        print(f"  RMSE: R$ {rf_rmse:,.0f}/semana")
+        print(f"  R²:   {rf_r2:.3f}")
+        print(f"  MAPE: {rf_mape:.1f}%")
+
+        models_results['RandomForest'] = {
+            'model': best_rf,
+            'mae': rf_mae,
+            'rmse': rf_rmse,
+            'r2': rf_r2,
+            'mape': rf_mape,
+            'best_params': best_params,
         }
 
-        # Train and evaluate each model
-        for name, model in models_config.items():
-            print(f"\n{name} - Training:")
-            print("-" * 60)
+        # Gradient Boosting (baseline)
+        print("\nGradientBoosting - Training:")
+        print("-" * 60)
+        gb_model = GradientBoostingRegressor(
+            n_estimators=200,
+            max_depth=6,
+            learning_rate=0.07,
+            random_state=random_state
+        )
+        gb_model.fit(X_train_scaled, y_train)
 
-            # K-Fold Cross-Validation
-            kfold = KFold(n_splits=self.n_splits, shuffle=True, random_state=42)
-            fold_maes = []
+        y_pred_gb = gb_model.predict(X_test_scaled)
+        gb_mae = mean_absolute_error(y_test, y_pred_gb)
+        gb_rmse = np.sqrt(mean_squared_error(y_test, y_pred_gb))
+        gb_r2 = r2_score(y_test, y_pred_gb)
+        gb_mape = np.mean(np.abs((y_test - y_pred_gb) / y_test)) * 100
 
-            for fold_num, (train_idx, val_idx) in enumerate(kfold.split(X_train_scaled), 1):
-                X_fold_train = X_train_scaled[train_idx]
-                X_fold_val = X_train_scaled[val_idx]
-                y_fold_train = y_train.iloc[train_idx]
-                y_fold_val = y_train.iloc[val_idx]
+        print("\nGradientBoosting Test Set Performance:")
+        print(f"  MAE:  R$ {gb_mae:,.0f}/semana")
+        print(f"  RMSE: R$ {gb_rmse:,.0f}/semana")
+        print(f"  R²:   {gb_r2:.3f}")
+        print(f"  MAPE: {gb_mape:.1f}%")
 
-                # Train
-                model.fit(X_fold_train, y_fold_train)
+        models_results['GradientBoosting'] = {
+            'model': gb_model,
+            'mae': gb_mae,
+            'rmse': gb_rmse,
+            'r2': gb_r2,
+            'mape': gb_mape,
+            'best_params': None,
+        }
 
-                # Predict
-                y_pred = model.predict(X_fold_val)
-                mae = mean_absolute_error(y_fold_val, y_pred)
-                fold_maes.append(mae)
+        # Refit scaler on full dataset and train final models on all data
+        self.scaler.fit(X)
+        X_full_scaled = self.scaler.transform(X)
 
-                print(f"Fold {fold_num}: MAE = R$ {mae:,.0f}/semana")
+        # Refit RandomForest on full data with best params
+        rf_full_params = dict(best_params)
+        rf_full_params.setdefault('random_state', random_state)
+        rf_full_params.setdefault('n_jobs', 1)
+        rf_full = RandomForestRegressor(**rf_full_params)
+        rf_full.fit(X_full_scaled, y)
+        models_results['RandomForest']['model'] = rf_full
 
-            # Summary
-            print(f"\nCross-Validation Summary:")
-            print(f"  MAE: R$ {np.mean(fold_maes):,.0f} ± {np.std(fold_maes):,.0f}")
+        # Refit GradientBoosting on full data
+        gb_full = GradientBoostingRegressor(
+            n_estimators=gb_model.n_estimators,
+            max_depth=gb_model.max_depth,
+            learning_rate=gb_model.learning_rate,
+            random_state=random_state
+        )
+        gb_full.fit(X_full_scaled, y)
+        models_results['GradientBoosting']['model'] = gb_full
 
-            # Final training on full training set
-            model.fit(X_train_scaled, y_train)
-
-            # Test set evaluation
-            y_pred_test = model.predict(X_test_scaled)
-            mae_test = mean_absolute_error(y_test, y_pred_test)
-            rmse_test = np.sqrt(mean_squared_error(y_test, y_pred_test))
-            r2_test = r2_score(y_test, y_pred_test)
-            mape_test = np.mean(np.abs((y_test - y_pred_test) / y_test)) * 100
-
-            print(f"\nTest Set Performance:")
-            print(f"  MAE:  R$ {mae_test:,.0f}/semana")
-            print(f"  RMSE: R$ {rmse_test:,.0f}/semana")
-            print(f"  R²:   {r2_test:.3f}")
-            print(f"  MAPE: {mape_test:.1f}%")
-
-            # Store model
-            self.models[name] = {
-                'model': model,
-                'mae': mae_test,
-                'rmse': rmse_test,
-                'r2': r2_test,
-                'mape': mape_test
-            }
+        # Persist results
+        self.models = models_results
 
         self.trained = True
         print(f"\n{'='*60}")

@@ -112,6 +112,7 @@ async function loadForecasts() {
         $('#forecastsList').empty();
 
         const response = await fetch('/api/forecasts', { credentials: 'include' });
+
         if (!response.ok) {
             throw new Error('Erro ao carregar análises');
         }
@@ -119,6 +120,11 @@ async function loadForecasts() {
         const forecasts = await response.json();
 
         $('#loadingForecasts').hide();
+
+        if (!Array.isArray(forecasts)) {
+            $('#forecastsList').html('<p class="text-danger">Erro: resposta inválida da API.</p>');
+            return;
+        }
 
         if (forecasts.length === 0) {
             $('#forecastsList').html('<p class="text-muted">Nenhuma análise salva ainda.</p>');
@@ -166,7 +172,7 @@ async function loadForecasts() {
     } catch (error) {
         console.error('Error loading forecasts:', error);
         $('#loadingForecasts').hide();
-        $('#forecastsList').html('<p class="text-danger">Erro ao carregar análises.</p>');
+        $('#forecastsList').html(`<p class="text-danger">Erro ao carregar análises: ${error.message}</p>`);
     }
 }
 
@@ -451,6 +457,7 @@ $(document).on('change', '#importFileInput', function() {
 window.openSaveModal = openSaveModal;
 window.openLoadModal = openLoadModal;
 window.saveForecast = saveForecast;
+window.loadForecasts = loadForecasts;
 window.loadForecast = loadForecast;
 window.deleteForecast = deleteForecast;
 window.importForecastFromFile = importForecastFromFile;

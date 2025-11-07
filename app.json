@@ -1,0 +1,70 @@
+{
+  "name": "Flow Forecaster",
+  "description": "Monte Carlo Simulation for Project Forecasting with ML and Async Processing",
+  "repository": "https://github.com/RodrigoAlmeidadeOliveira/flow-forecaster",
+  "logo": "https://raw.githubusercontent.com/RodrigoAlmeidadeOliveira/flow-forecaster/main/static/img/logo.png",
+  "keywords": [
+    "monte-carlo",
+    "forecasting",
+    "machine-learning",
+    "celery",
+    "async",
+    "flask",
+    "postgresql"
+  ],
+  "success_url": "/",
+  "scripts": {
+    "postdeploy": "python -c 'from database import init_db; init_db()'"
+  },
+  "formation": {
+    "web": {
+      "quantity": 1,
+      "size": "basic"
+    },
+    "worker": {
+      "quantity": 2,
+      "size": "basic"
+    }
+  },
+  "addons": [
+    {
+      "plan": "heroku-postgresql:essential-0",
+      "as": "DATABASE"
+    },
+    {
+      "plan": "heroku-redis:mini",
+      "as": "REDIS"
+    }
+  ],
+  "buildpacks": [
+    {
+      "url": "heroku/python"
+    }
+  ],
+  "env": {
+    "FLOW_FORECASTER_SECRET_KEY": {
+      "description": "Secret key for Flask sessions (generate with: openssl rand -hex 32)",
+      "generator": "secret"
+    },
+    "CELERY_BROKER_URL": {
+      "description": "Redis URL for Celery broker (auto-configured from REDIS_URL)",
+      "required": false
+    },
+    "CELERY_RESULT_BACKEND": {
+      "description": "Redis URL for Celery result backend (auto-configured from REDIS_URL)",
+      "required": false
+    },
+    "LOG_LEVEL": {
+      "description": "Application log level",
+      "value": "INFO"
+    },
+    "CELERY_WORKER_CONCURRENCY": {
+      "description": "Number of concurrent Celery workers",
+      "value": "4"
+    },
+    "CELERY_TASK_TIME_LIMIT": {
+      "description": "Maximum time in seconds for a task to run",
+      "value": "600"
+    }
+  }
+}

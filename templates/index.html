@@ -233,7 +233,7 @@
 <p>
                 <span data-i18n="site_tagline">Previsão de esforço e duração de projetos usando simulações Monte Carlo e aprendizado de máquina.</span>
                 <br/>
-                <span data-i18n="site_description">Seus dados permanecem locais no seu navegador/servidor.</span>
+               
             </p>
 <div class="alert alert-info d-inline-block mt-2" role="alert">
 <i class="fas fa-book-open"></i>
@@ -294,6 +294,11 @@
 <a aria-controls="cost-analysis" aria-selected="false" class="nav-link" data-toggle="tab" href="#cost-analysis" id="tab-cost-link" role="tab" data-i18n="tab_cost">Análise de Custos</a>
 </li>
 <li class="nav-item">
+<a aria-controls="cost-of-delay" aria-selected="false" class="nav-link" data-toggle="tab" href="#cost-of-delay" id="tab-cod-link" role="tab">
+<i class="fas fa-money-bill-wave"></i> Cost of Delay
+</a>
+</li>
+<li class="nav-item">
 <a aria-controls="trend-analysis" aria-selected="false" class="nav-link" data-toggle="tab" href="#trend-analysis" id="tab-trend-link" role="tab">
 <i class="fas fa-chart-line"></i> Análise de Tendências
 </a>
@@ -312,6 +317,11 @@
 <li class="nav-item">
 <a aria-controls="portfolio-dashboard" aria-selected="false" class="nav-link" data-toggle="tab" href="#portfolio-dashboard" id="tab-portfolio-link" role="tab">
 <i class="fas fa-briefcase"></i> Portfolio
+</a>
+</li>
+<li class="nav-item">
+<a aria-controls="backtesting-tab" aria-selected="false" class="nav-link" data-toggle="tab" href="#backtesting-tab" id="tab-backtesting-link" role="tab">
+<i class="fas fa-history"></i> Backtesting
 </a>
 </li>
 </ul>
@@ -1157,10 +1167,10 @@
 <div class="form-check mt-2" style="padding-left: 0;">
     <input class="form-check-input" type="checkbox" id="workshopMode" style="margin-left: 0; position: relative;">
     <label class="form-check-label" for="workshopMode" style="margin-left: 1.5rem; color: #28a745;">
-        <i class="fas fa-bolt"></i> <strong>Modo Workshop</strong> (2.000 simulações - 5x mais rápido)
+        <i class="fas fa-bolt"></i> <strong>Modo Fast</strong> (2.000 simulações - 5x mais rápido)
     </label>
     <small class="form-text text-muted" style="margin-left: 1.5rem;">
-        Ideal para demonstrações e ambientes com múltiplos usuários. Resultados ainda confiáveis.
+        Ideal para simulações rápidas. Resultados ainda confiáveis.
     </small>
 </div>
 </div>
@@ -2000,6 +2010,313 @@ Histograma mostrando a distribuição de probabilidade do esforço estimado usan
 </div>
 </div>
 </div>
+<!-- ============================================ -->
+<!-- Cost of Delay Tab -->
+<!-- ============================================ -->
+<div aria-labelledby="tab-cod-link" class="tab-pane fade" id="cost-of-delay" role="tabpanel">
+<div class="pt-4 pb-5">
+<div class="container">
+<h2 class="text-center mb-4">Cost of Delay Analysis</h2>
+<p class="text-center text-muted">Predict weekly delay cost using Machine Learning</p>
+
+<!-- Model Info Alert -->
+<div class="alert alert-info" role="alert">
+<h5 class="alert-heading"><i class="fas fa-info-circle"></i> About the CoD Model</h5>
+<p class="mb-0">
+The Cost of Delay (CoD) model uses Machine Learning to predict the weekly cost of delaying a project.
+The model is trained on historical project data and considers multiple factors.
+</p>
+<button id="showModelInfo" class="btn btn-sm btn-outline-info mt-2">Show Model Details</button>
+</div>
+
+<!-- Model Info Panel (initially hidden) -->
+<div id="model-info-panel" class="card mt-3" style="display:none">
+<div class="card-header bg-info text-white">
+<h5 class="mb-0">Model Information</h5>
+</div>
+<div class="card-body">
+<div id="model-info-content">
+<div class="text-center">
+<div class="spinner-border text-primary" role="status">
+<span class="sr-only">Loading...</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+<!-- Dataset Upload & Training -->
+<div class="card mt-4">
+<div class="card-header bg-secondary text-white">
+<h5 class="mb-0"><i class="fas fa-database"></i> 0️⃣ Train the Model with Your Data</h5>
+</div>
+<div class="card-body">
+<form id="codDatasetForm" enctype="multipart/form-data">
+<div class="form-row align-items-end">
+<div class="form-group col-md-4">
+<label>Dataset name</label>
+<input type="text" class="form-control" id="codDatasetName" placeholder="e.g., Projects 2024" />
+</div>
+<div class="form-group col-md-5">
+<label>CSV file<span style="color:red">*</span></label>
+<input type="file" class="form-control-file" id="codDatasetFile" accept=".csv" required />
+<small class="form-text text-muted">
+Include the columns: budget_millions, duration_weeks, team_size, num_stakeholders, business_value, complexity and cod_weekly (optionally project_type, risk_level).
+</small>
+</div>
+<div class="form-group col-md-3 text-md-right">
+<button type="submit" class="btn btn-primary btn-block" id="uploadCodDataset">
+<i class="fas fa-upload"></i> Import CSV
+</button>
+</div>
+</div>
+</form>
+<div id="codDatasetStatus" class="alert alert-light border mt-3" role="alert">
+No dataset uploaded yet.
+</div>
+<div class="d-flex flex-column flex-md-row align-items-start align-items-md-center">
+<button class="btn btn-success mr-md-3 mb-2 mb-md-0" id="trainCodModel" disabled>
+<i class="fas fa-robot"></i> Train model with my data
+</button>
+<a href="{{ url_for('download_cod_sample') }}" class="btn btn-outline-secondary" target="_blank" rel="noopener">
+<i class="fas fa-download"></i> Download sample CSV
+</a>
+</div>
+<div id="codTrainingMessage" class="mt-3"></div>
+</div>
+</div>
+
+<!-- Project Input Form -->
+<div class="card mt-4">
+<div class="card-header bg-primary text-white">
+<h5 class="mb-0"><i class="fas fa-project-diagram"></i> 1️⃣ Project Characteristics</h5>
+</div>
+<div class="card-body">
+<div class="row">
+<div class="col-md-6">
+<div class="form-group">
+<label>Budget (R$ millions)<span style="color:red">*</span></label>
+<input type="number" step="0.1" min="0.1" id="codBudget" class="form-control" placeholder="e.g., 2.5" required />
+<small class="form-text text-muted">Project budget in millions of reais</small>
+</div>
+<div class="form-group">
+<label>Duration (weeks)<span style="color:red">*</span></label>
+<input type="number" min="1" id="codDuration" class="form-control" placeholder="e.g., 20" required />
+<small class="form-text text-muted">Expected project duration</small>
+</div>
+<div class="form-group">
+<label>Team Size<span style="color:red">*</span></label>
+<input type="number" min="1" id="codTeamSize" class="form-control" placeholder="e.g., 5" required />
+<small class="form-text text-muted">Number of team members</small>
+</div>
+</div>
+<div class="col-md-6">
+<div class="form-group">
+<label>Number of Stakeholders<span style="color:red">*</span></label>
+<input type="number" min="1" id="codStakeholders" class="form-control" placeholder="e.g., 8" required />
+<small class="form-text text-muted">Total stakeholders involved</small>
+</div>
+<div class="form-group">
+<label>Business Value (0-100)<span style="color:red">*</span></label>
+<input type="number" min="0" max="100" id="codBusinessValue" class="form-control" placeholder="e.g., 75" required />
+<small class="form-text text-muted">Business value score</small>
+</div>
+<div class="form-group">
+<label>Complexity (1-5)<span style="color:red">*</span></label>
+<select id="codComplexity" class="form-control" required>
+<option value="">Select...</option>
+<option value="1">1 - Very Low</option>
+<option value="2">2 - Low</option>
+<option value="3">3 - Medium</option>
+<option value="4">4 - High</option>
+<option value="5">5 - Very High</option>
+</select>
+<small class="form-text text-muted">Project complexity level</small>
+</div>
+</div>
+</div>
+<div class="row">
+<div class="col-md-6">
+<div class="form-group">
+<label>Project Type</label>
+<select id="codProjectType" class="form-control">
+<option value="ERP">ERP</option>
+<option value="CRM">CRM</option>
+<option value="Analytics">Analytics</option>
+<option value="Mobile">Mobile</option>
+<option value="Web">Web</option>
+</select>
+<small class="form-text text-muted">Type of project</small>
+</div>
+</div>
+<div class="col-md-6">
+<div class="form-group">
+<label>Risk Level (1-5)</label>
+<select id="codRiskLevel" class="form-control">
+<option value="1">1 - Very Low</option>
+<option value="2">2 - Low</option>
+<option value="3" selected>3 - Medium</option>
+<option value="4">4 - High</option>
+<option value="5">5 - Very High</option>
+</select>
+<small class="form-text text-muted">Overall risk level</small>
+</div>
+</div>
+</div>
+<div class="text-center mt-3">
+<button id="predictCoD" type="button" class="btn btn-success btn-lg">
+<i class="fas fa-magic"></i> Predict Cost of Delay
+</button>
+</div>
+</div>
+</div>
+
+<!-- CoD Prediction Results -->
+<div id="cod-prediction-results" class="mt-4" style="display:none">
+<div class="card">
+<div class="card-header bg-success text-white">
+<h5 class="mb-0"><i class="fas fa-chart-bar"></i> Cost of Delay Prediction</h5>
+</div>
+<div class="card-body">
+<div class="row">
+<div class="col-md-4">
+<div class="card bg-light">
+<div class="card-body text-center">
+<h6 class="text-primary">Weekly CoD</h6>
+<h2 id="cod-weekly-value" class="text-success mb-0">-</h2>
+<p class="text-muted mb-0"><small>Cost per week of delay</small></p>
+</div>
+</div>
+</div>
+<div class="col-md-4">
+<div class="card bg-light">
+<div class="card-body text-center">
+<h6 class="text-primary">Daily CoD</h6>
+<h3 id="cod-daily-value" class="text-info mb-0">-</h3>
+<p class="text-muted mb-0"><small>Cost per day of delay</small></p>
+</div>
+</div>
+</div>
+<div class="col-md-4">
+<div class="card bg-light">
+<div class="card-body text-center">
+<h6 class="text-primary">Monthly CoD</h6>
+<h3 id="cod-monthly-value" class="text-warning mb-0">-</h3>
+<p class="text-muted mb-0"><small>Cost per month (4.33 weeks)</small></p>
+</div>
+</div>
+</div>
+</div>
+<div class="row mt-3">
+<div class="col-md-12">
+<div class="card bg-light">
+<div class="card-body">
+<h6 class="text-primary">Confidence Interval (95%)</h6>
+<p id="cod-confidence-interval" class="mb-0">-</p>
+<small class="text-muted">Range of predicted values</small>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+<!-- Total CoD Calculator -->
+<div class="card mt-4">
+<div class="card-header bg-warning text-dark">
+<h5 class="mb-0"><i class="fas fa-calculator"></i> 2️⃣ Total Cost of Delay Calculator</h5>
+</div>
+<div class="card-body">
+<p class="text-muted">Calculate the total cost based on delay duration</p>
+<div class="row">
+<div class="col-md-6">
+<div class="form-group">
+<label>Weekly CoD (R$)<span style="color:red">*</span></label>
+<input type="number" step="0.01" min="0" id="codWeeklyInput" class="form-control" placeholder="Will be filled from prediction" />
+<small class="form-text text-muted">Will auto-fill after prediction</small>
+</div>
+</div>
+<div class="col-md-6">
+<div class="form-group">
+<label>Delay Duration (weeks)<span style="color:red">*</span></label>
+<input type="number" step="0.1" min="0" id="delayWeeks" class="form-control" placeholder="e.g., 4" />
+<small class="form-text text-muted">How many weeks of delay</small>
+</div>
+</div>
+</div>
+<div class="text-center">
+<button id="calculateTotalCoD" type="button" class="btn btn-warning">
+<i class="fas fa-coins"></i> Calculate Total Cost
+</button>
+</div>
+</div>
+</div>
+
+<!-- Total CoD Results -->
+<div id="total-cod-results" class="mt-4" style="display:none">
+<div class="card border-danger">
+<div class="card-header bg-danger text-white">
+<h5 class="mb-0"><i class="fas fa-exclamation-triangle"></i> Total Cost of Delay</h5>
+</div>
+<div class="card-body">
+<div class="row align-items-center">
+<div class="col-md-8">
+<h5>Total Cost</h5>
+<h1 id="total-cod-value" class="text-danger mb-0">-</h1>
+</div>
+<div class="col-md-4 text-right">
+<p class="mb-1"><strong>Weekly CoD:</strong> <span id="total-cod-weekly">-</span></p>
+<p class="mb-0"><strong>Delay:</strong> <span id="total-cod-weeks">-</span> weeks</p>
+</div>
+</div>
+<div class="alert alert-danger mt-3 mb-0" role="alert">
+<strong><i class="fas fa-exclamation-circle"></i> Impact Assessment:</strong> This represents the potential financial loss due to project delay.
+Consider this when making prioritization decisions.
+</div>
+</div>
+</div>
+</div>
+
+<!-- Feature Importance -->
+<div class="card mt-4">
+<div class="card-header bg-info text-white">
+<h5 class="mb-0"><i class="fas fa-chart-pie"></i> 3️⃣ Feature Importance Analysis</h5>
+</div>
+<div class="card-body">
+<p class="text-muted">See which factors most influence the CoD prediction</p>
+<div class="text-center">
+<button id="showFeatureImportance" type="button" class="btn btn-info">
+<i class="fas fa-chart-bar"></i> Show Feature Importance
+</button>
+</div>
+<div id="feature-importance-results" class="mt-4" style="display:none">
+<div style="height: 400px;">
+<canvas id="feature-importance-chart"></canvas>
+</div>
+<div class="table-responsive mt-3">
+<table class="table table-striped">
+<thead>
+<tr>
+<th>Feature</th>
+<th>Importance</th>
+<th>Impact</th>
+</tr>
+</thead>
+<tbody id="feature-importance-table">
+</tbody>
+</table>
+</div>
+</div>
+</div>
+</div>
+
+</div>
+</div>
+</div>
+<!-- ============================================ -->
+<!-- End Cost of Delay Tab -->
+<!-- ============================================ -->
 <div aria-labelledby="tab-trend-link" class="tab-pane fade" id="trend-analysis" role="tabpanel">
 <div class="pt-4 pb-5">
 <div class="container text-center">
@@ -2796,6 +3113,96 @@ a probabilidade de todas serem entregues no prazo é de <strong>1 em 2^n</strong
     </div>
 </div>
 
+<!-- Backtesting Tab -->
+<div aria-labelledby="tab-backtesting-link" class="tab-pane fade" id="backtesting-tab" role="tabpanel">
+    <div class="container-fluid pt-4">
+        <div class="row">
+            <div class="col-12">
+                <h2 class="text-center mb-4">
+                    <i class="fas fa-history"></i> Backtesting
+                </h2>
+                <div class="alert alert-info">
+                    <h5 class="alert-heading"><i class="fas fa-info-circle"></i> Sobre o Backtesting</h5>
+                    <p>
+                        O backtesting valida a acurácia do modelo comparando as previsões com os resultados reais.
+                        Essa funcionalidade permite avaliar a qualidade das estimativas ao longo do tempo.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0"><i class="fas fa-chart-bar"></i> Análise de Backtesting</h5>
+                    </div>
+                    <div class="card-body">
+                        <form id="backtestingForm">
+                            <div class="form-row">
+                                <div class="form-group col-md-6">
+                                    <label for="backtest-project">Projeto</label>
+                                    <select class="form-control" id="backtest-project" required>
+                                        <option value="">Selecione um projeto...</option>
+                                    </select>
+                                </div>
+                                <div class="form-group col-md-6">
+                                    <label for="backtest-min-samples">Mínimo de Amostras</label>
+                                    <input type="number" class="form-control" id="backtest-min-samples" value="5" min="3" max="50">
+                                    <small class="form-text text-muted">Número mínimo de dados históricos para treinar</small>
+                                </div>
+                            </div>
+                            <button type="submit" class="btn btn-primary btn-block">
+                                <i class="fas fa-play"></i> Executar Backtesting
+                            </button>
+                        </form>
+
+                        <div id="backtesting-loading" class="text-center mt-4" style="display:none;">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="sr-only">Carregando...</span>
+                            </div>
+                            <p class="mt-2">Executando análise de backtesting...</p>
+                        </div>
+
+                        <div id="backtesting-results" class="mt-4" style="display:none;">
+                            <h5 class="mb-3">Resultados</h5>
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <div class="card bg-light">
+                                        <div class="card-body text-center">
+                                            <h6 class="text-muted">Acurácia Média</h6>
+                                            <h3 class="mb-0" id="backtest-accuracy">-</h3>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="card bg-light">
+                                        <div class="card-body text-center">
+                                            <h6 class="text-muted">Erro Médio (%)</h6>
+                                            <h3 class="mb-0" id="backtest-error">-</h3>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="card bg-light">
+                                        <div class="card-body text-center">
+                                            <h6 class="text-muted">Testes Realizados</h6>
+                                            <h3 class="mb-0" id="backtest-count">-</h3>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="mt-4">
+                                <canvas id="backtesting-chart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <br/><br/>
 </main>
 
@@ -2914,6 +3321,7 @@ a probabilidade de todas serem entregues no prazo é de <strong>1 em 2^n</strong
 <script src="{{ url_for('static', filename='js/demand_forecast.js') }}"></script>
 <script src="{{ url_for('static', filename='js/charts.js') }}"></script>
 <script src="{{ url_for('static', filename='js/cost_analysis.js') }}"></script>
+<script src="{{ url_for('static', filename='js/cost_of_delay.js') }}"></script>
 <script src="{{ url_for('static', filename='js/forecast-persistence.js') }}"></script>
 <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
 <script src="{{ url_for('static', filename='js/trend_insights.js') }}"></script>
@@ -2928,6 +3336,7 @@ a probabilidade de todas serem entregues no prazo é de <strong>1 em 2^n</strong
                 '#deadline-analysis': '#tab-deadline-link',
                 '#historical-charts': '#tab-historical-link',
                 '#cost-analysis': '#tab-cost-link',
+                '#cost-of-delay': '#tab-cod-link',
                 '#trend-analysis': '#tab-trend-link',
                 '#forecast-vs-actual': '#tab-forecast-vs-actual',
                 '#forecast-vs-actual-tab': '#tab-forecast-vs-actual',
@@ -2936,7 +3345,9 @@ a probabilidade de todas serem entregues no prazo é de <strong>1 em 2^n</strong
                 '#executive-dashboard': '#tab-dashboard-link',
                 '#dashboard': '#tab-dashboard-link',
                 '#portfolio-dashboard': '#tab-portfolio-link',
-                '#portfolio': '#tab-portfolio-link'
+                '#portfolio': '#tab-portfolio-link',
+                '#backtesting-tab': '#tab-backtesting-link',
+                '#backtesting': '#tab-backtesting-link'
             };
 
             const DEFAULT_TAB = '#mc-forecast';
@@ -3028,5 +3439,151 @@ a probabilidade de todas serem entregues no prazo é de <strong>1 em 2^n</strong
     </script>
     <script src="{{ url_for('static', filename='js/portfolio.js') }}"></script>
     <script src="{{ url_for('static', filename='js/forecast-vs-actual.js') }}"></script>
+
+    <!-- Backtesting JavaScript -->
+    <script>
+        $(document).ready(function() {
+            // Load projects on tab show
+            $('#tab-backtesting-link').on('shown.bs.tab', function() {
+                loadBacktestProjects();
+            });
+
+            function loadBacktestProjects() {
+                $.get('/api/projects', function(data) {
+                    const select = $('#backtest-project');
+                    select.empty().append('<option value="">Selecione um projeto...</option>');
+
+                    // API retorna array diretamente, não objeto com propriedade projects
+                    if (Array.isArray(data) && data.length > 0) {
+                        data.forEach(project => {
+                            select.append(`<option value="${project.id}">${project.name}</option>`);
+                        });
+                    }
+                }).fail(function(xhr) {
+                    console.error('Erro ao carregar projetos:', xhr);
+                    alert('Erro ao carregar lista de projetos: ' + (xhr.responseJSON?.error || 'Erro desconhecido'));
+                });
+            }
+
+            // Handle form submission
+            $('#backtestingForm').on('submit', function(e) {
+                e.preventDefault();
+
+                const projectId = $('#backtest-project').val();
+                const minSamples = parseInt($('#backtest-min-samples').val());
+
+                if (!projectId) {
+                    alert('Por favor, selecione um projeto');
+                    return;
+                }
+
+                // Show loading
+                $('#backtesting-loading').show();
+                $('#backtesting-results').hide();
+
+                // Make API call
+                $.ajax({
+                    url: '/api/backtest-project',
+                    method: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify({
+                        project_id: parseInt(projectId),
+                        min_train_size: minSamples
+                    }),
+                    success: function(response) {
+                        displayBacktestResults(response);
+                    },
+                    error: function(xhr) {
+                        console.error('Backtesting error:', xhr);
+                        const errorMsg = xhr.responseJSON?.error || xhr.responseText || 'Erro desconhecido';
+                        alert('Erro ao executar backtesting: ' + errorMsg);
+                    },
+                    complete: function() {
+                        $('#backtesting-loading').hide();
+                    }
+                });
+            });
+
+            function displayBacktestResults(data) {
+                // Display metrics
+                const accuracy = (data.metrics?.avg_accuracy * 100 || 0).toFixed(1);
+                const error = (data.metrics?.avg_error_pct || 0).toFixed(1);
+                const count = data.results?.length || 0;
+
+                $('#backtest-accuracy').text(accuracy + '%');
+                $('#backtest-error').text(error + '%');
+                $('#backtest-count').text(count);
+
+                // Create chart if we have results
+                if (data.results && data.results.length > 0) {
+                    createBacktestChart(data.results);
+                }
+
+                $('#backtesting-results').show();
+            }
+
+            function createBacktestChart(results) {
+                const ctx = document.getElementById('backtesting-chart').getContext('2d');
+
+                // Destroy existing chart if any
+                if (window.backtestChart) {
+                    window.backtestChart.destroy();
+                }
+
+                const labels = results.map((_, idx) => `Test ${idx + 1}`);
+                const predicted = results.map(r => r.predicted_p85);
+                const actual = results.map(r => r.actual_duration);
+
+                window.backtestChart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: 'Previsão (P85)',
+                            data: predicted,
+                            borderColor: 'rgb(54, 162, 235)',
+                            backgroundColor: 'rgba(54, 162, 235, 0.1)',
+                            tension: 0.1
+                        }, {
+                            label: 'Real',
+                            data: actual,
+                            borderColor: 'rgb(255, 99, 132)',
+                            backgroundColor: 'rgba(255, 99, 132, 0.1)',
+                            tension: 0.1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: true,
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                title: {
+                                    display: true,
+                                    text: 'Duração (semanas)'
+                                }
+                            },
+                            x: {
+                                title: {
+                                    display: true,
+                                    text: 'Testes de Backtesting'
+                                }
+                            }
+                        },
+                        plugins: {
+                            legend: {
+                                display: true,
+                                position: 'top'
+                            },
+                            title: {
+                                display: true,
+                                text: 'Previsão vs Real - Backtesting'
+                            }
+                        }
+                    }
+                });
+            }
+        });
+    </script>
 </body>
 </html>
