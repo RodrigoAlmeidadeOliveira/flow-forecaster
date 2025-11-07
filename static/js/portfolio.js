@@ -307,3 +307,4 @@ function renderProjectList(projects, colorClass) {
     html += '</ul>';
     return html;
 }
+

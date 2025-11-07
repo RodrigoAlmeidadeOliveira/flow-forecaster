@@ -453,6 +453,32 @@ class SimulationRun(Base):
         return result
 
 
+class CoDTrainingDataset(Base):
+    """Persisted CoD training datasets per user."""
+    __tablename__ = 'cod_training_datasets'
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False, index=True)
+    name = Column(String(200), nullable=True)
+    original_filename = Column(String(255), nullable=False)
+    data = Column(Text, nullable=False)  # JSON array of records
+    column_names = Column(Text, nullable=False)  # JSON array of column names
+    row_count = Column(Integer, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    user = relationship('User', back_populates='cod_datasets')
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'name': self.name,
+            'original_filename': self.original_filename,
+            'row_count': self.row_count,
+            'column_names': json.loads(self.column_names) if self.column_names else [],
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+        }
+
+
 class CoDModel(Base):
     """Persisted Cost of Delay models per user."""
     __tablename__ = 'cod_models'
