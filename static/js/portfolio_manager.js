@@ -935,3 +935,29 @@ function renderCoDAnalysisResults(result) {
 
     document.getElementById('simulationContent').innerHTML = html;
 }
+
+/**
+ * Export portfolio to Excel
+ */
+function exportToExcel() {
+    if (!currentPortfolioId) {
+        alert('Por favor, selecione um portfolio primeiro');
+        return;
+    }
+
+    // Open export endpoint in new tab
+    window.open(`/api/portfolios/${currentPortfolioId}/export/excel`, '_blank');
+}
+
+/**
+ * Export portfolio to PDF
+ */
+function exportToPDF() {
+    if (!currentPortfolioId) {
+        alert('Por favor, selecione um portfolio primeiro');
+        return;
+    }
+
+    // Open export endpoint in new tab
+    window.open(`/api/portfolios/${currentPortfolioId}/export/pdf`, '_blank');
+}

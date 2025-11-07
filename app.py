@@ -56,6 +56,7 @@ from portfolio_optimizer import (
     optimize_portfolio_simple,
     PULP_AVAILABLE
 )
+from portfolio_export import export_portfolio_excel, export_portfolio_pdf
 from accuracy_metrics import (
     calculate_accuracy_metrics,
     calculate_time_series_metrics,
@@ -3501,6 +3502,164 @@ def generate_pareto_frontier(portfolio_id):
         session.close()
 
 
+@app.route('/api/portfolios/<int:portfolio_id>/export/excel', methods=['GET'])
+@login_required
+def export_portfolio_to_excel(portfolio_id):
+    """Export portfolio data to Excel"""
+    session = get_session()
+    try:
+        # Get portfolio
+        portfolio = scoped_portfolio_query(session).filter(Portfolio.id == portfolio_id).one_or_none()
+        if not portfolio:
+            return jsonify({'error': 'Portfolio not found'}), 404
+
+        # Get projects
+        portfolio_projects = session.query(PortfolioProject).filter(
+            PortfolioProject.portfolio_id == portfolio_id
+        ).all()
+
+        projects_data = []
+        for pp in portfolio_projects:
+            project = session.get(Project, pp.project_id)
+            if project:
+                project_dict = {
+                    'project_id': project.id,
+                    'project_name': project.name,
+                    'priority': pp.priority,
+                    'business_value': pp.business_value,
+                    'wsjf_score': pp.wsjf_score,
+                    'cod_weekly': pp.cod_weekly,
+                    'budget_allocated': pp.budget_allocated,
+                    'capacity_allocated': pp.capacity_allocated,
+                    'time_criticality': pp.time_criticality,
+                    'risk_reduction': pp.risk_reduction,
+                    'status': project.status if hasattr(project, 'status') else 'active',
+                }
+                projects_data.append(project_dict)
+
+        # Get metrics (optional - from dashboard)
+        metrics = None
+        try:
+            from portfolio_dashboard import PortfolioDashboard
+            dashboard = PortfolioDashboard()
+            dashboard_data = dashboard.generate_dashboard(portfolio.to_dict(), portfolio_projects)
+            metrics = dashboard_data.get('metrics', {})
+        except:
+            pass
+
+        # Get risks (optional)
+        risks_data = None
+        try:
+            portfolio_risks = session.query(PortfolioRisk).filter(
+                PortfolioRisk.portfolio_id == portfolio_id
+            ).all()
+            if portfolio_risks:
+                risks_data = [r.to_dict() for r in portfolio_risks]
+        except:
+            pass
+
+        # Generate Excel file
+        excel_buffer = export_portfolio_excel(
+            portfolio.to_dict(),
+            projects_data,
+            metrics=metrics,
+            risks=risks_data
+        )
+
+        # Send file
+        filename = f"portfolio_{portfolio.id}_{portfolio.name.replace(' ', '_')}_{datetime.now().strftime('%Y%m%d')}.xlsx"
+        return send_file(
+            excel_buffer,
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            as_attachment=True,
+            download_name=filename
+        )
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        session.close()
+
+
+@app.route('/api/portfolios/<int:portfolio_id>/export/pdf', methods=['GET'])
+@login_required
+def export_portfolio_to_pdf(portfolio_id):
+    """Export portfolio data to PDF"""
+    session = get_session()
+    try:
+        # Get portfolio
+        portfolio = scoped_portfolio_query(session).filter(Portfolio.id == portfolio_id).one_or_none()
+        if not portfolio:
+            return jsonify({'error': 'Portfolio not found'}), 404
+
+        # Get projects
+        portfolio_projects = session.query(PortfolioProject).filter(
+            PortfolioProject.portfolio_id == portfolio_id
+        ).all()
+
+        projects_data = []
+        for pp in portfolio_projects:
+            project = session.get(Project, pp.project_id)
+            if project:
+                project_dict = {
+                    'project_id': project.id,
+                    'project_name': project.name,
+                    'priority': pp.priority,
+                    'business_value': pp.business_value,
+                    'wsjf_score': pp.wsjf_score,
+                    'cod_weekly': pp.cod_weekly,
+                    'budget_allocated': pp.budget_allocated,
+                    'capacity_allocated': pp.capacity_allocated,
+                    'time_criticality': pp.time_criticality,
+                    'risk_reduction': pp.risk_reduction,
+                    'status': project.status if hasattr(project, 'status') else 'active',
+                }
+                projects_data.append(project_dict)
+
+        # Get metrics (optional - from dashboard)
+        metrics = None
+        try:
+            from portfolio_dashboard import PortfolioDashboard
+            dashboard = PortfolioDashboard()
+            dashboard_data = dashboard.generate_dashboard(portfolio.to_dict(), portfolio_projects)
+            metrics = dashboard_data.get('metrics', {})
+        except:
+            pass
+
+        # Get risks (optional)
+        risks_data = None
+        try:
+            portfolio_risks = session.query(PortfolioRisk).filter(
+                PortfolioRisk.portfolio_id == portfolio_id
+            ).all()
+            if portfolio_risks:
+                risks_data = [r.to_dict() for r in portfolio_risks]
+        except:
+            pass
+
+        # Generate PDF file
+        pdf_buffer = export_portfolio_pdf(
+            portfolio.to_dict(),
+            projects_data,
+            metrics=metrics,
+            risks=risks_data
+        )
+
+        # Send file
+        filename = f"portfolio_{portfolio.id}_{portfolio.name.replace(' ', '_')}_{datetime.now().strftime('%Y%m%d')}.pdf"
+        return send_file(
+            pdf_buffer,
+            mimetype='application/pdf',
+            as_attachment=True,
+            download_name=filename
+        )
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        session.close()
+
+
 @app.route('/api/forecasts', methods=['GET', 'POST'])
 @login_required
 def handle_forecasts():
@@ -3804,6 +3963,24 @@ def portfolio_optimization_page():
         <body>
             <h1>Template Error</h1>
             <p>Error loading Portfolio Optimization template: {str(e)}</p>
+        </body>
+        </html>
+        """, 500
+
+
+@app.route('/portfolio/executive')
+@login_required
+def portfolio_executive_dashboard():
+    """Render the Executive Dashboard page"""
+    try:
+        return render_template('portfolio_executive.html')
+    except Exception as e:
+        return f"""
+        <html>
+        <head><title>Executive Dashboard - Error</title></head>
+        <body>
+            <h1>Template Error</h1>
+            <p>Error loading Executive Dashboard template: {str(e)}</p>
         </body>
         </html>
         """, 500
