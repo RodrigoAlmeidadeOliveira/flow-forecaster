@@ -46,8 +46,9 @@ from cost_pert_beta import (
     calculate_effort_based_cost_with_percentiles
 )
 from database import get_session, close_session, init_db
-from models import Project, Forecast, Actual, User, Portfolio, PortfolioProject, SimulationRun
-from models import Project, Forecast, Actual, User, CoDTrainingDataset, CoDModel
+from models import Project, Forecast, Actual, User, Portfolio, PortfolioProject, SimulationRun, PortfolioRisk
+from models import CoDTrainingDataset, CoDModel
+from portfolio_risk_manager import PortfolioRiskManager, analyze_portfolio_risks
 from accuracy_metrics import (
     calculate_accuracy_metrics,
     calculate_time_series_metrics,
@@ -2953,6 +2954,241 @@ def get_portfolio_dashboard(portfolio_id):
         )
 
         return jsonify(dashboard.to_dict()), 200
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        session.close()
+
+
+# ============================================================================
+# PORTFOLIO RISK MANAGEMENT ENDPOINTS
+# ============================================================================
+
+@app.route('/api/portfolios/<int:portfolio_id>/risks', methods=['GET', 'POST'])
+@login_required
+def handle_portfolio_risks(portfolio_id):
+    """List or create portfolio risks"""
+    session = get_session()
+    try:
+        # Verify portfolio exists and user has access
+        portfolio = scoped_portfolio_query(session).filter(Portfolio.id == portfolio_id).one_or_none()
+        if not portfolio:
+            return jsonify({'error': 'Portfolio not found'}), 404
+
+        if request.method == 'GET':
+            # Get all risks for this portfolio
+            risks = session.query(PortfolioRisk).filter(
+                PortfolioRisk.portfolio_id == portfolio_id
+            ).order_by(PortfolioRisk.risk_score.desc()).all()
+
+            return jsonify([r.to_dict() for r in risks]), 200
+
+        elif request.method == 'POST':
+            data = request.json or {}
+
+            # Validate required fields
+            if not data.get('risk_title'):
+                return jsonify({
+                    'error': 'Missing required field',
+                    'hint': 'risk_title is required',
+                    'error_type': 'validation_error'
+                }), 400
+
+            # Create new risk
+            risk = PortfolioRisk(
+                portfolio_id=portfolio_id,
+                project_id=data.get('project_id'),
+                risk_title=data['risk_title'],
+                risk_description=data.get('risk_description'),
+                risk_category=data.get('risk_category', 'general'),
+                probability=data.get('probability', 3),
+                impact=data.get('impact', 3),
+                status=data.get('status', 'identified'),
+                owner=data.get('owner'),
+                mitigation_plan=data.get('mitigation_plan'),
+                contingency_plan=data.get('contingency_plan'),
+                estimated_cost_if_occurs=data.get('estimated_cost_if_occurs'),
+                mitigation_cost=data.get('mitigation_cost'),
+                created_by=current_user.name
+            )
+
+            # Calculate risk score
+            risk.calculate_risk_score()
+
+            session.add(risk)
+            session.commit()
+
+            return jsonify(risk.to_dict()), 201
+
+    except Exception as e:
+        session.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        session.close()
+
+
+@app.route('/api/portfolios/<int:portfolio_id>/risks/<int:risk_id>', methods=['GET', 'PUT', 'DELETE'])
+@login_required
+def handle_portfolio_risk(portfolio_id, risk_id):
+    """Get, update, or delete a specific portfolio risk"""
+    session = get_session()
+    try:
+        # Verify portfolio exists and user has access
+        portfolio = scoped_portfolio_query(session).filter(Portfolio.id == portfolio_id).one_or_none()
+        if not portfolio:
+            return jsonify({'error': 'Portfolio not found'}), 404
+
+        # Get the risk
+        risk = session.query(PortfolioRisk).filter(
+            PortfolioRisk.id == risk_id,
+            PortfolioRisk.portfolio_id == portfolio_id
+        ).one_or_none()
+
+        if not risk:
+            return jsonify({'error': 'Risk not found'}), 404
+
+        if request.method == 'GET':
+            return jsonify(risk.to_dict()), 200
+
+        elif request.method == 'PUT':
+            data = request.json or {}
+
+            # Update fields
+            if 'risk_title' in data:
+                risk.risk_title = data['risk_title']
+            if 'risk_description' in data:
+                risk.risk_description = data['risk_description']
+            if 'risk_category' in data:
+                risk.risk_category = data['risk_category']
+            if 'probability' in data:
+                risk.probability = data['probability']
+            if 'impact' in data:
+                risk.impact = data['impact']
+            if 'status' in data:
+                risk.status = data['status']
+                # Set dates based on status
+                if data['status'] == 'occurred' and not risk.occurred_date:
+                    risk.occurred_date = datetime.utcnow()
+                elif data['status'] == 'closed' and not risk.closed_date:
+                    risk.closed_date = datetime.utcnow()
+            if 'owner' in data:
+                risk.owner = data['owner']
+            if 'mitigation_plan' in data:
+                risk.mitigation_plan = data['mitigation_plan']
+            if 'contingency_plan' in data:
+                risk.contingency_plan = data['contingency_plan']
+            if 'estimated_cost_if_occurs' in data:
+                risk.estimated_cost_if_occurs = data['estimated_cost_if_occurs']
+            if 'mitigation_cost' in data:
+                risk.mitigation_cost = data['mitigation_cost']
+            if 'project_id' in data:
+                risk.project_id = data['project_id']
+
+            # Recalculate risk score
+            risk.calculate_risk_score()
+            risk.last_reviewed_date = datetime.utcnow()
+
+            session.commit()
+            return jsonify(risk.to_dict()), 200
+
+        elif request.method == 'DELETE':
+            session.delete(risk)
+            session.commit()
+            return jsonify({'message': 'Risk deleted successfully'}), 200
+
+    except Exception as e:
+        session.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        session.close()
+
+
+@app.route('/api/portfolios/<int:portfolio_id>/risks/analysis', methods=['GET'])
+@login_required
+def portfolio_risk_analysis(portfolio_id):
+    """
+    Get comprehensive risk analysis for a portfolio
+    Includes metrics, heatmap, alerts, and suggested risks
+    """
+    session = get_session()
+    try:
+        # Verify portfolio exists and user has access
+        portfolio = scoped_portfolio_query(session).filter(Portfolio.id == portfolio_id).one_or_none()
+        if not portfolio:
+            return jsonify({'error': 'Portfolio not found'}), 404
+
+        # Get all risks for this portfolio
+        risks = session.query(PortfolioRisk).filter(
+            PortfolioRisk.portfolio_id == portfolio_id
+        ).all()
+
+        # Get portfolio projects for rollup analysis
+        portfolio_projects = session.query(PortfolioProject).filter(
+            PortfolioProject.portfolio_id == portfolio_id,
+            PortfolioProject.is_active == True
+        ).all()
+
+        projects = []
+        for pp in portfolio_projects:
+            project = session.get(Project, pp.project_id)
+            if project:
+                projects.append(project.to_dict())
+
+        # Analyze risks
+        analysis = analyze_portfolio_risks(
+            [r.to_dict() for r in risks],
+            projects
+        )
+
+        return jsonify(analysis), 200
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        session.close()
+
+
+@app.route('/api/portfolios/<int:portfolio_id>/risks/suggest', methods=['POST'])
+@login_required
+def suggest_portfolio_risks(portfolio_id):
+    """
+    Suggest portfolio-level risks based on project data
+    This endpoint analyzes projects and recommends risks to track
+    """
+    session = get_session()
+    try:
+        # Verify portfolio exists and user has access
+        portfolio = scoped_portfolio_query(session).filter(Portfolio.id == portfolio_id).one_or_none()
+        if not portfolio:
+            return jsonify({'error': 'Portfolio not found'}), 404
+
+        # Get portfolio projects
+        portfolio_projects = session.query(PortfolioProject).filter(
+            PortfolioProject.portfolio_id == portfolio_id,
+            PortfolioProject.is_active == True
+        ).all()
+
+        projects = []
+        for pp in portfolio_projects:
+            project = session.get(Project, pp.project_id)
+            if project:
+                projects.append(project.to_dict())
+
+        if not projects:
+            return jsonify({
+                'suggested_risks': [],
+                'message': 'No projects in portfolio to analyze'
+            }), 200
+
+        # Use risk manager to suggest risks
+        risk_manager = PortfolioRiskManager()
+        suggested_risks = risk_manager.rollup_project_risks(projects)
+
+        return jsonify({
+            'suggested_risks': suggested_risks,
+            'count': len(suggested_risks)
+        }), 200
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
