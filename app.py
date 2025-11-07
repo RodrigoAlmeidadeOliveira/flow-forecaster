@@ -2566,6 +2566,176 @@ def get_portfolio_simulations(portfolio_id):
         session.close()
 
 
+@app.route('/api/portfolios/<int:portfolio_id>/cod-analysis', methods=['POST'])
+@login_required
+def analyze_portfolio_cod(portfolio_id):
+    """
+    Perform Cost of Delay analysis for a portfolio.
+    Includes WSJF optimization and strategy comparison.
+    """
+    session = get_session()
+    try:
+        from cod_portfolio_analyzer import (
+            ProjectCoDProfile,
+            analyze_portfolio_cod as perform_cod_analysis,
+            compare_prioritization_strategies
+        )
+
+        # Verify portfolio ownership
+        portfolio = session.query(Portfolio).filter(
+            Portfolio.id == portfolio_id,
+            Portfolio.user_id == current_user.id
+        ).one_or_none()
+
+        if not portfolio:
+            return jsonify({'error': 'Portfolio not found'}), 404
+
+        # Get all active projects in portfolio
+        portfolio_projects = session.query(PortfolioProject).filter(
+            PortfolioProject.portfolio_id == portfolio_id,
+            PortfolioProject.is_active == True
+        ).all()
+
+        if not portfolio_projects:
+            return jsonify({'error': 'No projects in portfolio'}), 400
+
+        # Build CoD profiles for each project
+        cod_profiles = []
+        for pp in portfolio_projects:
+            project = pp.project
+
+            # Get most recent forecast for duration estimates
+            latest_forecast = session.query(Forecast).filter(
+                Forecast.project_id == project.id
+            ).order_by(Forecast.created_at.desc()).first()
+
+            if not latest_forecast:
+                continue
+
+            # Use forecast data for duration
+            p50 = latest_forecast.projected_weeks_p85 or 10  # Fallback
+            p85 = p50 * 1.3  # Estimate if not available
+            p95 = p50 * 1.5
+
+            cod_profile = ProjectCoDProfile(
+                project_id=project.id,
+                project_name=project.name,
+                duration_p50=p50,
+                duration_p85=p85,
+                duration_p95=p95,
+                cod_weekly=pp.cod_weekly or 0,
+                business_value=pp.business_value_score,
+                time_criticality=pp.time_criticality_score,
+                risk_reduction=pp.risk_reduction_score
+            )
+
+            cod_profiles.append(cod_profile)
+
+        if not cod_profiles:
+            return jsonify({'error': 'No projects with forecast data'}), 400
+
+        # Perform CoD analysis
+        analysis = perform_cod_analysis(
+            portfolio_id=portfolio_id,
+            portfolio_name=portfolio.name,
+            projects=cod_profiles
+        )
+
+        # Compare prioritization strategies
+        strategy_comparison = compare_prioritization_strategies(cod_profiles)
+
+        result = analysis.to_dict()
+        result['strategy_comparison'] = strategy_comparison
+
+        return jsonify(result), 200
+
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+    except Exception as e:
+        session.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        session.close()
+
+
+@app.route('/api/portfolios/<int:portfolio_id>/delay-impact', methods=['POST'])
+@login_required
+def calculate_project_delay_impact(portfolio_id):
+    """
+    Calculate the financial impact of delaying a specific project.
+    """
+    session = get_session()
+    try:
+        from cod_portfolio_analyzer import (
+            ProjectCoDProfile,
+            calculate_delay_impact
+        )
+
+        # Verify portfolio ownership
+        portfolio = session.query(Portfolio).filter(
+            Portfolio.id == portfolio_id,
+            Portfolio.user_id == current_user.id
+        ).one_or_none()
+
+        if not portfolio:
+            return jsonify({'error': 'Portfolio not found'}), 404
+
+        # Get request data
+        data = request.json or {}
+        project_id = data.get('project_id')
+        delay_weeks = data.get('delay_weeks', 1)
+
+        if not project_id:
+            return jsonify({'error': 'project_id is required'}), 400
+
+        # Get portfolio project
+        portfolio_project = session.query(PortfolioProject).filter(
+            PortfolioProject.portfolio_id == portfolio_id,
+            PortfolioProject.project_id == project_id,
+            PortfolioProject.is_active == True
+        ).one_or_none()
+
+        if not portfolio_project:
+            return jsonify({'error': 'Project not in portfolio'}), 404
+
+        project = portfolio_project.project
+
+        # Get forecast data
+        latest_forecast = session.query(Forecast).filter(
+            Forecast.project_id == project.id
+        ).order_by(Forecast.created_at.desc()).first()
+
+        if not latest_forecast:
+            return jsonify({'error': 'No forecast data for project'}), 404
+
+        p50 = latest_forecast.projected_weeks_p85 or 10
+        p85 = p50 * 1.3
+        p95 = p50 * 1.5
+
+        # Create CoD profile
+        cod_profile = ProjectCoDProfile(
+            project_id=project.id,
+            project_name=project.name,
+            duration_p50=p50,
+            duration_p85=p85,
+            duration_p95=p95,
+            cod_weekly=portfolio_project.cod_weekly or 0,
+            business_value=portfolio_project.business_value_score,
+            time_criticality=portfolio_project.time_criticality_score,
+            risk_reduction=portfolio_project.risk_reduction_score
+        )
+
+        # Calculate delay impact
+        impact = calculate_delay_impact(cod_profile, delay_weeks)
+
+        return jsonify(impact), 200
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        session.close()
+
+
 @app.route('/api/forecasts', methods=['GET', 'POST'])
 @login_required
 def handle_forecasts():
