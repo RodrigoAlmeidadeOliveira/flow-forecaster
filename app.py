@@ -49,6 +49,13 @@ from database import get_session, close_session, init_db
 from models import Project, Forecast, Actual, User, Portfolio, PortfolioProject, SimulationRun, PortfolioRisk
 from models import CoDTrainingDataset, CoDModel
 from portfolio_risk_manager import PortfolioRiskManager, analyze_portfolio_risks
+from portfolio_optimizer import (
+    PortfolioOptimizer,
+    OptimizationConstraints,
+    Scenario,
+    optimize_portfolio_simple,
+    PULP_AVAILABLE
+)
 from accuracy_metrics import (
     calculate_accuracy_metrics,
     calculate_time_series_metrics,
@@ -3188,6 +3195,304 @@ def suggest_portfolio_risks(portfolio_id):
         return jsonify({
             'suggested_risks': suggested_risks,
             'count': len(suggested_risks)
+        }), 200
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        session.close()
+
+
+# ============================================================================
+# PORTFOLIO OPTIMIZATION ENDPOINTS
+# ============================================================================
+
+@app.route('/api/portfolios/<int:portfolio_id>/optimize', methods=['POST'])
+@login_required
+def optimize_portfolio(portfolio_id):
+    """
+    Optimize portfolio using linear programming
+    Selects optimal subset of projects given constraints
+    """
+    session = get_session()
+    try:
+        # Check if PuLP is available
+        if not PULP_AVAILABLE:
+            return jsonify({
+                'error': 'Optimization library not available',
+                'hint': 'PuLP library is required for portfolio optimization',
+                'action': 'Install with: pip install pulp',
+                'error_type': 'dependency_missing'
+            }), 503
+
+        # Verify portfolio exists and user has access
+        portfolio = scoped_portfolio_query(session).filter(Portfolio.id == portfolio_id).one_or_none()
+        if not portfolio:
+            return jsonify({'error': 'Portfolio not found'}), 404
+
+        data = request.json or {}
+
+        # Get portfolio projects
+        portfolio_projects = session.query(PortfolioProject).filter(
+            PortfolioProject.portfolio_id == portfolio_id,
+            PortfolioProject.is_active == True
+        ).all()
+
+        if not portfolio_projects:
+            return jsonify({
+                'error': 'No projects in portfolio',
+                'hint': 'Add projects to portfolio before optimization',
+                'error_type': 'no_projects'
+            }), 400
+
+        # Build project data for optimization
+        projects = []
+        for pp in portfolio_projects:
+            project = session.get(Project, pp.project_id)
+            if not project:
+                continue
+
+            # Get latest forecast for duration estimate
+            latest_forecast = session.query(Forecast).filter(
+                Forecast.project_id == project.id
+            ).order_by(Forecast.created_at.desc()).first()
+
+            duration_p85 = latest_forecast.projected_weeks_p85 if latest_forecast else 0
+
+            projects.append({
+                'id': project.id,
+                'name': project.name,
+                'business_value': pp.business_value_score or project.business_value,
+                'risk_level': project.risk_level,
+                'budget_allocated': pp.budget_allocated or 0,
+                'capacity_allocated': pp.capacity_allocated or project.capacity_allocated,
+                'wsjf_score': pp.wsjf_score,
+                'estimated_duration_p85': duration_p85
+            })
+
+        # Create constraints
+        constraints = OptimizationConstraints(
+            max_budget=data.get('max_budget', portfolio.total_budget),
+            max_capacity=data.get('max_capacity', portfolio.total_capacity),
+            min_business_value=data.get('min_business_value'),
+            max_risk_score=data.get('max_risk_score'),
+            mandatory_projects=data.get('mandatory_projects', []),
+            excluded_projects=data.get('excluded_projects', []),
+            max_duration_weeks=data.get('max_duration_weeks')
+        )
+
+        # Run optimization
+        optimizer = PortfolioOptimizer()
+        objective = data.get('objective', 'maximize_value')
+        result = optimizer.optimize_portfolio(projects, constraints, objective)
+
+        # Build response with project details
+        selected_project_details = []
+        for proj_id in result.selected_projects:
+            proj = next(p for p in projects if p['id'] == proj_id)
+            selected_project_details.append(proj)
+
+        return jsonify({
+            'optimization': {
+                'status': result.optimization_status,
+                'objective_value': result.objective_value,
+                'constraints_satisfied': result.constraints_satisfied
+            },
+            'selected_projects': selected_project_details,
+            'excluded_projects': [
+                p for p in projects if p['id'] not in result.selected_projects
+            ],
+            'metrics': {
+                'projects_included': result.projects_included,
+                'projects_excluded': result.projects_excluded,
+                'total_value': result.total_value,
+                'total_cost': result.total_cost,
+                'total_capacity': result.total_capacity,
+                'total_duration': result.total_duration,
+                'total_risk_score': result.total_risk_score
+            },
+            'utilization': {
+                'budget': {
+                    'used': result.total_cost,
+                    'available': constraints.max_budget,
+                    'percentage': (result.total_cost / constraints.max_budget * 100) if constraints.max_budget else 0
+                },
+                'capacity': {
+                    'used': result.total_capacity,
+                    'available': constraints.max_capacity,
+                    'percentage': (result.total_capacity / constraints.max_capacity * 100) if constraints.max_capacity else 0
+                }
+            },
+            'recommendations': result.recommendations
+        }), 200
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        session.close()
+
+
+@app.route('/api/portfolios/<int:portfolio_id>/scenarios', methods=['POST'])
+@login_required
+def compare_scenarios(portfolio_id):
+    """
+    Compare multiple what-if scenarios
+    Helps answer questions like:
+    - What if budget increases by 20%?
+    - What if we lose 2 FTEs?
+    - What if Project X is mandatory?
+    """
+    session = get_session()
+    try:
+        if not PULP_AVAILABLE:
+            return jsonify({
+                'error': 'Optimization library not available',
+                'error_type': 'dependency_missing'
+            }), 503
+
+        # Verify portfolio exists
+        portfolio = scoped_portfolio_query(session).filter(Portfolio.id == portfolio_id).one_or_none()
+        if not portfolio:
+            return jsonify({'error': 'Portfolio not found'}), 404
+
+        data = request.json or {}
+        scenario_defs = data.get('scenarios', [])
+
+        if not scenario_defs:
+            return jsonify({
+                'error': 'No scenarios provided',
+                'hint': 'Provide at least one scenario in the scenarios array'
+            }), 400
+
+        # Get portfolio projects
+        portfolio_projects = session.query(PortfolioProject).filter(
+            PortfolioProject.portfolio_id == portfolio_id,
+            PortfolioProject.is_active == True
+        ).all()
+
+        projects = []
+        for pp in portfolio_projects:
+            project = session.get(Project, pp.project_id)
+            if not project:
+                continue
+
+            latest_forecast = session.query(Forecast).filter(
+                Forecast.project_id == project.id
+            ).order_by(Forecast.created_at.desc()).first()
+
+            projects.append({
+                'id': project.id,
+                'name': project.name,
+                'business_value': pp.business_value_score or project.business_value,
+                'risk_level': project.risk_level,
+                'budget_allocated': pp.budget_allocated or 0,
+                'capacity_allocated': pp.capacity_allocated or project.capacity_allocated,
+                'wsjf_score': pp.wsjf_score,
+                'estimated_duration_p85': latest_forecast.projected_weeks_p85 if latest_forecast else 0
+            })
+
+        # Build scenarios
+        scenarios = []
+        for scenario_def in scenario_defs:
+            constraints = OptimizationConstraints(
+                max_budget=scenario_def.get('max_budget', portfolio.total_budget),
+                max_capacity=scenario_def.get('max_capacity', portfolio.total_capacity),
+                mandatory_projects=scenario_def.get('mandatory_projects', []),
+                excluded_projects=scenario_def.get('excluded_projects', [])
+            )
+            scenarios.append(Scenario(
+                scenario_name=scenario_def.get('name', f'Scenario {len(scenarios) + 1}'),
+                scenario_description=scenario_def.get('description', ''),
+                constraints=constraints
+            ))
+
+        # Run comparison
+        optimizer = PortfolioOptimizer()
+        comparison = optimizer.compare_scenarios(projects, scenarios)
+
+        # Add project names to results
+        for scenario_result in comparison['scenarios']:
+            scenario_result['selected_projects'] = [
+                next(p['name'] for p in projects if p['id'] == proj_id)
+                for proj_id in scenario_result['selected_project_ids']
+            ]
+
+        return jsonify(comparison), 200
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        session.close()
+
+
+@app.route('/api/portfolios/<int:portfolio_id>/pareto', methods=['POST'])
+@login_required
+def generate_pareto_frontier(portfolio_id):
+    """
+    Generate Pareto frontier for trade-off analysis
+    Shows optimal trade-offs between conflicting objectives
+    """
+    session = get_session()
+    try:
+        if not PULP_AVAILABLE:
+            return jsonify({
+                'error': 'Optimization library not available',
+                'error_type': 'dependency_missing'
+            }), 503
+
+        # Verify portfolio exists
+        portfolio = scoped_portfolio_query(session).filter(Portfolio.id == portfolio_id).one_or_none()
+        if not portfolio:
+            return jsonify({'error': 'Portfolio not found'}), 404
+
+        data = request.json or {}
+
+        # Get portfolio projects
+        portfolio_projects = session.query(PortfolioProject).filter(
+            PortfolioProject.portfolio_id == portfolio_id,
+            PortfolioProject.is_active == True
+        ).all()
+
+        projects = []
+        for pp in portfolio_projects:
+            project = session.get(Project, pp.project_id)
+            if not project:
+                continue
+
+            latest_forecast = session.query(Forecast).filter(
+                Forecast.project_id == project.id
+            ).order_by(Forecast.created_at.desc()).first()
+
+            projects.append({
+                'id': project.id,
+                'name': project.name,
+                'business_value': pp.business_value_score or project.business_value,
+                'risk_level': project.risk_level,
+                'budget_allocated': pp.budget_allocated or 0,
+                'capacity_allocated': pp.capacity_allocated or project.capacity_allocated,
+                'wsjf_score': pp.wsjf_score,
+                'estimated_duration_p85': latest_forecast.projected_weeks_p85 if latest_forecast else 0
+            })
+
+        constraints = OptimizationConstraints(
+            max_budget=portfolio.total_budget,
+            max_capacity=portfolio.total_capacity
+        )
+
+        optimizer = PortfolioOptimizer()
+        pareto_points = optimizer.generate_pareto_frontier(
+            projects,
+            constraints,
+            axis_x=data.get('axis_x', 'cost'),
+            axis_y=data.get('axis_y', 'value'),
+            points=data.get('points', 10)
+        )
+
+        return jsonify({
+            'pareto_frontier': pareto_points,
+            'axis_x': data.get('axis_x', 'cost'),
+            'axis_y': data.get('axis_y', 'value'),
+            'points_count': len(pareto_points)
         }), 200
 
     except Exception as e:
