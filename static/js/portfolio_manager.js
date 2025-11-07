@@ -10,7 +10,20 @@ let projects = [];
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', () => {
     loadPortfolios();
+
+    // Initialize Bootstrap tooltips
+    initializeTooltips();
 });
+
+/**
+ * Initialize Bootstrap tooltips
+ */
+function initializeTooltips() {
+    const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+}
 
 /**
  * Load all portfolios for current user
@@ -592,4 +605,333 @@ function showSuccess(message) {
  */
 function showError(message) {
     alert('Erro: ' + message);
+}
+
+/**
+ * Display detailed CoD analysis error with issues, hints and actions
+ */
+function displayCoDAnalysisError(errorData) {
+    let html = `
+        <div class="alert alert-danger">
+            <h5 class="alert-heading">
+                <i class="fas fa-exclamation-triangle"></i> ${errorData.error}
+            </h5>
+    `;
+
+    // Display issues if available
+    if (errorData.issues && errorData.issues.length > 0) {
+        errorData.issues.forEach(issue => {
+            html += `
+                <div class="mt-3 ps-3 border-start border-3 border-danger">
+                    <strong>${issue.message}</strong>
+
+                    ${issue.projects && issue.projects.length > 0 ? `
+                        <div class="mt-2">
+                            <small class="text-muted d-block mb-1">Projetos afetados:</small>
+                            <ul class="mb-2">
+                                ${issue.projects.map(p => `<li>${p}</li>`).join('')}
+                            </ul>
+                        </div>
+                    ` : ''}
+
+                    ${issue.hint ? `
+                        <div class="alert alert-info mb-2 p-2">
+                            <i class="fas fa-lightbulb"></i> <strong>Dica:</strong> ${issue.hint}
+                        </div>
+                    ` : ''}
+
+                    ${issue.action ? `
+                        <div class="alert alert-warning mb-2 p-2">
+                            <i class="fas fa-hand-point-right"></i> <strong>Ação:</strong> ${issue.action}
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+        });
+    } else if (errorData.hint) {
+        // Simple error with hint
+        html += `
+            <hr>
+            <p class="mb-1"><strong>Dica:</strong> ${errorData.hint}</p>
+            ${errorData.action ? `<p class="mb-0"><strong>Ação:</strong> ${errorData.action}</p>` : ''}
+        `;
+    }
+
+    html += `</div>`;
+    document.getElementById('simulationContent').innerHTML = html;
+}
+
+/**
+ * Display warnings at the top of CoD analysis results
+ */
+function displayCoDAnalysisWarnings(warnings) {
+    const warningsContainer = document.getElementById('simulationContent');
+
+    let html = '';
+    warnings.forEach(warning => {
+        const severityClass = warning.severity === 'warning' ? 'warning' : 'info';
+
+        html += `
+            <div class="alert alert-${severityClass} alert-dismissible fade show" role="alert">
+                <h6 class="alert-heading">
+                    <i class="fas fa-exclamation-circle"></i> ${warning.message}
+                </h6>
+
+                ${warning.projects && warning.projects.length > 0 ? `
+                    <small class="d-block mb-2">
+                        Projetos: ${warning.projects.join(', ')}
+                    </small>
+                ` : ''}
+
+                ${warning.hint ? `
+                    <small class="d-block mb-1">
+                        <i class="fas fa-lightbulb"></i> ${warning.hint}
+                    </small>
+                ` : ''}
+
+                ${warning.impact ? `
+                    <small class="d-block text-muted">
+                        Impacto: ${warning.impact}
+                    </small>
+                ` : ''}
+
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        `;
+    });
+
+    // Prepend warnings to existing content
+    warningsContainer.innerHTML = html + warningsContainer.innerHTML;
+}
+
+/**
+ * Run Cost of Delay analysis
+ */
+async function runCoDAnalysis() {
+    if (!currentPortfolioId) return;
+
+    // Show loading
+    document.getElementById('simulationResults').style.display = 'block';
+    document.getElementById('simulationContent').innerHTML = `
+        <div class="text-center p-5">
+            <div class="spinner-border text-primary mb-3" style="width: 3rem; height: 3rem;" role="status"></div>
+            <p class="lead">Analisando Cost of Delay...</p>
+            <p class="text-muted">Otimizando sequência por WSJF</p>
+        </div>
+    `;
+
+    try {
+        const response = await fetch(`/api/portfolios/${currentPortfolioId}/cod-analysis`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            displayCoDAnalysisError(errorData);
+            return;
+        }
+
+        const result = await response.json();
+
+        // Check for warnings
+        if (result.warnings && result.warnings.length > 0) {
+            displayCoDAnalysisWarnings(result.warnings);
+        }
+
+        renderCoDAnalysisResults(result);
+
+    } catch (error) {
+        console.error('Error running CoD analysis:', error);
+        document.getElementById('simulationContent').innerHTML = `
+            <div class="alert alert-danger">
+                <i class="fas fa-exclamation-triangle"></i>
+                <strong>Erro:</strong> ${error.message}
+            </div>
+        `;
+    }
+}
+
+/**
+ * Render Cost of Delay analysis results
+ */
+function renderCoDAnalysisResults(result) {
+    const optimization = result.optimization;
+    const strategies = result.strategy_comparison.strategies;
+    const bestStrategy = result.strategy_comparison.best_strategy;
+
+    const html = `
+        <div class="row mb-4">
+            <div class="col-md-12">
+                <h5><i class="fas fa-dollar-sign"></i> Análise de Cost of Delay</h5>
+                <div class="alert alert-success">
+                    <strong>Economia com WSJF:</strong> R$ ${formatNumber(optimization.cod_savings)}
+                    (${optimization.cod_savings_pct.toFixed(1)}% de redução no CoD total)
+                </div>
+            </div>
+        </div>
+
+        <!-- CoD Totals Comparison -->
+        <div class="row mb-4">
+            <div class="col-md-4">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <h6 class="text-muted">Paralelo</h6>
+                        <h3 class="text-success">R$ ${formatNumber(result.totals.parallel.total_cod)}</h3>
+                        <p class="small mb-0">${result.totals.parallel.duration_p85.toFixed(1)} semanas</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <h6 class="text-muted">Sequencial (não otimizado)</h6>
+                        <h3 class="text-danger">R$ ${formatNumber(result.totals.sequential_unoptimized.total_cod)}</h3>
+                        <p class="small mb-0">${result.totals.sequential_unoptimized.duration_p85.toFixed(1)} semanas</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card text-center border-success">
+                    <div class="card-body">
+                        <h6 class="text-muted">Sequencial (WSJF otimizado)</h6>
+                        <h3 class="text-success">R$ ${formatNumber(result.totals.sequential_optimized.total_cod)}</h3>
+                        <p class="small mb-0">${result.totals.sequential_optimized.duration_p85.toFixed(1)} semanas</p>
+                        <span class="badge bg-success mt-2">Recomendado</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- WSJF Ranking -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <strong><i class="fas fa-trophy"></i> Ranking WSJF - Ordem de Execução Recomendada</strong>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Projeto</th>
+                                <th>WSJF Score</th>
+                                <th>CoD Total</th>
+                                <th>Recomendação</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${optimization.optimized_sequence.map((projectId, index) => {
+                                const ranking = optimization.project_rankings[projectId];
+                                return `
+                                    <tr>
+                                        <td><strong>${index + 1}</strong></td>
+                                        <td>${escapeHtml(ranking.name)}</td>
+                                        <td><span class="wsjf-score">${ranking.wsjf}</span></td>
+                                        <td>R$ ${formatNumber(ranking.cod)}</td>
+                                        <td>
+                                            ${index === 0 ? '<span class="badge bg-danger">URGENTE - Fazer Primeiro!</span>' :
+                                              index === 1 ? '<span class="badge bg-warning">Alta Prioridade</span>' :
+                                              '<span class="badge bg-secondary">Normal</span>'}
+                                        </td>
+                                    </tr>
+                                `;
+                            }).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Strategy Comparison -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <strong><i class="fas fa-balance-scale"></i> Comparação de Estratégias de Priorização</strong>
+            </div>
+            <div class="card-body">
+                <p class="text-muted">Comparando diferentes métodos de priorização:</p>
+                <div class="row">
+                    ${Object.keys(strategies).map(strategyName => {
+                        const strategy = strategies[strategyName];
+                        const isBest = strategy.is_best;
+                        const strategyLabel = {
+                            'wsjf': 'WSJF (Recomendado)',
+                            'shortest_first': 'Menor Duração Primeiro',
+                            'highest_cod_first': 'Maior CoD Primeiro',
+                            'business_value_first': 'Maior Valor de Negócio'
+                        }[strategyName];
+
+                        return `
+                            <div class="col-md-6 mb-3">
+                                <div class="card ${isBest ? 'border-success' : ''}">
+                                    <div class="card-body">
+                                        <h6>${strategyLabel}</h6>
+                                        <p class="mb-0">
+                                            <strong>CoD Total:</strong> R$ ${formatNumber(strategy.total_cod)}
+                                            ${isBest ? '<span class="badge bg-success ms-2">Melhor</span>' : ''}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+                <div class="alert alert-info mt-3">
+                    <strong>Melhor Estratégia:</strong> ${
+                        bestStrategy === 'wsjf' ? 'WSJF (balanceia valor, criticidade e duração)' :
+                        bestStrategy === 'shortest_first' ? 'Menor Duração Primeiro' :
+                        bestStrategy === 'highest_cod_first' ? 'Maior CoD Primeiro' :
+                        'Maior Valor de Negócio'
+                    }
+                </div>
+            </div>
+        </div>
+
+        <!-- Risk Assessment -->
+        <div class="card">
+            <div class="card-header">
+                <strong><i class="fas fa-exclamation-triangle"></i> Avaliação de Riscos</strong>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>Projetos com Alto CoD</h6>
+                        ${result.risk_assessment.high_cod_projects.length > 0 ? `
+                            <ul class="list-unstyled">
+                                ${result.risk_assessment.high_cod_projects.map(pid => {
+                                    const project = result.projects.find(p => p.project_id === pid);
+                                    return project ? `
+                                        <li>
+                                            <i class="fas fa-exclamation-circle text-danger"></i>
+                                            ${escapeHtml(project.project_name)}
+                                            <span class="cod-badge badge">R$ ${formatNumber(project.total_cod)}/total</span>
+                                        </li>
+                                    ` : '';
+                                }).join('')}
+                            </ul>
+                        ` : '<p class="text-muted">Nenhum projeto com CoD crítico</p>'}
+                    </div>
+                    <div class="col-md-6">
+                        <h6>Projetos com Prazos Críticos</h6>
+                        ${result.risk_assessment.critical_deadline_projects.length > 0 ? `
+                            <ul class="list-unstyled">
+                                ${result.risk_assessment.critical_deadline_projects.map(pid => {
+                                    const project = result.projects.find(p => p.project_id === pid);
+                                    return project ? `
+                                        <li>
+                                            <i class="fas fa-clock text-warning"></i>
+                                            ${escapeHtml(project.project_name)}
+                                            <span class="badge bg-warning">Criticidade: ${project.time_criticality}</span>
+                                        </li>
+                                    ` : '';
+                                }).join('')}
+                            </ul>
+                        ` : '<p class="text-muted">Nenhum projeto com prazo crítico</p>'}
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    document.getElementById('simulationContent').innerHTML = html;
 }

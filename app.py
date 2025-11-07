@@ -2572,6 +2572,400 @@ def get_portfolio_simulations(portfolio_id):
         session.close()
 
 
+@app.route('/api/portfolios/<int:portfolio_id>/cod-analysis', methods=['POST'])
+@login_required
+def analyze_portfolio_cod(portfolio_id):
+    """
+    Perform Cost of Delay analysis for a portfolio.
+    Includes WSJF optimization and strategy comparison.
+    """
+    session = get_session()
+    try:
+        from cod_portfolio_analyzer import (
+            ProjectCoDProfile,
+            analyze_portfolio_cod as perform_cod_analysis,
+            compare_prioritization_strategies
+        )
+
+        # Verify portfolio ownership
+        portfolio = session.query(Portfolio).filter(
+            Portfolio.id == portfolio_id,
+            Portfolio.user_id == current_user.id
+        ).one_or_none()
+
+        if not portfolio:
+            return jsonify({'error': 'Portfolio not found'}), 404
+
+        # Get all active projects in portfolio
+        portfolio_projects = session.query(PortfolioProject).filter(
+            PortfolioProject.portfolio_id == portfolio_id,
+            PortfolioProject.is_active == True
+        ).all()
+
+        if not portfolio_projects:
+            return jsonify({
+                'error': 'Nenhum projeto no portfolio',
+                'hint': 'Adicione projetos ao portfolio antes de executar a análise CoD',
+                'action': 'Clique em "Adicionar Projeto" para começar',
+                'error_type': 'no_projects'
+            }), 400
+
+        # Build CoD profiles for each project
+        cod_profiles = []
+        projects_without_forecast = []
+        projects_without_cod = []
+
+        for pp in portfolio_projects:
+            project = pp.project
+
+            # Get most recent forecast for duration estimates
+            latest_forecast = session.query(Forecast).filter(
+                Forecast.project_id == project.id
+            ).order_by(Forecast.created_at.desc()).first()
+
+            if not latest_forecast:
+                projects_without_forecast.append(project.name)
+                continue
+
+            # Check if CoD is configured
+            if not pp.cod_weekly or pp.cod_weekly == 0:
+                projects_without_cod.append(project.name)
+
+            # Use forecast data for duration
+            p50 = latest_forecast.projected_weeks_p85 or 10  # Fallback
+            p85 = p50 * 1.3  # Estimate if not available
+            p95 = p50 * 1.5
+
+            cod_profile = ProjectCoDProfile(
+                project_id=project.id,
+                project_name=project.name,
+                duration_p50=p50,
+                duration_p85=p85,
+                duration_p95=p95,
+                cod_weekly=pp.cod_weekly or 0,
+                business_value=pp.business_value_score,
+                time_criticality=pp.time_criticality_score,
+                risk_reduction=pp.risk_reduction_score
+            )
+
+            cod_profiles.append(cod_profile)
+
+        # Detailed error messages
+        if not cod_profiles:
+            error_details = {
+                'error': 'Não foi possível executar análise CoD',
+                'error_type': 'missing_data',
+                'issues': []
+            }
+
+            if projects_without_forecast:
+                error_details['issues'].append({
+                    'type': 'missing_forecasts',
+                    'message': f'{len(projects_without_forecast)} projeto(s) sem forecast',
+                    'projects': projects_without_forecast,
+                    'hint': 'Execute forecasts para estes projetos primeiro',
+                    'action': 'Vá em Projetos → Selecionar projeto → Executar forecast'
+                })
+
+            return jsonify(error_details), 400
+
+        # Warning if some projects don't have CoD configured
+        warnings = []
+        if projects_without_cod:
+            warnings.append({
+                'type': 'missing_cod',
+                'severity': 'warning',
+                'message': f'{len(projects_without_cod)} projeto(s) sem Cost of Delay configurado',
+                'projects': projects_without_cod,
+                'hint': 'Configure CoD (R$/semana) para análise mais precisa',
+                'impact': 'Estes projetos terão CoD = 0 na análise'
+            })
+
+        # Perform CoD analysis
+        analysis = perform_cod_analysis(
+            portfolio_id=portfolio_id,
+            portfolio_name=portfolio.name,
+            projects=cod_profiles
+        )
+
+        # Compare prioritization strategies
+        strategy_comparison = compare_prioritization_strategies(cod_profiles)
+
+        result = analysis.to_dict()
+        result['strategy_comparison'] = strategy_comparison
+
+        # Add warnings if any
+        if warnings:
+            result['warnings'] = warnings
+
+        return jsonify(result), 200
+
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+    except Exception as e:
+        session.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        session.close()
+
+
+@app.route('/api/portfolios/<int:portfolio_id>/delay-impact', methods=['POST'])
+@login_required
+def calculate_project_delay_impact(portfolio_id):
+    """
+    Calculate the financial impact of delaying a specific project.
+    """
+    session = get_session()
+    try:
+        from cod_portfolio_analyzer import (
+            ProjectCoDProfile,
+            calculate_delay_impact
+        )
+
+        # Verify portfolio ownership
+        portfolio = session.query(Portfolio).filter(
+            Portfolio.id == portfolio_id,
+            Portfolio.user_id == current_user.id
+        ).one_or_none()
+
+        if not portfolio:
+            return jsonify({'error': 'Portfolio not found'}), 404
+
+        # Get request data
+        data = request.json or {}
+        project_id = data.get('project_id')
+        delay_weeks = data.get('delay_weeks', 1)
+
+        if not project_id:
+            return jsonify({'error': 'project_id is required'}), 400
+
+        # Get portfolio project
+        portfolio_project = session.query(PortfolioProject).filter(
+            PortfolioProject.portfolio_id == portfolio_id,
+            PortfolioProject.project_id == project_id,
+            PortfolioProject.is_active == True
+        ).one_or_none()
+
+        if not portfolio_project:
+            return jsonify({'error': 'Project not in portfolio'}), 404
+
+        project = portfolio_project.project
+
+        # Get forecast data
+        latest_forecast = session.query(Forecast).filter(
+            Forecast.project_id == project.id
+        ).order_by(Forecast.created_at.desc()).first()
+
+        if not latest_forecast:
+            return jsonify({'error': 'No forecast data for project'}), 404
+
+        p50 = latest_forecast.projected_weeks_p85 or 10
+        p85 = p50 * 1.3
+        p95 = p50 * 1.5
+
+        # Create CoD profile
+        cod_profile = ProjectCoDProfile(
+            project_id=project.id,
+            project_name=project.name,
+            duration_p50=p50,
+            duration_p85=p85,
+            duration_p95=p95,
+            cod_weekly=portfolio_project.cod_weekly or 0,
+            business_value=portfolio_project.business_value_score,
+            time_criticality=portfolio_project.time_criticality_score,
+            risk_reduction=portfolio_project.risk_reduction_score
+        )
+
+        # Calculate delay impact
+        impact = calculate_delay_impact(cod_profile, delay_weeks)
+
+        return jsonify(impact), 200
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        session.close()
+
+
+@app.route('/api/portfolios/<int:portfolio_id>/dashboard', methods=['GET'])
+@login_required
+def get_portfolio_dashboard(portfolio_id):
+    """
+    Get comprehensive dashboard data for a portfolio.
+    Includes metrics, health indicators, alerts, timeline, and resource allocation.
+    """
+    session = get_session()
+    try:
+        from portfolio_dashboard import (
+            ProjectMetrics,
+            PortfolioDashboard,
+            calculate_portfolio_health,
+            generate_intelligent_alerts,
+            generate_timeline_events,
+            calculate_resource_timeline
+        )
+
+        # Verify portfolio ownership
+        portfolio = session.query(Portfolio).filter(
+            Portfolio.id == portfolio_id,
+            Portfolio.user_id == current_user.id
+        ).one_or_none()
+
+        if not portfolio:
+            return jsonify({'error': 'Portfolio not found'}), 404
+
+        # Get all projects in portfolio
+        portfolio_projects = session.query(PortfolioProject).filter(
+            PortfolioProject.portfolio_id == portfolio_id,
+            PortfolioProject.is_active == True
+        ).all()
+
+        # Build project metrics
+        project_metrics = []
+        total_items_completed = 0
+        total_items_remaining = 0
+        earliest_start = None
+        latest_end = None
+        total_cod = 0.0
+
+        for pp in portfolio_projects:
+            project = pp.project
+
+            # Get latest forecast
+            latest_forecast = session.query(Forecast).filter(
+                Forecast.project_id == project.id
+            ).order_by(Forecast.created_at.desc()).first()
+
+            if not latest_forecast:
+                continue
+
+            # Calculate metrics
+            items_completed = latest_forecast.backlog - (latest_forecast.backlog * (1 - (latest_forecast.scope_completion_pct or 0) / 100))
+            items_remaining = latest_forecast.backlog - items_completed
+            completion_pct = (latest_forecast.scope_completion_pct or 0)
+
+            # Estimate durations
+            duration_p50 = latest_forecast.projected_weeks_p85 or 10
+            duration_p85 = duration_p50 * 1.3
+            duration_p95 = duration_p50 * 1.5
+
+            # Determine if on track
+            on_track = True
+            if project.target_end_date and latest_forecast.projected_weeks_p85:
+                # Simple check: would need actual date comparison
+                on_track = latest_forecast.can_meet_deadline if latest_forecast.can_meet_deadline is not None else True
+
+            # Calculate projected end date
+            projected_end = None
+            if project.start_date and latest_forecast.projected_weeks_p85:
+                try:
+                    from datetime import datetime, timedelta
+                    start = datetime.strptime(project.start_date, '%d/%m/%Y')
+                    end = start + timedelta(weeks=latest_forecast.projected_weeks_p85)
+                    projected_end = end.strftime('%d/%m/%Y')
+                except:
+                    pass
+
+            # Update earliest/latest
+            if project.start_date:
+                if not earliest_start or project.start_date < earliest_start:
+                    earliest_start = project.start_date
+
+            if project.target_end_date:
+                if not latest_end or project.target_end_date > latest_end:
+                    latest_end = project.target_end_date
+
+            # CoD
+            if pp.cod_weekly:
+                total_cod += pp.cod_weekly * duration_p85
+
+            metrics = ProjectMetrics(
+                project_id=project.id,
+                project_name=project.name,
+                status=project.status,
+                estimated_duration_p50=duration_p50,
+                estimated_duration_p85=duration_p85,
+                estimated_duration_p95=duration_p95,
+                items_completed=int(items_completed),
+                items_remaining=int(items_remaining),
+                completion_pct=completion_pct,
+                cod_weekly=pp.cod_weekly,
+                wsjf_score=pp.wsjf_score,
+                start_date=project.start_date,
+                target_end_date=project.target_end_date,
+                projected_end_date=projected_end,
+                on_track=on_track,
+                risk_level=project.risk_level,
+                capacity_allocated=pp.capacity_allocated or project.capacity_allocated,
+                budget_allocated=pp.budget_allocated,
+                priority=pp.portfolio_priority
+            )
+
+            project_metrics.append(metrics)
+            total_items_completed += int(items_completed)
+            total_items_remaining += int(items_remaining)
+
+        # Calculate health
+        health = calculate_portfolio_health(
+            project_metrics,
+            portfolio.total_capacity,
+            portfolio.total_budget
+        )
+
+        # Generate alerts
+        alerts = generate_intelligent_alerts(
+            project_metrics,
+            health,
+            portfolio.total_capacity,
+            portfolio.total_budget
+        )
+
+        # Generate timeline events
+        timeline_events = generate_timeline_events(project_metrics)
+
+        # Calculate resource timeline
+        resource_timeline = []
+        if portfolio.total_capacity:
+            resource_timeline = calculate_resource_timeline(
+                project_metrics,
+                portfolio.total_capacity,
+                weeks=12
+            )
+
+        # Calculate duration
+        current_duration = 0
+        projected_duration = max([p.estimated_duration_p85 for p in project_metrics]) if project_metrics else 0
+
+        # Create dashboard
+        dashboard = PortfolioDashboard(
+            portfolio_id=portfolio.id,
+            portfolio_name=portfolio.name,
+            total_projects=len(portfolio_projects),
+            active_projects=len([p for p in project_metrics if p.status == 'active']),
+            completed_projects=len([p for p in project_metrics if p.status == 'completed']),
+            earliest_start=earliest_start,
+            latest_end=latest_end,
+            current_duration_weeks=current_duration,
+            projected_duration_weeks=projected_duration,
+            total_cod=total_cod if total_cod > 0 else None,
+            health=health,
+            projects=project_metrics,
+            alerts=alerts,
+            timeline_events=timeline_events,
+            resource_timeline=resource_timeline,
+            avg_completion_pct=sum(p.completion_pct for p in project_metrics) / len(project_metrics) if project_metrics else 0,
+            total_items_completed=total_items_completed,
+            total_items_remaining=total_items_remaining
+        )
+
+        return jsonify(dashboard.to_dict()), 200
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        session.close()
+
+
 @app.route('/api/forecasts', methods=['GET', 'POST'])
 @login_required
 def handle_forecasts():
@@ -2821,6 +3215,24 @@ def portfolio_manager_page():
         <body>
             <h1>Template Error</h1>
             <p>Error loading Portfolio Manager template: {str(e)}</p>
+        </body>
+        </html>
+        """, 500
+
+
+@app.route('/portfolio/dashboard')
+@login_required
+def portfolio_dashboard_page():
+    """Render the Portfolio Dashboard page"""
+    try:
+        return render_template('portfolio_dashboard.html')
+    except Exception as e:
+        return f"""
+        <html>
+        <head><title>Portfolio Dashboard - Error</title></head>
+        <body>
+            <h1>Template Error</h1>
+            <p>Error loading Portfolio Dashboard template: {str(e)}</p>
         </body>
         </html>
         """, 500
