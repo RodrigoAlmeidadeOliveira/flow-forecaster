@@ -175,7 +175,9 @@
                         <button class="btn btn-sm btn-light float-end ms-2" onclick="runSimulation()">
                             <i class="fas fa-chart-line"></i> Simular
                         </button>
-                        <button class="btn btn-sm btn-warning float-end ms-2" onclick="runCoDAnalysis()">
+                        <button class="btn btn-sm btn-warning float-end ms-2" onclick="runCoDAnalysis()"
+                                data-bs-toggle="tooltip" data-bs-placement="top"
+                                title="Analisa o Cost of Delay e sugere a melhor ordem de execução dos projetos usando WSJF. Requer: projetos com forecasts salvos.">
                             <i class="fas fa-dollar-sign"></i> CoD Analysis
                         </button>
                         <button class="btn btn-sm btn-light float-end ms-2" onclick="showAddProjectModal()">
@@ -285,7 +287,11 @@
                         <h6 class="mb-3">Configurações do Projeto no Portfólio</h6>
                         <div class="row">
                             <div class="col-md-6 mb-3">
-                                <label class="form-label">Prioridade</label>
+                                <label class="form-label">
+                                    Prioridade
+                                    <i class="fas fa-info-circle text-muted" data-bs-toggle="tooltip"
+                                       title="Prioridade manual (1=alta, 5=baixa). Diferente do WSJF que é calculado automaticamente."></i>
+                                </label>
                                 <select class="form-select" id="projectPriority">
                                     <option value="1">1 - Muito Alta</option>
                                     <option value="2">2 - Alta</option>
@@ -295,22 +301,51 @@
                                 </select>
                             </div>
                             <div class="col-md-6 mb-3">
-                                <label class="form-label">Cost of Delay (R$/semana)</label>
-                                <input type="number" class="form-control" id="projectCoD" step="100">
+                                <label class="form-label">
+                                    Cost of Delay (R$/semana)
+                                    <i class="fas fa-info-circle text-muted" data-bs-toggle="tooltip"
+                                       title="Quanto a empresa perde (em R$) por semana de atraso neste projeto. Exemplo: R$ 5.000/semana."></i>
+                                </label>
+                                <input type="number" class="form-control" id="projectCoD" step="100"
+                                       placeholder="Ex: 5000">
+                                <small class="text-muted">Quanto maior, mais urgente é o projeto</small>
                             </div>
                         </div>
                         <div class="row">
+                            <div class="col-md-12 mb-2">
+                                <div class="alert alert-info py-2 px-3">
+                                    <small>
+                                        <i class="fas fa-calculator"></i> <strong>WSJF Score:</strong>
+                                        (Valor Negócio + Criticidade Tempo + Redução Risco) / Duração do Projeto
+                                    </small>
+                                </div>
+                            </div>
                             <div class="col-md-4 mb-3">
-                                <label class="form-label">Valor de Negócio (0-100)</label>
+                                <label class="form-label">
+                                    Valor de Negócio (0-100)
+                                    <i class="fas fa-info-circle text-muted" data-bs-toggle="tooltip"
+                                       title="Quanto valor este projeto traz para o negócio? 100 = valor máximo, 0 = sem valor direto."></i>
+                                </label>
                                 <input type="number" class="form-control" id="projectBusinessValue" value="50" min="0" max="100">
+                                <small class="text-muted">Impacto no negócio</small>
                             </div>
                             <div class="col-md-4 mb-3">
-                                <label class="form-label">Criticidade Tempo (0-100)</label>
+                                <label class="form-label">
+                                    Criticidade Tempo (0-100)
+                                    <i class="fas fa-info-circle text-muted" data-bs-toggle="tooltip"
+                                       title="Quão urgente é este projeto? 100 = extremamente urgente (prazo apertado), 0 = pode esperar."></i>
+                                </label>
                                 <input type="number" class="form-control" id="projectTimeCriticality" value="50" min="0" max="100">
+                                <small class="text-muted">Urgência temporal</small>
                             </div>
                             <div class="col-md-4 mb-3">
-                                <label class="form-label">Redução Risco (0-100)</label>
+                                <label class="form-label">
+                                    Redução Risco (0-100)
+                                    <i class="fas fa-info-circle text-muted" data-bs-toggle="tooltip"
+                                       title="Quanto este projeto reduz riscos para a organização? 100 = reduz riscos críticos, 0 = não reduz riscos."></i>
+                                </label>
                                 <input type="number" class="form-control" id="projectRiskReduction" value="50" min="0" max="100">
+                                <small class="text-muted">Mitigação de riscos</small>
                             </div>
                         </div>
                     </div>

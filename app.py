@@ -2597,10 +2597,18 @@ def analyze_portfolio_cod(portfolio_id):
         ).all()
 
         if not portfolio_projects:
-            return jsonify({'error': 'No projects in portfolio'}), 400
+            return jsonify({
+                'error': 'Nenhum projeto no portfolio',
+                'hint': 'Adicione projetos ao portfolio antes de executar a análise CoD',
+                'action': 'Clique em "Adicionar Projeto" para começar',
+                'error_type': 'no_projects'
+            }), 400
 
         # Build CoD profiles for each project
         cod_profiles = []
+        projects_without_forecast = []
+        projects_without_cod = []
+
         for pp in portfolio_projects:
             project = pp.project
 
@@ -2610,7 +2618,12 @@ def analyze_portfolio_cod(portfolio_id):
             ).order_by(Forecast.created_at.desc()).first()
 
             if not latest_forecast:
+                projects_without_forecast.append(project.name)
                 continue
+
+            # Check if CoD is configured
+            if not pp.cod_weekly or pp.cod_weekly == 0:
+                projects_without_cod.append(project.name)
 
             # Use forecast data for duration
             p50 = latest_forecast.projected_weeks_p85 or 10  # Fallback
@@ -2631,8 +2644,36 @@ def analyze_portfolio_cod(portfolio_id):
 
             cod_profiles.append(cod_profile)
 
+        # Detailed error messages
         if not cod_profiles:
-            return jsonify({'error': 'No projects with forecast data'}), 400
+            error_details = {
+                'error': 'Não foi possível executar análise CoD',
+                'error_type': 'missing_data',
+                'issues': []
+            }
+
+            if projects_without_forecast:
+                error_details['issues'].append({
+                    'type': 'missing_forecasts',
+                    'message': f'{len(projects_without_forecast)} projeto(s) sem forecast',
+                    'projects': projects_without_forecast,
+                    'hint': 'Execute forecasts para estes projetos primeiro',
+                    'action': 'Vá em Projetos → Selecionar projeto → Executar forecast'
+                })
+
+            return jsonify(error_details), 400
+
+        # Warning if some projects don't have CoD configured
+        warnings = []
+        if projects_without_cod:
+            warnings.append({
+                'type': 'missing_cod',
+                'severity': 'warning',
+                'message': f'{len(projects_without_cod)} projeto(s) sem Cost of Delay configurado',
+                'projects': projects_without_cod,
+                'hint': 'Configure CoD (R$/semana) para análise mais precisa',
+                'impact': 'Estes projetos terão CoD = 0 na análise'
+            })
 
         # Perform CoD analysis
         analysis = perform_cod_analysis(
@@ -2646,6 +2687,10 @@ def analyze_portfolio_cod(portfolio_id):
 
         result = analysis.to_dict()
         result['strategy_comparison'] = strategy_comparison
+
+        # Add warnings if any
+        if warnings:
+            result['warnings'] = warnings
 
         return jsonify(result), 200
 

@@ -10,7 +10,20 @@ let projects = [];
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', () => {
     loadPortfolios();
+
+    // Initialize Bootstrap tooltips
+    initializeTooltips();
 });
+
+/**
+ * Initialize Bootstrap tooltips
+ */
+function initializeTooltips() {
+    const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+}
 
 /**
  * Load all portfolios for current user
@@ -595,6 +608,103 @@ function showError(message) {
 }
 
 /**
+ * Display detailed CoD analysis error with issues, hints and actions
+ */
+function displayCoDAnalysisError(errorData) {
+    let html = `
+        <div class="alert alert-danger">
+            <h5 class="alert-heading">
+                <i class="fas fa-exclamation-triangle"></i> ${errorData.error}
+            </h5>
+    `;
+
+    // Display issues if available
+    if (errorData.issues && errorData.issues.length > 0) {
+        errorData.issues.forEach(issue => {
+            html += `
+                <div class="mt-3 ps-3 border-start border-3 border-danger">
+                    <strong>${issue.message}</strong>
+
+                    ${issue.projects && issue.projects.length > 0 ? `
+                        <div class="mt-2">
+                            <small class="text-muted d-block mb-1">Projetos afetados:</small>
+                            <ul class="mb-2">
+                                ${issue.projects.map(p => `<li>${p}</li>`).join('')}
+                            </ul>
+                        </div>
+                    ` : ''}
+
+                    ${issue.hint ? `
+                        <div class="alert alert-info mb-2 p-2">
+                            <i class="fas fa-lightbulb"></i> <strong>Dica:</strong> ${issue.hint}
+                        </div>
+                    ` : ''}
+
+                    ${issue.action ? `
+                        <div class="alert alert-warning mb-2 p-2">
+                            <i class="fas fa-hand-point-right"></i> <strong>Ação:</strong> ${issue.action}
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+        });
+    } else if (errorData.hint) {
+        // Simple error with hint
+        html += `
+            <hr>
+            <p class="mb-1"><strong>Dica:</strong> ${errorData.hint}</p>
+            ${errorData.action ? `<p class="mb-0"><strong>Ação:</strong> ${errorData.action}</p>` : ''}
+        `;
+    }
+
+    html += `</div>`;
+    document.getElementById('simulationContent').innerHTML = html;
+}
+
+/**
+ * Display warnings at the top of CoD analysis results
+ */
+function displayCoDAnalysisWarnings(warnings) {
+    const warningsContainer = document.getElementById('simulationContent');
+
+    let html = '';
+    warnings.forEach(warning => {
+        const severityClass = warning.severity === 'warning' ? 'warning' : 'info';
+
+        html += `
+            <div class="alert alert-${severityClass} alert-dismissible fade show" role="alert">
+                <h6 class="alert-heading">
+                    <i class="fas fa-exclamation-circle"></i> ${warning.message}
+                </h6>
+
+                ${warning.projects && warning.projects.length > 0 ? `
+                    <small class="d-block mb-2">
+                        Projetos: ${warning.projects.join(', ')}
+                    </small>
+                ` : ''}
+
+                ${warning.hint ? `
+                    <small class="d-block mb-1">
+                        <i class="fas fa-lightbulb"></i> ${warning.hint}
+                    </small>
+                ` : ''}
+
+                ${warning.impact ? `
+                    <small class="d-block text-muted">
+                        Impacto: ${warning.impact}
+                    </small>
+                ` : ''}
+
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        `;
+    });
+
+    // Prepend warnings to existing content
+    warningsContainer.innerHTML = html + warningsContainer.innerHTML;
+}
+
+/**
  * Run Cost of Delay analysis
  */
 async function runCoDAnalysis() {
@@ -617,11 +727,18 @@ async function runCoDAnalysis() {
         });
 
         if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.error || 'CoD analysis failed');
+            const errorData = await response.json();
+            displayCoDAnalysisError(errorData);
+            return;
         }
 
         const result = await response.json();
+
+        // Check for warnings
+        if (result.warnings && result.warnings.length > 0) {
+            displayCoDAnalysisWarnings(result.warnings);
+        }
+
         renderCoDAnalysisResults(result);
 
     } catch (error) {
