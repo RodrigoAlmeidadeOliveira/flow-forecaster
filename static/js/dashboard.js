@@ -25,6 +25,9 @@ function getCurrentBacklog() {
 
 // Refresh dashboard with current data
 async function refreshDashboard() {
+    if (typeof loadPortfolioDashboard === 'function') {
+        await loadPortfolioDashboard();
+    }
     updateCurrentKPIs();
     await loadHistoricalMetrics();
     updateProjectHealth();

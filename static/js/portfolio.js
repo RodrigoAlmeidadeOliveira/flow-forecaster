@@ -3,25 +3,195 @@
  * Manages portfolio-level visualization and analysis
  */
 
-// Initialize portfolio when Dashboard & Portfolio tab is shown
+let selectedPortfolioId = 'all';
+let selectedProjectFilters = [];
+let portfolioRequestToken = 0;
+
+// Initialize filters and listeners when document is ready
 $(document).ready(function() {
+    setupPortfolioDashboardFilters();
+
     $('#tab-dashboard-link').on('shown.bs.tab', function() {
         loadPortfolioDashboard();
     });
 });
 
-async function loadPortfolioDashboard() {
+function setupPortfolioDashboardFilters() {
+    loadPortfolioOptions();
+
+    $('#portfolio-dashboard-select').on('change', function() {
+        selectedPortfolioId = $(this).val() || 'all';
+        selectedProjectFilters = [];
+        if (selectedPortfolioId === 'all') {
+            resetProjectFilterState(false);
+        } else {
+            resetProjectFilterState(true);
+        }
+        loadPortfolioDashboard();
+    });
+
+    $('#portfolio-project-select').on('change', function() {
+        const values = $(this).val() || [];
+        selectedProjectFilters = values
+            .map(value => parseInt(value, 10))
+            .filter(value => Number.isInteger(value));
+
+        $('#project-filter-clear').prop('disabled', selectedProjectFilters.length === 0);
+        loadPortfolioDashboard();
+    });
+
+    $('#project-filter-clear').on('click', function() {
+        if (!selectedProjectFilters.length) {
+            return;
+        }
+        selectedProjectFilters = [];
+        $('#portfolio-project-select').val([]);
+        $('#project-filter-clear').prop('disabled', true);
+        loadPortfolioDashboard();
+    });
+
+    // Initial load so the view is ready even before the tab is opened
+    loadPortfolioDashboard();
+}
+
+async function loadPortfolioOptions() {
     try {
-        const response = await fetch('/api/portfolio/dashboard');
+        const response = await fetch('/api/portfolios');
+        if (!response.ok) {
+            throw new Error('Falha ao carregar portfólios');
+        }
+
+        const portfolios = await response.json();
+        const selector = $('#portfolio-dashboard-select');
+
+        if (!selector.length) {
+            return;
+        }
+
+        selector.empty();
+        selector.append('<option value="all">Todos os projetos</option>');
+
+        portfolios.forEach(portfolio => {
+            selector.append(
+                $('<option></option>')
+                    .val(portfolio.id)
+                    .text(`${portfolio.name} (${portfolio.projects_count} projetos)`)
+            );
+        });
+    } catch (error) {
+        console.error('Error loading portfolios:', error);
+    }
+}
+
+function resetProjectFilterState(enableSelection) {
+    const projectSelect = $('#portfolio-project-select');
+    const hint = $('#project-filter-hint');
+
+    projectSelect.empty();
+    if (enableSelection) {
+        projectSelect.prop('disabled', true);
+        hint.text('Carregando projetos...');
+    } else {
+        projectSelect.prop('disabled', true);
+        hint.text('Selecione um portfolio para habilitar o filtro por projetos.');
+    }
+    $('#project-filter-clear').prop('disabled', true);
+}
+
+function updateProjectFilterOptions(projects) {
+    const projectSelect = $('#portfolio-project-select');
+    const hint = $('#project-filter-hint');
+
+    if (selectedPortfolioId === 'all' || !projects || !projects.length) {
+        resetProjectFilterState(selectedPortfolioId !== 'all');
+        return;
+    }
+
+    const sortedProjects = [...projects].sort((a, b) => {
+        const nameA = (a.name || a.project_name || '').toLowerCase();
+        const nameB = (b.name || b.project_name || '').toLowerCase();
+        return nameA.localeCompare(nameB);
+    });
+
+    projectSelect.prop('disabled', false);
+    projectSelect.empty();
+    sortedProjects.forEach(project => {
+        const value = project.id || project.project_id;
+        const label = project.name || project.project_name || `Projeto ${value}`;
+        projectSelect.append(
+            $('<option></option>')
+                .val(value)
+                .text(label)
+        );
+    });
+
+    if (selectedProjectFilters.length) {
+        projectSelect.val(selectedProjectFilters.map(id => id.toString()));
+    }
+
+    hint.text('Selecione um ou mais projetos para refinar a visão.');
+    $('#project-filter-clear').prop('disabled', selectedProjectFilters.length === 0);
+}
+
+function showPortfolioLoading() {
+    $('#portfolio-content').html(`
+        <div class="text-center py-5">
+            <div class="spinner-border text-primary" role="status">
+                <span class="sr-only">Carregando...</span>
+            </div>
+            <p class="mt-3 text-muted">Carregando dados do portfolio...</p>
+        </div>
+    `);
+    $('#wsjf-ranking').empty();
+    $('#wsjf-prioritization').hide();
+}
+
+async function loadPortfolioDashboard() {
+    const currentToken = ++portfolioRequestToken;
+    showPortfolioLoading();
+
+    try {
+        let url = '/api/portfolio/dashboard';
+        const params = new URLSearchParams();
+
+        if (selectedPortfolioId !== 'all') {
+            params.append('portfolio_id', selectedPortfolioId);
+        }
+        if (selectedProjectFilters.length > 0) {
+            params.append('project_ids', selectedProjectFilters.join(','));
+        }
+        if ([...params.keys()].length > 0) {
+            url += `?${params.toString()}`;
+        }
+
+        const response = await fetch(url);
+        if (!response.ok) {
+            throw new Error('Erro ao carregar dados de portfolio');
+        }
         const data = await response.json();
 
-        if (!data.has_data) {
-            renderEmptyState(data.message);
+        if (currentToken !== portfolioRequestToken) {
+            // A newer request has been made; discard this response
             return;
+        }
+
+        if (!data.has_data) {
+            updateProjectFilterOptions([]);
+            renderEmptyState(data.message || 'Nenhum dado disponível.');
+            return;
+        }
+
+        if (selectedPortfolioId !== 'all') {
+            updateProjectFilterOptions(data.projects || []);
+        } else {
+            resetProjectFilterState(false);
         }
 
         renderPortfolioDashboard(data);
     } catch (error) {
+        if (currentToken !== portfolioRequestToken) {
+            return;
+        }
         console.error('Error loading portfolio:', error);
         renderError('Erro ao carregar portfolio: ' + error.message);
     }
@@ -422,5 +592,4 @@ function renderWSJFRanking(projects) {
 
     $('#wsjf-ranking').html(html);
 }
-
 

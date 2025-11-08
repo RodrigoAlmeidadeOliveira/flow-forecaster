@@ -2996,6 +2996,38 @@ a probabilidade de todas serem entregues no prazo é de <strong>1 em 2^n</strong
 <button class="btn btn-primary btn-sm" onclick="refreshDashboard()"><i class="fas fa-sync-alt"></i> Atualizar Dashboard</button>
 </div>
 
+<!-- Portfolio Filters -->
+<div class="container mb-4">
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <div class="form-row align-items-end">
+                <div class="form-group col-md-4">
+                    <label class="text-muted mb-1" for="portfolio-dashboard-select">
+                        Selecionar portfolio
+                    </label>
+                    <select class="form-control" id="portfolio-dashboard-select">
+                        <option value="all">Todos os projetos</option>
+                    </select>
+                </div>
+                <div class="form-group col-md-6">
+                    <label class="text-muted mb-1" for="portfolio-project-select">
+                        Filtrar projetos (opcional)
+                    </label>
+                    <select class="form-control" id="portfolio-project-select" multiple size="4" disabled></select>
+                    <small class="text-muted d-block mt-1" id="project-filter-hint">
+                        Selecione um portfolio para habilitar o filtro por projetos.
+                    </small>
+                </div>
+                <div class="form-group col-md-2">
+                    <button class="btn btn-outline-secondary w-100" id="project-filter-clear" disabled>
+                        Limpar filtro
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Portfolio Overview Section -->
 <div class="container-fluid mb-5">
     <h4 class="mb-3"><i class="fas fa-briefcase"></i> Visão Geral do Portfólio</h4>

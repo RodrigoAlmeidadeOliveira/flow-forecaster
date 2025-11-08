@@ -3938,18 +3938,7 @@ def portfolio_manager_page():
 @login_required
 def portfolio_dashboard_page():
     """Render the Portfolio Dashboard page"""
-    try:
-        return render_template('portfolio_dashboard.html')
-    except Exception as e:
-        return f"""
-        <html>
-        <head><title>Portfolio Dashboard - Error</title></head>
-        <body>
-            <h1>Template Error</h1>
-            <p>Error loading Portfolio Dashboard template: {str(e)}</p>
-        </body>
-        </html>
-        """, 500
+    return redirect(url_for('index') + '#executive-dashboard')
 
 
 @app.route('/portfolio/risks')
@@ -4673,8 +4662,50 @@ def portfolio_dashboard():
     """
     session = get_session()
     try:
-        # Get all projects
-        projects = scoped_project_query(session).all()
+        portfolio_id = request.args.get('portfolio_id', type=int)
+        project_ids_param = request.args.get('project_ids', '')
+
+        requested_project_ids = set()
+        if project_ids_param:
+            for raw_id in project_ids_param.split(','):
+                raw_id = raw_id.strip()
+                if not raw_id:
+                    continue
+                try:
+                    requested_project_ids.add(int(raw_id))
+                except ValueError:
+                    continue
+
+        projects_query = scoped_project_query(session)
+
+        if portfolio_id:
+            portfolio = scoped_portfolio_query(session).filter(Portfolio.id == portfolio_id).one_or_none()
+            if not portfolio:
+                return jsonify({'error': 'Portfolio não encontrado'}), 404
+
+            portfolio_projects = session.query(PortfolioProject).filter(
+                PortfolioProject.portfolio_id == portfolio_id,
+                PortfolioProject.is_active == True
+            ).all()
+
+            allowed_project_ids = {pp.project_id for pp in portfolio_projects}
+
+            if requested_project_ids:
+                allowed_project_ids = allowed_project_ids.intersection(requested_project_ids)
+
+            if not allowed_project_ids:
+                return jsonify({
+                    'has_data': False,
+                    'message': 'Nenhum projeto selecionado para este portfolio.'
+                })
+
+            projects_query = projects_query.filter(Project.id.in_(allowed_project_ids))
+
+        elif requested_project_ids:
+            projects_query = projects_query.filter(Project.id.in_(requested_project_ids))
+
+        # Get all projects after filters
+        projects = projects_query.all()
 
         if not projects:
             return jsonify({
@@ -4682,21 +4713,29 @@ def portfolio_dashboard():
                 'message': 'Nenhum projeto cadastrado. Crie projetos para visualizar o portfolio.'
             })
 
+        selected_project_ids = [p.id for p in projects]
+
         # Get forecasts for each project
-        all_forecasts = scoped_forecast_query(session).all()
+        forecasts_query = scoped_forecast_query(session)
+        if selected_project_ids:
+            forecasts_query = forecasts_query.filter(Forecast.project_id.in_(selected_project_ids))
+        all_forecasts = forecasts_query.all()
+
         forecasts_by_project = {}
         for forecast in all_forecasts:
-            if forecast.project_id not in forecasts_by_project:
-                forecasts_by_project[forecast.project_id] = []
-            forecasts_by_project[forecast.project_id].append(forecast)
+            forecasts_by_project.setdefault(forecast.project_id, []).append(forecast)
 
         # Get actuals mapped by forecast_id
-        all_actuals = scoped_actual_query(session).all()
+        forecast_ids = [f.id for f in all_forecasts]
+        if forecast_ids:
+            actuals_query = scoped_actual_query(session).filter(Actual.forecast_id.in_(forecast_ids))
+            all_actuals = actuals_query.all()
+        else:
+            all_actuals = []
+
         actuals_map = {}
         for actual in all_actuals:
-            if actual.forecast_id not in actuals_map:
-                actuals_map[actual.forecast_id] = []
-            actuals_map[actual.forecast_id].append(actual)
+            actuals_map.setdefault(actual.forecast_id, []).append(actual)
 
         # Calculate health scores for each project
         health_scores = []
