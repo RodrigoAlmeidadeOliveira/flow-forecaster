@@ -428,9 +428,9 @@ function renderTimeline(events) {
  * Navigate to project detail
  */
 function goToProject(projectId) {
-    // For now, just log
-    console.log('Navigate to project:', projectId);
-    // Could redirect to project page: window.location.href = `/projects/${projectId}`;
+    // Redirect to home page with project context
+    // Future enhancement: create dedicated project detail page
+    window.location.href = `/?project=${projectId}`;
 }
 
 /**
@@ -441,4 +441,30 @@ function formatNumber(num) {
         minimumFractionDigits: 0,
         maximumFractionDigits: 2
     }).format(num);
+}
+
+/**
+ * Export portfolio to Excel
+ */
+function exportToExcel() {
+    if (!currentPortfolioId) {
+        alert('Por favor, selecione um portfolio primeiro');
+        return;
+    }
+
+    // Open export endpoint in new tab
+    window.open(`/api/portfolios/${currentPortfolioId}/export/excel`, '_blank');
+}
+
+/**
+ * Export portfolio to PDF
+ */
+function exportToPDF() {
+    if (!currentPortfolioId) {
+        alert('Por favor, selecione um portfolio primeiro');
+        return;
+    }
+
+    // Open export endpoint in new tab
+    window.open(`/api/portfolios/${currentPortfolioId}/export/pdf`, '_blank');
 }

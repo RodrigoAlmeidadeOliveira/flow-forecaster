@@ -1,0 +1,54 @@
+<!-- Breadcrumb Navigation Component -->
+<nav aria-label="breadcrumb" class="breadcrumb-container">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="/"><i class="fas fa-home"></i> Home</a></li>
+        {% if breadcrumbs %}
+            {% for breadcrumb in breadcrumbs %}
+                {% if breadcrumb.active %}
+                    <li class="breadcrumb-item active" aria-current="page">{{ breadcrumb.text }}</li>
+                {% else %}
+                    <li class="breadcrumb-item"><a href="{{ breadcrumb.url }}">{{ breadcrumb.text }}</a></li>
+                {% endif %}
+            {% endfor %}
+        {% endif %}
+    </ol>
+</nav>
+
+<style>
+    .breadcrumb-container {
+        background: rgba(255, 255, 255, 0.1);
+        padding: 0.75rem 1.5rem;
+        border-radius: 8px;
+        margin-bottom: 1.5rem;
+    }
+
+    .breadcrumb {
+        margin-bottom: 0;
+        background: transparent;
+    }
+
+    .breadcrumb-item {
+        color: #c9d1d9;
+    }
+
+    .breadcrumb-item a {
+        color: #58a6ff;
+        text-decoration: none;
+        transition: all 0.2s;
+    }
+
+    .breadcrumb-item a:hover {
+        color: #79c0ff;
+        text-decoration: underline;
+    }
+
+    .breadcrumb-item.active {
+        color: #ffffff;
+        font-weight: 500;
+    }
+
+    .breadcrumb-item + .breadcrumb-item::before {
+        content: ">";
+        color: #8b949e;
+    }
+</style>

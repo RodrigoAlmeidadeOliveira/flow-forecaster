@@ -180,6 +180,14 @@
                                 title="Analisa o Cost of Delay e sugere a melhor ordem de execução dos projetos usando WSJF. Requer: projetos com forecasts salvos.">
                             <i class="fas fa-dollar-sign"></i> CoD Analysis
                         </button>
+                        <div class="btn-group float-end ms-2" role="group">
+                            <button class="btn btn-sm btn-success" onclick="exportToExcel()" title="Export to Excel">
+                                <i class="fas fa-file-excel"></i>
+                            </button>
+                            <button class="btn btn-sm btn-danger" onclick="exportToPDF()" title="Export to PDF">
+                                <i class="fas fa-file-pdf"></i>
+                            </button>
+                        </div>
                         <button class="btn btn-sm btn-light float-end ms-2" onclick="showAddProjectModal()">
                             <i class="fas fa-plus"></i> Adicionar Projeto
                         </button>

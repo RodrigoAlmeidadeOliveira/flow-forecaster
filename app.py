@@ -46,8 +46,17 @@ from cost_pert_beta import (
     calculate_effort_based_cost_with_percentiles
 )
 from database import get_session, close_session, init_db
-from models import Project, Forecast, Actual, User, Portfolio, PortfolioProject, SimulationRun
-from models import Project, Forecast, Actual, User, CoDTrainingDataset, CoDModel
+from models import Project, Forecast, Actual, User, Portfolio, PortfolioProject, SimulationRun, PortfolioRisk
+from models import CoDTrainingDataset, CoDModel
+from portfolio_risk_manager import PortfolioRiskManager, analyze_portfolio_risks
+from portfolio_optimizer import (
+    PortfolioOptimizer,
+    OptimizationConstraints,
+    Scenario,
+    optimize_portfolio_simple,
+    PULP_AVAILABLE
+)
+from portfolio_export import export_portfolio_excel, export_portfolio_pdf
 from accuracy_metrics import (
     calculate_accuracy_metrics,
     calculate_time_series_metrics,
@@ -2966,6 +2975,697 @@ def get_portfolio_dashboard(portfolio_id):
         session.close()
 
 
+# ============================================================================
+# PORTFOLIO RISK MANAGEMENT ENDPOINTS
+# ============================================================================
+
+@app.route('/api/portfolios/<int:portfolio_id>/risks', methods=['GET', 'POST'])
+@login_required
+def handle_portfolio_risks(portfolio_id):
+    """List or create portfolio risks"""
+    session = get_session()
+    try:
+        # Verify portfolio exists and user has access
+        portfolio = scoped_portfolio_query(session).filter(Portfolio.id == portfolio_id).one_or_none()
+        if not portfolio:
+            return jsonify({'error': 'Portfolio not found'}), 404
+
+        if request.method == 'GET':
+            # Get all risks for this portfolio
+            risks = session.query(PortfolioRisk).filter(
+                PortfolioRisk.portfolio_id == portfolio_id
+            ).order_by(PortfolioRisk.risk_score.desc()).all()
+
+            return jsonify([r.to_dict() for r in risks]), 200
+
+        elif request.method == 'POST':
+            data = request.json or {}
+
+            # Validate required fields
+            if not data.get('risk_title'):
+                return jsonify({
+                    'error': 'Missing required field',
+                    'hint': 'risk_title is required',
+                    'error_type': 'validation_error'
+                }), 400
+
+            # Create new risk
+            risk = PortfolioRisk(
+                portfolio_id=portfolio_id,
+                project_id=data.get('project_id'),
+                risk_title=data['risk_title'],
+                risk_description=data.get('risk_description'),
+                risk_category=data.get('risk_category', 'general'),
+                probability=data.get('probability', 3),
+                impact=data.get('impact', 3),
+                status=data.get('status', 'identified'),
+                owner=data.get('owner'),
+                mitigation_plan=data.get('mitigation_plan'),
+                contingency_plan=data.get('contingency_plan'),
+                estimated_cost_if_occurs=data.get('estimated_cost_if_occurs'),
+                mitigation_cost=data.get('mitigation_cost'),
+                created_by=current_user.name
+            )
+
+            # Calculate risk score
+            risk.calculate_risk_score()
+
+            session.add(risk)
+            session.commit()
+
+            return jsonify(risk.to_dict()), 201
+
+    except Exception as e:
+        session.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        session.close()
+
+
+@app.route('/api/portfolios/<int:portfolio_id>/risks/<int:risk_id>', methods=['GET', 'PUT', 'DELETE'])
+@login_required
+def handle_portfolio_risk(portfolio_id, risk_id):
+    """Get, update, or delete a specific portfolio risk"""
+    session = get_session()
+    try:
+        # Verify portfolio exists and user has access
+        portfolio = scoped_portfolio_query(session).filter(Portfolio.id == portfolio_id).one_or_none()
+        if not portfolio:
+            return jsonify({'error': 'Portfolio not found'}), 404
+
+        # Get the risk
+        risk = session.query(PortfolioRisk).filter(
+            PortfolioRisk.id == risk_id,
+            PortfolioRisk.portfolio_id == portfolio_id
+        ).one_or_none()
+
+        if not risk:
+            return jsonify({'error': 'Risk not found'}), 404
+
+        if request.method == 'GET':
+            return jsonify(risk.to_dict()), 200
+
+        elif request.method == 'PUT':
+            data = request.json or {}
+
+            # Update fields
+            if 'risk_title' in data:
+                risk.risk_title = data['risk_title']
+            if 'risk_description' in data:
+                risk.risk_description = data['risk_description']
+            if 'risk_category' in data:
+                risk.risk_category = data['risk_category']
+            if 'probability' in data:
+                risk.probability = data['probability']
+            if 'impact' in data:
+                risk.impact = data['impact']
+            if 'status' in data:
+                risk.status = data['status']
+                # Set dates based on status
+                if data['status'] == 'occurred' and not risk.occurred_date:
+                    risk.occurred_date = datetime.utcnow()
+                elif data['status'] == 'closed' and not risk.closed_date:
+                    risk.closed_date = datetime.utcnow()
+            if 'owner' in data:
+                risk.owner = data['owner']
+            if 'mitigation_plan' in data:
+                risk.mitigation_plan = data['mitigation_plan']
+            if 'contingency_plan' in data:
+                risk.contingency_plan = data['contingency_plan']
+            if 'estimated_cost_if_occurs' in data:
+                risk.estimated_cost_if_occurs = data['estimated_cost_if_occurs']
+            if 'mitigation_cost' in data:
+                risk.mitigation_cost = data['mitigation_cost']
+            if 'project_id' in data:
+                risk.project_id = data['project_id']
+
+            # Recalculate risk score
+            risk.calculate_risk_score()
+            risk.last_reviewed_date = datetime.utcnow()
+
+            session.commit()
+            return jsonify(risk.to_dict()), 200
+
+        elif request.method == 'DELETE':
+            session.delete(risk)
+            session.commit()
+            return jsonify({'message': 'Risk deleted successfully'}), 200
+
+    except Exception as e:
+        session.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        session.close()
+
+
+@app.route('/api/portfolios/<int:portfolio_id>/risks/analysis', methods=['GET'])
+@login_required
+def portfolio_risk_analysis(portfolio_id):
+    """
+    Get comprehensive risk analysis for a portfolio
+    Includes metrics, heatmap, alerts, and suggested risks
+    """
+    session = get_session()
+    try:
+        # Verify portfolio exists and user has access
+        portfolio = scoped_portfolio_query(session).filter(Portfolio.id == portfolio_id).one_or_none()
+        if not portfolio:
+            return jsonify({'error': 'Portfolio not found'}), 404
+
+        # Get all risks for this portfolio
+        risks = session.query(PortfolioRisk).filter(
+            PortfolioRisk.portfolio_id == portfolio_id
+        ).all()
+
+        # Get portfolio projects for rollup analysis
+        portfolio_projects = session.query(PortfolioProject).filter(
+            PortfolioProject.portfolio_id == portfolio_id,
+            PortfolioProject.is_active == True
+        ).all()
+
+        projects = []
+        for pp in portfolio_projects:
+            project = session.get(Project, pp.project_id)
+            if project:
+                projects.append(project.to_dict())
+
+        # Analyze risks
+        analysis = analyze_portfolio_risks(
+            [r.to_dict() for r in risks],
+            projects
+        )
+
+        return jsonify(analysis), 200
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        session.close()
+
+
+@app.route('/api/portfolios/<int:portfolio_id>/risks/suggest', methods=['POST'])
+@login_required
+def suggest_portfolio_risks(portfolio_id):
+    """
+    Suggest portfolio-level risks based on project data
+    This endpoint analyzes projects and recommends risks to track
+    """
+    session = get_session()
+    try:
+        # Verify portfolio exists and user has access
+        portfolio = scoped_portfolio_query(session).filter(Portfolio.id == portfolio_id).one_or_none()
+        if not portfolio:
+            return jsonify({'error': 'Portfolio not found'}), 404
+
+        # Get portfolio projects
+        portfolio_projects = session.query(PortfolioProject).filter(
+            PortfolioProject.portfolio_id == portfolio_id,
+            PortfolioProject.is_active == True
+        ).all()
+
+        projects = []
+        for pp in portfolio_projects:
+            project = session.get(Project, pp.project_id)
+            if project:
+                projects.append(project.to_dict())
+
+        if not projects:
+            return jsonify({
+                'suggested_risks': [],
+                'message': 'No projects in portfolio to analyze'
+            }), 200
+
+        # Use risk manager to suggest risks
+        risk_manager = PortfolioRiskManager()
+        suggested_risks = risk_manager.rollup_project_risks(projects)
+
+        return jsonify({
+            'suggested_risks': suggested_risks,
+            'count': len(suggested_risks)
+        }), 200
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        session.close()
+
+
+# ============================================================================
+# PORTFOLIO OPTIMIZATION ENDPOINTS
+# ============================================================================
+
+@app.route('/api/portfolios/<int:portfolio_id>/optimize', methods=['POST'])
+@login_required
+def optimize_portfolio(portfolio_id):
+    """
+    Optimize portfolio using linear programming
+    Selects optimal subset of projects given constraints
+    """
+    session = get_session()
+    try:
+        # Check if PuLP is available
+        if not PULP_AVAILABLE:
+            return jsonify({
+                'error': 'Optimization library not available',
+                'hint': 'PuLP library is required for portfolio optimization',
+                'action': 'Install with: pip install pulp',
+                'error_type': 'dependency_missing'
+            }), 503
+
+        # Verify portfolio exists and user has access
+        portfolio = scoped_portfolio_query(session).filter(Portfolio.id == portfolio_id).one_or_none()
+        if not portfolio:
+            return jsonify({'error': 'Portfolio not found'}), 404
+
+        data = request.json or {}
+
+        # Get portfolio projects
+        portfolio_projects = session.query(PortfolioProject).filter(
+            PortfolioProject.portfolio_id == portfolio_id,
+            PortfolioProject.is_active == True
+        ).all()
+
+        if not portfolio_projects:
+            return jsonify({
+                'error': 'No projects in portfolio',
+                'hint': 'Add projects to portfolio before optimization',
+                'error_type': 'no_projects'
+            }), 400
+
+        # Build project data for optimization
+        projects = []
+        for pp in portfolio_projects:
+            project = session.get(Project, pp.project_id)
+            if not project:
+                continue
+
+            # Get latest forecast for duration estimate
+            latest_forecast = session.query(Forecast).filter(
+                Forecast.project_id == project.id
+            ).order_by(Forecast.created_at.desc()).first()
+
+            duration_p85 = latest_forecast.projected_weeks_p85 if latest_forecast else 0
+
+            projects.append({
+                'id': project.id,
+                'name': project.name,
+                'business_value': pp.business_value_score or project.business_value,
+                'risk_level': project.risk_level,
+                'budget_allocated': pp.budget_allocated or 0,
+                'capacity_allocated': pp.capacity_allocated or project.capacity_allocated,
+                'wsjf_score': pp.wsjf_score,
+                'estimated_duration_p85': duration_p85
+            })
+
+        # Create constraints
+        constraints = OptimizationConstraints(
+            max_budget=data.get('max_budget', portfolio.total_budget),
+            max_capacity=data.get('max_capacity', portfolio.total_capacity),
+            min_business_value=data.get('min_business_value'),
+            max_risk_score=data.get('max_risk_score'),
+            mandatory_projects=data.get('mandatory_projects', []),
+            excluded_projects=data.get('excluded_projects', []),
+            max_duration_weeks=data.get('max_duration_weeks')
+        )
+
+        # Run optimization
+        optimizer = PortfolioOptimizer()
+        objective = data.get('objective', 'maximize_value')
+        result = optimizer.optimize_portfolio(projects, constraints, objective)
+
+        # Build response with project details
+        selected_project_details = []
+        for proj_id in result.selected_projects:
+            proj = next(p for p in projects if p['id'] == proj_id)
+            selected_project_details.append(proj)
+
+        return jsonify({
+            'optimization': {
+                'status': result.optimization_status,
+                'objective_value': result.objective_value,
+                'constraints_satisfied': result.constraints_satisfied
+            },
+            'selected_projects': selected_project_details,
+            'excluded_projects': [
+                p for p in projects if p['id'] not in result.selected_projects
+            ],
+            'metrics': {
+                'projects_included': result.projects_included,
+                'projects_excluded': result.projects_excluded,
+                'total_value': result.total_value,
+                'total_cost': result.total_cost,
+                'total_capacity': result.total_capacity,
+                'total_duration': result.total_duration,
+                'total_risk_score': result.total_risk_score
+            },
+            'utilization': {
+                'budget': {
+                    'used': result.total_cost,
+                    'available': constraints.max_budget,
+                    'percentage': (result.total_cost / constraints.max_budget * 100) if constraints.max_budget else 0
+                },
+                'capacity': {
+                    'used': result.total_capacity,
+                    'available': constraints.max_capacity,
+                    'percentage': (result.total_capacity / constraints.max_capacity * 100) if constraints.max_capacity else 0
+                }
+            },
+            'recommendations': result.recommendations
+        }), 200
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        session.close()
+
+
+@app.route('/api/portfolios/<int:portfolio_id>/scenarios', methods=['POST'])
+@login_required
+def compare_scenarios(portfolio_id):
+    """
+    Compare multiple what-if scenarios
+    Helps answer questions like:
+    - What if budget increases by 20%?
+    - What if we lose 2 FTEs?
+    - What if Project X is mandatory?
+    """
+    session = get_session()
+    try:
+        if not PULP_AVAILABLE:
+            return jsonify({
+                'error': 'Optimization library not available',
+                'error_type': 'dependency_missing'
+            }), 503
+
+        # Verify portfolio exists
+        portfolio = scoped_portfolio_query(session).filter(Portfolio.id == portfolio_id).one_or_none()
+        if not portfolio:
+            return jsonify({'error': 'Portfolio not found'}), 404
+
+        data = request.json or {}
+        scenario_defs = data.get('scenarios', [])
+
+        if not scenario_defs:
+            return jsonify({
+                'error': 'No scenarios provided',
+                'hint': 'Provide at least one scenario in the scenarios array'
+            }), 400
+
+        # Get portfolio projects
+        portfolio_projects = session.query(PortfolioProject).filter(
+            PortfolioProject.portfolio_id == portfolio_id,
+            PortfolioProject.is_active == True
+        ).all()
+
+        projects = []
+        for pp in portfolio_projects:
+            project = session.get(Project, pp.project_id)
+            if not project:
+                continue
+
+            latest_forecast = session.query(Forecast).filter(
+                Forecast.project_id == project.id
+            ).order_by(Forecast.created_at.desc()).first()
+
+            projects.append({
+                'id': project.id,
+                'name': project.name,
+                'business_value': pp.business_value_score or project.business_value,
+                'risk_level': project.risk_level,
+                'budget_allocated': pp.budget_allocated or 0,
+                'capacity_allocated': pp.capacity_allocated or project.capacity_allocated,
+                'wsjf_score': pp.wsjf_score,
+                'estimated_duration_p85': latest_forecast.projected_weeks_p85 if latest_forecast else 0
+            })
+
+        # Build scenarios
+        scenarios = []
+        for scenario_def in scenario_defs:
+            constraints = OptimizationConstraints(
+                max_budget=scenario_def.get('max_budget', portfolio.total_budget),
+                max_capacity=scenario_def.get('max_capacity', portfolio.total_capacity),
+                mandatory_projects=scenario_def.get('mandatory_projects', []),
+                excluded_projects=scenario_def.get('excluded_projects', [])
+            )
+            scenarios.append(Scenario(
+                scenario_name=scenario_def.get('name', f'Scenario {len(scenarios) + 1}'),
+                scenario_description=scenario_def.get('description', ''),
+                constraints=constraints
+            ))
+
+        # Run comparison
+        optimizer = PortfolioOptimizer()
+        comparison = optimizer.compare_scenarios(projects, scenarios)
+
+        # Add project names to results
+        for scenario_result in comparison['scenarios']:
+            scenario_result['selected_projects'] = [
+                next(p['name'] for p in projects if p['id'] == proj_id)
+                for proj_id in scenario_result['selected_project_ids']
+            ]
+
+        return jsonify(comparison), 200
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        session.close()
+
+
+@app.route('/api/portfolios/<int:portfolio_id>/pareto', methods=['POST'])
+@login_required
+def generate_pareto_frontier(portfolio_id):
+    """
+    Generate Pareto frontier for trade-off analysis
+    Shows optimal trade-offs between conflicting objectives
+    """
+    session = get_session()
+    try:
+        if not PULP_AVAILABLE:
+            return jsonify({
+                'error': 'Optimization library not available',
+                'error_type': 'dependency_missing'
+            }), 503
+
+        # Verify portfolio exists
+        portfolio = scoped_portfolio_query(session).filter(Portfolio.id == portfolio_id).one_or_none()
+        if not portfolio:
+            return jsonify({'error': 'Portfolio not found'}), 404
+
+        data = request.json or {}
+
+        # Get portfolio projects
+        portfolio_projects = session.query(PortfolioProject).filter(
+            PortfolioProject.portfolio_id == portfolio_id,
+            PortfolioProject.is_active == True
+        ).all()
+
+        projects = []
+        for pp in portfolio_projects:
+            project = session.get(Project, pp.project_id)
+            if not project:
+                continue
+
+            latest_forecast = session.query(Forecast).filter(
+                Forecast.project_id == project.id
+            ).order_by(Forecast.created_at.desc()).first()
+
+            projects.append({
+                'id': project.id,
+                'name': project.name,
+                'business_value': pp.business_value_score or project.business_value,
+                'risk_level': project.risk_level,
+                'budget_allocated': pp.budget_allocated or 0,
+                'capacity_allocated': pp.capacity_allocated or project.capacity_allocated,
+                'wsjf_score': pp.wsjf_score,
+                'estimated_duration_p85': latest_forecast.projected_weeks_p85 if latest_forecast else 0
+            })
+
+        constraints = OptimizationConstraints(
+            max_budget=portfolio.total_budget,
+            max_capacity=portfolio.total_capacity
+        )
+
+        optimizer = PortfolioOptimizer()
+        pareto_points = optimizer.generate_pareto_frontier(
+            projects,
+            constraints,
+            axis_x=data.get('axis_x', 'cost'),
+            axis_y=data.get('axis_y', 'value'),
+            points=data.get('points', 10)
+        )
+
+        return jsonify({
+            'pareto_frontier': pareto_points,
+            'axis_x': data.get('axis_x', 'cost'),
+            'axis_y': data.get('axis_y', 'value'),
+            'points_count': len(pareto_points)
+        }), 200
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        session.close()
+
+
+@app.route('/api/portfolios/<int:portfolio_id>/export/excel', methods=['GET'])
+@login_required
+def export_portfolio_to_excel(portfolio_id):
+    """Export portfolio data to Excel"""
+    session = get_session()
+    try:
+        # Get portfolio
+        portfolio = scoped_portfolio_query(session).filter(Portfolio.id == portfolio_id).one_or_none()
+        if not portfolio:
+            return jsonify({'error': 'Portfolio not found'}), 404
+
+        # Get projects
+        portfolio_projects = session.query(PortfolioProject).filter(
+            PortfolioProject.portfolio_id == portfolio_id
+        ).all()
+
+        projects_data = []
+        for pp in portfolio_projects:
+            project = session.get(Project, pp.project_id)
+            if project:
+                project_dict = {
+                    'project_id': project.id,
+                    'project_name': project.name,
+                    'priority': pp.priority,
+                    'business_value': pp.business_value,
+                    'wsjf_score': pp.wsjf_score,
+                    'cod_weekly': pp.cod_weekly,
+                    'budget_allocated': pp.budget_allocated,
+                    'capacity_allocated': pp.capacity_allocated,
+                    'time_criticality': pp.time_criticality,
+                    'risk_reduction': pp.risk_reduction,
+                    'status': project.status if hasattr(project, 'status') else 'active',
+                }
+                projects_data.append(project_dict)
+
+        # Get metrics (optional - from dashboard)
+        metrics = None
+        try:
+            from portfolio_dashboard import PortfolioDashboard
+            dashboard = PortfolioDashboard()
+            dashboard_data = dashboard.generate_dashboard(portfolio.to_dict(), portfolio_projects)
+            metrics = dashboard_data.get('metrics', {})
+        except:
+            pass
+
+        # Get risks (optional)
+        risks_data = None
+        try:
+            portfolio_risks = session.query(PortfolioRisk).filter(
+                PortfolioRisk.portfolio_id == portfolio_id
+            ).all()
+            if portfolio_risks:
+                risks_data = [r.to_dict() for r in portfolio_risks]
+        except:
+            pass
+
+        # Generate Excel file
+        excel_buffer = export_portfolio_excel(
+            portfolio.to_dict(),
+            projects_data,
+            metrics=metrics,
+            risks=risks_data
+        )
+
+        # Send file
+        filename = f"portfolio_{portfolio.id}_{portfolio.name.replace(' ', '_')}_{datetime.now().strftime('%Y%m%d')}.xlsx"
+        return send_file(
+            excel_buffer,
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            as_attachment=True,
+            download_name=filename
+        )
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        session.close()
+
+
+@app.route('/api/portfolios/<int:portfolio_id>/export/pdf', methods=['GET'])
+@login_required
+def export_portfolio_to_pdf(portfolio_id):
+    """Export portfolio data to PDF"""
+    session = get_session()
+    try:
+        # Get portfolio
+        portfolio = scoped_portfolio_query(session).filter(Portfolio.id == portfolio_id).one_or_none()
+        if not portfolio:
+            return jsonify({'error': 'Portfolio not found'}), 404
+
+        # Get projects
+        portfolio_projects = session.query(PortfolioProject).filter(
+            PortfolioProject.portfolio_id == portfolio_id
+        ).all()
+
+        projects_data = []
+        for pp in portfolio_projects:
+            project = session.get(Project, pp.project_id)
+            if project:
+                project_dict = {
+                    'project_id': project.id,
+                    'project_name': project.name,
+                    'priority': pp.priority,
+                    'business_value': pp.business_value,
+                    'wsjf_score': pp.wsjf_score,
+                    'cod_weekly': pp.cod_weekly,
+                    'budget_allocated': pp.budget_allocated,
+                    'capacity_allocated': pp.capacity_allocated,
+                    'time_criticality': pp.time_criticality,
+                    'risk_reduction': pp.risk_reduction,
+                    'status': project.status if hasattr(project, 'status') else 'active',
+                }
+                projects_data.append(project_dict)
+
+        # Get metrics (optional - from dashboard)
+        metrics = None
+        try:
+            from portfolio_dashboard import PortfolioDashboard
+            dashboard = PortfolioDashboard()
+            dashboard_data = dashboard.generate_dashboard(portfolio.to_dict(), portfolio_projects)
+            metrics = dashboard_data.get('metrics', {})
+        except:
+            pass
+
+        # Get risks (optional)
+        risks_data = None
+        try:
+            portfolio_risks = session.query(PortfolioRisk).filter(
+                PortfolioRisk.portfolio_id == portfolio_id
+            ).all()
+            if portfolio_risks:
+                risks_data = [r.to_dict() for r in portfolio_risks]
+        except:
+            pass
+
+        # Generate PDF file
+        pdf_buffer = export_portfolio_pdf(
+            portfolio.to_dict(),
+            projects_data,
+            metrics=metrics,
+            risks=risks_data
+        )
+
+        # Send file
+        filename = f"portfolio_{portfolio.id}_{portfolio.name.replace(' ', '_')}_{datetime.now().strftime('%Y%m%d')}.pdf"
+        return send_file(
+            pdf_buffer,
+            mimetype='application/pdf',
+            as_attachment=True,
+            download_name=filename
+        )
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        session.close()
+
+
 @app.route('/api/forecasts', methods=['GET', 'POST'])
 @login_required
 def handle_forecasts():
@@ -3233,6 +3933,60 @@ def portfolio_dashboard_page():
         <body>
             <h1>Template Error</h1>
             <p>Error loading Portfolio Dashboard template: {str(e)}</p>
+        </body>
+        </html>
+        """, 500
+
+
+@app.route('/portfolio/risks')
+@login_required
+def portfolio_risks_page():
+    """Render the Portfolio Risk Management page"""
+    try:
+        return render_template('portfolio_risks.html')
+    except Exception as e:
+        return f"""
+        <html>
+        <head><title>Portfolio Risks - Error</title></head>
+        <body>
+            <h1>Template Error</h1>
+            <p>Error loading Portfolio Risks template: {str(e)}</p>
+        </body>
+        </html>
+        """, 500
+
+
+@app.route('/portfolio/optimize')
+@login_required
+def portfolio_optimization_page():
+    """Render the Portfolio Optimization page"""
+    try:
+        return render_template('portfolio_optimization.html')
+    except Exception as e:
+        return f"""
+        <html>
+        <head><title>Portfolio Optimization - Error</title></head>
+        <body>
+            <h1>Template Error</h1>
+            <p>Error loading Portfolio Optimization template: {str(e)}</p>
+        </body>
+        </html>
+        """, 500
+
+
+@app.route('/portfolio/executive')
+@login_required
+def portfolio_executive_dashboard():
+    """Render the Executive Dashboard page"""
+    try:
+        return render_template('portfolio_executive.html')
+    except Exception as e:
+        return f"""
+        <html>
+        <head><title>Executive Dashboard - Error</title></head>
+        <body>
+            <h1>Template Error</h1>
+            <p>Error loading Executive Dashboard template: {str(e)}</p>
         </body>
         </html>
         """, 500
