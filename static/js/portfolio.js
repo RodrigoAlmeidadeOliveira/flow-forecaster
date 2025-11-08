@@ -6,6 +6,16 @@
 let selectedPortfolioId = 'all';
 let selectedProjectFilters = [];
 let portfolioRequestToken = 0;
+let efficientFrontierRequestToken = 0;
+let efficientFrontierChart = null;
+
+function formatPercent(value, decimals = 1) {
+    const num = Number(value);
+    if (!Number.isFinite(num)) {
+        return '-';
+    }
+    return `${(num * 100).toFixed(decimals)}%`;
+}
 
 // Initialize filters and listeners when document is ready
 $(document).ready(function() {
@@ -178,6 +188,7 @@ async function loadPortfolioDashboard() {
         if (!data.has_data) {
             updateProjectFilterOptions([]);
             renderEmptyState(data.message || 'Nenhum dado disponível.');
+            hideEfficientFrontierSection(data.message || 'Nenhum dado disponível.');
             return;
         }
 
@@ -188,12 +199,19 @@ async function loadPortfolioDashboard() {
         }
 
         renderPortfolioDashboard(data);
+
+        if (selectedPortfolioId !== 'all') {
+            loadEfficientFrontier(selectedPortfolioId, selectedProjectFilters);
+        } else {
+            hideEfficientFrontierSection('Selecione um portfolio específico para visualizar a fronteira eficiente.');
+        }
     } catch (error) {
         if (currentToken !== portfolioRequestToken) {
             return;
         }
         console.error('Error loading portfolio:', error);
         renderError('Erro ao carregar portfolio: ' + error.message);
+        hideEfficientFrontierSection('Não foi possível calcular a fronteira eficiente.');
     }
 }
 
@@ -593,3 +611,259 @@ function renderWSJFRanking(projects) {
     $('#wsjf-ranking').html(html);
 }
 
+// ---------------------------------------------------------------------------
+// Efficient Frontier (Markowitz)
+// ---------------------------------------------------------------------------
+
+function hideEfficientFrontierSection(message) {
+    const section = $('#efficient-frontier-section');
+    const info = $('#efficient-frontier-info');
+    const alertBox = $('#efficient-frontier-message');
+
+    if (efficientFrontierChart) {
+        efficientFrontierChart.destroy();
+        efficientFrontierChart = null;
+    }
+
+    $('#efficient-frontier-summary').html('');
+    alertBox.hide();
+
+    if (message) {
+        info.text(message);
+    }
+
+    section.hide();
+}
+
+function showEfficientFrontierMessage(message, variant = 'info') {
+    const section = $('#efficient-frontier-section');
+    const alertBox = $('#efficient-frontier-message');
+
+    section.show();
+    $('#efficient-frontier-summary').html('');
+
+    if (efficientFrontierChart) {
+        efficientFrontierChart.destroy();
+        efficientFrontierChart = null;
+    }
+
+    alertBox
+        .show()
+        .removeClass('alert-info alert-warning alert-danger alert-success')
+        .addClass(`alert-${variant}`)
+        .text(message);
+}
+
+function showEfficientFrontierLoading() {
+    $('#efficient-frontier-info').text('Calculando fronteira eficiente com simulações de Monte Carlo...');
+    showEfficientFrontierMessage('Processando dados do portfolio...', 'info');
+}
+
+async function loadEfficientFrontier(portfolioId, projectFilterIds = []) {
+    if (!portfolioId || portfolioId === 'all') {
+        hideEfficientFrontierSection('Selecione um portfolio específico para visualizar a fronteira eficiente.');
+        return;
+    }
+
+    const currentToken = ++efficientFrontierRequestToken;
+    showEfficientFrontierLoading();
+
+    try {
+        let url = `/api/portfolios/${portfolioId}/efficient-frontier`;
+        const params = new URLSearchParams();
+
+        if (projectFilterIds && projectFilterIds.length > 0) {
+            params.append('project_ids', projectFilterIds.join(','));
+        }
+
+        if ([...params.keys()].length > 0) {
+            url += `?${params.toString()}`;
+        }
+
+        const response = await fetch(url);
+        if (!response.ok) {
+            throw new Error('Erro ao consultar a fronteira eficiente');
+        }
+
+        const data = await response.json();
+        if (currentToken !== efficientFrontierRequestToken) {
+            return;
+        }
+
+        if (data.error) {
+            showEfficientFrontierMessage(data.error, 'warning');
+            return;
+        }
+
+        renderEfficientFrontier(data);
+    } catch (error) {
+        if (currentToken !== efficientFrontierRequestToken) {
+            return;
+        }
+        console.error('Erro ao calcular fronteira eficiente:', error);
+        showEfficientFrontierMessage('Erro ao calcular a fronteira eficiente: ' + error.message, 'danger');
+    }
+}
+
+function renderEfficientFrontier(data) {
+    $('#efficient-frontier-section').show();
+    $('#efficient-frontier-message').hide();
+
+    const infoText = `Simulações Monte Carlo: ${data?.monte_carlo?.sample_size || 0} • Taxa livre de risco: ${formatPercent(data?.risk_free_rate || 0, 2)}`;
+    $('#efficient-frontier-info').text(infoText);
+
+    const monteCarloPoints = (data?.monte_carlo?.points || []).map(point => ({
+        x: (point.risk || 0) * 100,
+        y: (point.expected_return || 0) * 100,
+        sharpe: point.sharpe
+    }));
+
+    const frontierPoints = (data?.efficient_frontier || []).map(point => ({
+        x: (point.risk || 0) * 100,
+        y: (point.expected_return || 0) * 100
+    }));
+
+    const chartEl = document.getElementById('efficientFrontierChart');
+    if (!chartEl) {
+        return;
+    }
+
+    const datasets = [
+        {
+            label: 'Portfólios Monte Carlo',
+            data: monteCarloPoints,
+            backgroundColor: 'rgba(102, 126, 234, 0.25)',
+            borderColor: 'rgba(102, 126, 234, 0.25)',
+            pointRadius: 3,
+            pointHoverRadius: 4
+        },
+        {
+            type: 'line',
+            label: 'Fronteira Eficiente',
+            data: frontierPoints,
+            borderColor: '#f5576c',
+            backgroundColor: 'transparent',
+            borderWidth: 2,
+            pointRadius: 0,
+            tension: 0.25
+        }
+    ];
+
+    if (data?.best_portfolio) {
+        datasets.push({
+            label: 'Melhor Portfólio (Sharpe)',
+            data: [{
+                x: (data.best_portfolio.risk || 0) * 100,
+                y: (data.best_portfolio.expected_return || 0) * 100
+            }],
+            backgroundColor: '#28a745',
+            borderColor: '#1e7e34',
+            pointRadius: 6,
+            pointHoverRadius: 7
+        });
+    }
+
+    if (data?.current_portfolio) {
+        datasets.push({
+            label: 'Portfolio Atual',
+            data: [{
+                x: (data.current_portfolio.risk || 0) * 100,
+                y: (data.current_portfolio.expected_return || 0) * 100
+            }],
+            backgroundColor: '#ffc107',
+            borderColor: '#e0a800',
+            pointRadius: 6,
+            pointHoverRadius: 7
+        });
+    }
+
+    if (efficientFrontierChart) {
+        efficientFrontierChart.destroy();
+    }
+
+    efficientFrontierChart = new Chart(chartEl.getContext('2d'), {
+        type: 'scatter',
+        data: { datasets },
+        options: {
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom'
+                },
+                tooltip: {
+                    callbacks: {
+                        label: context => {
+                            const label = context.dataset.label || '';
+                            const x = context.parsed.x?.toFixed(2) || '0.00';
+                            const y = context.parsed.y?.toFixed(2) || '0.00';
+                            return `${label}: retorno ${y}% • risco ${x}%`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    title: {
+                        display: true,
+                        text: 'Risco (desvio padrão %)'
+                    },
+                    ticks: { callback: value => `${value}%` }
+                },
+                y: {
+                    title: {
+                        display: true,
+                        text: 'Retorno esperado %'
+                    },
+                    ticks: { callback: value => `${value}%` }
+                }
+            }
+        }
+    });
+
+    const summaryContainer = $('#efficient-frontier-summary');
+    let summaryHtml = '';
+    summaryHtml += renderPortfolioSummaryCard('Melhor Portfólio (Sharpe)', data.best_portfolio, 'success');
+    summaryHtml += renderPortfolioSummaryCard('Portfolio Atual', data.current_portfolio, 'warning');
+    summaryContainer.html(summaryHtml);
+}
+
+function renderPortfolioSummaryCard(title, summary, variant = 'info') {
+    if (!summary) {
+        return `
+            <div class="alert alert-${variant} mb-3">
+                ${title}: dados indisponíveis.
+            </div>
+        `;
+    }
+
+    const sharpe = Number(summary.sharpe || 0).toFixed(2);
+    const weightsHtml = buildWeightsList(summary.weights || []);
+
+    return `
+        <div class="border rounded p-3 mb-3 bg-light">
+            <h6 class="text-muted text-uppercase mb-2">${title}</h6>
+            <p class="mb-1"><strong>Retorno:</strong> ${formatPercent(summary.expected_return)} • <strong>Risco:</strong> ${formatPercent(summary.risk)}</p>
+            <p class="mb-2"><strong>Sharpe:</strong> ${sharpe}</p>
+            <div class="small">
+                ${weightsHtml}
+            </div>
+        </div>
+    `;
+}
+
+function buildWeightsList(weights) {
+    if (!weights.length) {
+        return '<span class="text-muted">Distribuição uniforme.</span>';
+    }
+
+    const significantWeights = weights
+        .filter(item => item.weight >= 0.01)
+        .slice(0, 5);
+
+    return significantWeights.map(weight => `
+        <div class="d-flex justify-content-between mb-1">
+            <span>${weight.project_name}</span>
+            <strong>${formatPercent(weight.weight, 1)}</strong>
+        </div>
+    `).join('') || '<span class="text-muted">Pesos muito distribuídos.</span>';
+}

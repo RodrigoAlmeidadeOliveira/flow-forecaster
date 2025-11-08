@@ -3053,6 +3053,35 @@ a probabilidade de todas serem entregues no prazo é de <strong>1 em 2^n</strong
         </div>
     </div>
 
+    <!-- Efficient Frontier Section -->
+    <div class="row mt-4" id="efficient-frontier-section" style="display:none;">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-wave-square"></i> Fronteira Eficiente (Markowitz)
+                    </h5>
+                </div>
+                <div class="card-body" id="efficient-frontier-card-body">
+                    <p class="text-muted small mb-3" id="efficient-frontier-info">
+                        Selecione um portfolio para visualizar risco x retorno, Monte Carlo e fronteira eficiente.
+                    </p>
+                    <div id="efficient-frontier-message" class="alert alert-info" style="display:none;"></div>
+                    <div class="row align-items-center">
+                        <div class="col-lg-8 mb-3 mb-lg-0">
+                            <div class="chart-container" style="height: 360px;">
+                                <canvas id="efficientFrontierChart"></canvas>
+                            </div>
+                        </div>
+                        <div class="col-lg-4">
+                            <div id="efficient-frontier-summary"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <hr class="my-5">
 </div>
 

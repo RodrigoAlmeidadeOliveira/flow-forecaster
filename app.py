@@ -12,7 +12,7 @@ import pickle
 import pandas as pd
 from pathlib import Path
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import Optional, Set
 from flask import Flask, render_template, request, jsonify, redirect, url_for, flash, send_file
 from flask_login import (
     LoginManager,
@@ -56,6 +56,7 @@ from portfolio_optimizer import (
     optimize_portfolio_simple,
     PULP_AVAILABLE
 )
+from portfolio_markowitz import PortfolioMarkowitzAnalyzer, RISK_LEVEL_SIGMA
 from portfolio_export import export_portfolio_excel, export_portfolio_pdf
 from accuracy_metrics import (
     calculate_accuracy_metrics,
@@ -279,6 +280,41 @@ def scoped_portfolio_query(session):
         return query.filter(Portfolio.id == -1)
 
     return query.filter(Portfolio.user_id == user_id)
+
+
+def coerce_to_float(*values, default=0.0) -> float:
+    """
+    Convert the first non-null numeric-like value into a float.
+    Falls back to the provided default when all candidates are invalid.
+    """
+    for value in values:
+        if value is None:
+            continue
+        try:
+            number = float(value)
+            if math.isnan(number) or math.isinf(number):
+                continue
+            return number
+        except (TypeError, ValueError):
+            continue
+    return float(default)
+
+
+def parse_project_ids(raw_ids: Optional[str]) -> Set[int]:
+    """Parse comma-separated project ids into a sanitized set of integers."""
+    if not raw_ids:
+        return set()
+
+    project_ids: Set[int] = set()
+    for chunk in raw_ids.split(','):
+        chunk = chunk.strip()
+        if not chunk:
+            continue
+        try:
+            project_ids.add(int(chunk))
+        except ValueError:
+            continue
+    return project_ids
 
 
 def has_record_access(record, attr='user_id') -> bool:
@@ -3266,17 +3302,6 @@ def optimize_portfolio(portfolio_id):
                 'error_type': 'no_projects'
             }), 400
 
-        # Build project data for optimization
-        def safe_numeric(*values, default=0.0):
-            for value in values:
-                if value is None:
-                    continue
-                try:
-                    return float(value)
-                except (TypeError, ValueError):
-                    continue
-            return float(default)
-
         projects = []
         for pp in portfolio_projects:
             project = session.get(Project, pp.project_id)
@@ -3288,7 +3313,7 @@ def optimize_portfolio(portfolio_id):
                 Forecast.project_id == project.id
             ).order_by(Forecast.created_at.desc()).first()
 
-            duration_p85 = safe_numeric(
+            duration_p85 = coerce_to_float(
                 latest_forecast.projected_weeks_p85 if latest_forecast else None,
                 default=0
             )
@@ -3296,10 +3321,10 @@ def optimize_portfolio(portfolio_id):
             projects.append({
                 'id': project.id,
                 'name': project.name,
-                'business_value': safe_numeric(pp.business_value_score, project.business_value),
+                'business_value': coerce_to_float(pp.business_value_score, project.business_value),
                 'risk_level': project.risk_level,
-                'budget_allocated': safe_numeric(pp.budget_allocated, default=0),
-                'capacity_allocated': safe_numeric(pp.capacity_allocated, project.capacity_allocated),
+                'budget_allocated': coerce_to_float(pp.budget_allocated, default=0),
+                'capacity_allocated': coerce_to_float(pp.capacity_allocated, project.capacity_allocated),
                 'wsjf_score': pp.wsjf_score,
                 'estimated_duration_p85': duration_p85
             })
@@ -3366,6 +3391,114 @@ def optimize_portfolio(portfolio_id):
         session.close()
 
 
+@app.route('/api/portfolios/<int:portfolio_id>/efficient-frontier', methods=['GET'])
+@login_required
+def portfolio_efficient_frontier(portfolio_id):
+    """Compute Markowitz efficient frontier and Monte Carlo simulations for a portfolio."""
+    session = get_session()
+    try:
+        portfolio = scoped_portfolio_query(session).filter(Portfolio.id == portfolio_id).one_or_none()
+        if not portfolio:
+            return jsonify({'error': 'Portfolio não encontrado'}), 404
+
+        requested_project_ids = parse_project_ids(request.args.get('project_ids'))
+
+        portfolio_projects_query = session.query(PortfolioProject).filter(
+            PortfolioProject.portfolio_id == portfolio_id,
+            PortfolioProject.is_active == True
+        )
+
+        if requested_project_ids:
+            portfolio_projects_query = portfolio_projects_query.filter(
+                PortfolioProject.project_id.in_(requested_project_ids)
+            )
+
+        portfolio_projects = portfolio_projects_query.all()
+
+        if len(portfolio_projects) < 2:
+            return jsonify({
+                'error': 'São necessários pelo menos 2 projetos ativos para calcular a fronteira eficiente.'
+            }), 400
+
+        max_cod = max([coerce_to_float(pp.cod_weekly, default=0) for pp in portfolio_projects] or [0])
+        max_cod = max(max_cod, 1.0)
+
+        project_metrics = []
+        total_capacity = 0.0
+
+        for pp in portfolio_projects:
+            project = session.get(Project, pp.project_id)
+            if not project:
+                continue
+
+            business_value = coerce_to_float(pp.business_value_score, project.business_value, default=50)
+            time_criticality = coerce_to_float(pp.time_criticality_score, default=50)
+            risk_reduction = coerce_to_float(pp.risk_reduction_score, default=50)
+            cod_weekly = coerce_to_float(pp.cod_weekly, default=0)
+            cod_factor = min(max(cod_weekly / max_cod, 0), 1)
+
+            wsjf_score = coerce_to_float(
+                pp.wsjf_score,
+                default=(business_value + time_criticality + risk_reduction) / 10.0
+            )
+            normalized_wsjf = min(max(wsjf_score / 25.0, 0), 1)
+
+            expected_return = max(0.01, (
+                0.5 * (business_value / 100.0) +
+                0.3 * cod_factor +
+                0.2 * normalized_wsjf
+            ))
+
+            risk_level = (project.risk_level or 'medium').lower()
+            volatility = RISK_LEVEL_SIGMA.get(risk_level, 0.18)
+
+            capacity = coerce_to_float(pp.capacity_allocated, project.capacity_allocated, default=1)
+            total_capacity += capacity
+
+            project_metrics.append({
+                'id': project.id,
+                'name': project.name,
+                'expected_return': float(expected_return),
+                'volatility': float(volatility),
+                'risk_level': risk_level,
+                'capacity_allocated': float(capacity)
+            })
+
+        if len(project_metrics) < 2:
+            return jsonify({
+                'error': 'São necessários pelo menos 2 projetos válidos para calcular a fronteira eficiente.'
+            }), 400
+
+        capacities = np.array([p['capacity_allocated'] for p in project_metrics], dtype=float)
+        if total_capacity > 0:
+            capacities = capacities / total_capacity
+        else:
+            capacities = np.ones(len(project_metrics), dtype=float) / len(project_metrics)
+
+        analyzer = PortfolioMarkowitzAnalyzer(project_metrics)
+        analysis = analyzer.run_analysis(current_weights=capacities)
+
+        response = {
+            'projects': project_metrics,
+            'monte_carlo': analysis['monte_carlo'],
+            'efficient_frontier': analysis['efficient_frontier'],
+            'best_portfolio': analysis['best_portfolio'],
+            'current_portfolio': analysis['current_portfolio'],
+            'risk_free_rate': analysis['risk_free_rate']
+        }
+
+        return jsonify(convert_to_native_types(response)), 200
+
+    except Exception as e:
+        import traceback
+        return jsonify({
+            'error': str(e),
+            'trace': traceback.format_exc()
+        }), 500
+    finally:
+        session.close()
+
+
 @app.route('/api/portfolios/<int:portfolio_id>/scenarios', methods=['POST'])
 @login_required
 def compare_scenarios(portfolio_id):
@@ -3417,12 +3550,15 @@ def compare_scenarios(portfolio_id):
             projects.append({
                 'id': project.id,
                 'name': project.name,
-                'business_value': pp.business_value_score or project.business_value,
+                'business_value': coerce_to_float(pp.business_value_score, project.business_value),
                 'risk_level': project.risk_level,
-                'budget_allocated': pp.budget_allocated or 0,
-                'capacity_allocated': pp.capacity_allocated or project.capacity_allocated,
-                'wsjf_score': pp.wsjf_score,
-                'estimated_duration_p85': latest_forecast.projected_weeks_p85 if latest_forecast else 0
+                'budget_allocated': coerce_to_float(pp.budget_allocated, default=0),
+                'capacity_allocated': coerce_to_float(pp.capacity_allocated, project.capacity_allocated),
+                'wsjf_score': coerce_to_float(pp.wsjf_score),
+                'estimated_duration_p85': coerce_to_float(
+                    latest_forecast.projected_weeks_p85 if latest_forecast else None,
+                    default=0
+                )
             })
 
         # Build scenarios
@@ -4676,18 +4812,7 @@ def portfolio_dashboard():
     session = get_session()
     try:
         portfolio_id = request.args.get('portfolio_id', type=int)
-        project_ids_param = request.args.get('project_ids', '')
-
-        requested_project_ids = set()
-        if project_ids_param:
-            for raw_id in project_ids_param.split(','):
-                raw_id = raw_id.strip()
-                if not raw_id:
-                    continue
-                try:
-                    requested_project_ids.add(int(raw_id))
-                except ValueError:
-                    continue
+        requested_project_ids = parse_project_ids(request.args.get('project_ids'))
 
         projects_query = scoped_project_query(session)
 
