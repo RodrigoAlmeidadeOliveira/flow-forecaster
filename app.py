@@ -2489,6 +2489,33 @@ def simulate_portfolio(portfolio_id):
         confidence_level = data.get('confidence_level', 'P85')
         execution_mode = data.get('execution_mode', 'parallel')  # parallel, sequential, compare
 
+        def extract_tp_samples(input_payload):
+            if not isinstance(input_payload, dict):
+                return []
+
+            raw_samples = (
+                input_payload.get('tp_samples') or
+                input_payload.get('tpSamples') or
+                input_payload.get('throughput_samples') or
+                input_payload.get('tp_samples_raw')
+            )
+
+            if isinstance(raw_samples, str):
+                raw_samples = [chunk.strip() for chunk in raw_samples.replace(';', ',').split(',') if chunk.strip()]
+
+            if not isinstance(raw_samples, list):
+                return []
+
+            cleaned = []
+            for sample in raw_samples:
+                try:
+                    value = float(sample)
+                except (TypeError, ValueError):
+                    continue
+                if value > 0:
+                    cleaned.append(value)
+            return cleaned
+
         # Get all active projects in portfolio
         portfolio_projects = session.query(PortfolioProject).filter(
             PortfolioProject.portfolio_id == portfolio_id,
@@ -2513,14 +2540,29 @@ def simulate_portfolio(portfolio_id):
                 continue
 
             # Extract throughput samples from forecast
-            input_data = json.loads(latest_forecast.input_data)
-            tp_samples = input_data.get('tp_samples', [])
+            try:
+                input_data = json.loads(latest_forecast.input_data)
+            except Exception:
+                input_data = {}
+
+            tp_samples = extract_tp_samples(input_data)
 
             if not tp_samples:
                 continue
 
             # Get backlog from latest forecast or use a default
-            backlog = latest_forecast.backlog or 10
+            backlog = (
+                latest_forecast.backlog or
+                input_data.get('backlog') or
+                input_data.get('numberOfTasks') or
+                input_data.get('number_of_tasks') or
+                0
+            )
+
+            backlog = int(backlog) if backlog else 0
+
+            if backlog <= 0:
+                continue
 
             project_input = ProjectForecastInput(
                 project_id=project.id,

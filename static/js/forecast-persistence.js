@@ -3,10 +3,115 @@
  * Handles saving and loading forecasts to/from database
  */
 
+let saveModalLoading = false;
+let cachedProjects = [];
+let cachedPortfolios = [];
+
 // Open save modal
 function openSaveModal() {
+    populateSaveForecastSelectors();
     $('#saveForecastModal').modal('show');
 }
+
+async function populateSaveForecastSelectors() {
+    if (saveModalLoading) {
+        return;
+    }
+
+    saveModalLoading = true;
+    const projectSelect = $('#forecastProjectSelect');
+    const portfolioSelect = $('#forecastPortfolioSelect');
+
+    try {
+        projectSelect.html('<option value="">Carregando projetos...</option>');
+        portfolioSelect.html('<option value="">Carregando portfólios...</option>');
+
+        const [projects, portfolios] = await Promise.all([
+            fetch('/api/projects', { credentials: 'include' }),
+            fetch('/api/portfolios', { credentials: 'include' })
+        ]);
+
+        if (!projects.ok) {
+            throw new Error('Não foi possível obter a lista de projetos.');
+        }
+        if (!portfolios.ok) {
+            throw new Error('Não foi possível obter a lista de portfólios.');
+        }
+
+        cachedProjects = await projects.json();
+        cachedPortfolios = await portfolios.json();
+
+        projectSelect.empty();
+        projectSelect.append('<option value="">Selecione um projeto existente...</option>');
+        cachedProjects.forEach(project => {
+            projectSelect.append(`<option value="${project.id}">${escapeHtml(project.name)}</option>`);
+        });
+
+        portfolioSelect.empty();
+        portfolioSelect.append('<option value="">Não associar agora</option>');
+        cachedPortfolios.forEach(portfolio => {
+            portfolioSelect.append(`<option value="${portfolio.id}">${escapeHtml(portfolio.name)} (${portfolio.projects_count || 0} projetos)</option>`);
+        });
+
+    } catch (error) {
+        console.error('Erro ao carregar projetos/portfólios:', error);
+        projectSelect.html('<option value="">Erro ao carregar projetos</option>');
+        portfolioSelect.html('<option value="">Erro ao carregar portfólios</option>');
+    } finally {
+        saveModalLoading = false;
+    }
+}
+
+function normalizeSamples(samples) {
+    if (!Array.isArray(samples)) {
+        return [];
+    }
+    return samples
+        .map(value => {
+            const parsed = Number(value);
+            return Number.isFinite(parsed) ? parsed : null;
+        })
+        .filter(value => Number.isFinite(value) && value > 0);
+}
+
+async function ensureProjectInPortfolio(portfolioId, projectId) {
+    if (!portfolioId || !projectId) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/portfolios/${portfolioId}/projects`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ project_id: projectId })
+        });
+
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({}));
+            if (error.error && !/already in portfolio/i.test(error.error)) {
+                throw new Error(error.error);
+            }
+        }
+    } catch (error) {
+        console.error('Erro ao vincular projeto ao portfólio:', error);
+        alert('Aviso: não foi possível vincular o projeto ao portfólio. Adicione manualmente pelo gerenciador de portfólio.');
+    }
+}
+
+$(document).ready(function() {
+    $('#forecastProjectSelect').on('change', function() {
+        if ($(this).val()) {
+            $('#projectName').val('');
+        }
+    });
+
+    $('#projectName').on('input', function() {
+        if ($(this).val().trim().length) {
+            $('#forecastProjectSelect').val('');
+        }
+    });
+});
 
 // Open load modal and fetch forecasts
 function openLoadModal() {
@@ -22,19 +127,38 @@ async function saveForecast() {
         return;
     }
 
+    const projectIdValue = $('#forecastProjectSelect').val();
+    const projectNameInput = $('#projectName').val().trim();
+    const portfolioIdValue = $('#forecastPortfolioSelect').val();
+
+    if (!projectIdValue && !projectNameInput) {
+        alert('Selecione um projeto existente ou informe um novo nome de projeto.');
+        return;
+    }
+
     try {
         const simulationData = window.lastSimulationData || {};
         const throughputSamples = (simulationData.tpSamples && simulationData.tpSamples.length)
             ? simulationData.tpSamples
             : collectThroughputSamples();
+        const cleanedSamples = normalizeSamples(throughputSamples);
+
+        if (!cleanedSamples.length) {
+            alert('Nenhuma amostra de throughput válida foi encontrada. Execute a simulação antes de salvar.');
+            return;
+        }
+
         const backlogValue = Number.isFinite(simulationData.numberOfTasks)
             ? simulationData.numberOfTasks
             : getCurrentBacklog();
 
         // Collect all current state
         const inputData = {
-            tpSamples: throughputSamples,
+            tpSamples: cleanedSamples,
+            tp_samples: cleanedSamples,
+            throughput_samples: cleanedSamples,
             backlog: backlogValue,
+            numberOfTasks: backlogValue,
             teamSize: Number.isFinite(simulationData.totalContributors)
                 ? simulationData.totalContributors
                 : parseInt($('#totalContributors').val() || 0, 10),
@@ -61,10 +185,14 @@ async function saveForecast() {
         const forecastData = window.lastSimulationResults || {};
 
         // Prepare payload
+        const projectNameForPayload = projectNameInput ||
+            $('#forecastProjectSelect option:selected').text().trim() ||
+            'Default Project';
+
         const payload = {
             name: name,
             description: $('#forecastDescription').val() || '',
-            project_name: $('#projectName').val() || 'Default Project',
+            project_name: projectNameForPayload,
             forecast_type: 'deadline',
             input_data: inputData,
             forecast_data: forecastData,
@@ -75,6 +203,16 @@ async function saveForecast() {
             can_meet_deadline: forecastData.can_meet_deadline,
             scope_completion_pct: forecastData.scope_completion_pct
         };
+
+        if (projectIdValue) {
+            payload.project_id = parseInt(projectIdValue, 10);
+        }
+
+        if (portfolioIdValue) {
+            payload.portfolio_context = {
+                portfolio_id: parseInt(portfolioIdValue, 10)
+            };
+        }
 
         // Save to API
         const response = await fetch('/api/forecasts', {
@@ -93,11 +231,15 @@ async function saveForecast() {
 
         const result = await response.json();
 
+        if (portfolioIdValue) {
+            await ensureProjectInPortfolio(parseInt(portfolioIdValue, 10), result.project_id);
+        }
+
         // Clear form and close modal
         $('#saveForecastForm')[0].reset();
         $('#saveForecastModal').modal('hide');
 
-        alert('Análise salva com sucesso!');
+        alert('Análise salva com sucesso! Os dados agora estão disponíveis para simulação no portfólio.');
 
     } catch (error) {
         console.error('Error saving forecast:', error);

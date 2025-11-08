@@ -3321,12 +3321,33 @@ a probabilidade de todas serem entregues no prazo é de <strong>1 em 2^n</strong
                         <input type="text" class="form-control" id="forecastName" required placeholder="Ex: Sprint 1 - Análise de Prazo">
                     </div>
                     <div class="form-group">
+                        <label for="forecastProjectSelect">Projeto existente</label>
+                        <select class="form-control" id="forecastProjectSelect">
+                            <option value="">Selecione um projeto existente...</option>
+                        </select>
+                        <small class="form-text text-muted">
+                            Use um projeto existente do portfólio ou deixe em branco para criar um novo abaixo.
+                        </small>
+                    </div>
+                    <div class="form-group">
                         <label for="forecastDescription">Descrição</label>
                         <textarea class="form-control" id="forecastDescription" rows="3" placeholder="Informações adicionais sobre esta análise..."></textarea>
                     </div>
                     <div class="form-group">
-                        <label for="projectName">Projeto</label>
-                        <input type="text" class="form-control" id="projectName" placeholder="Nome do projeto">
+                        <label for="projectName">Novo projeto (opcional)</label>
+                        <input type="text" class="form-control" id="projectName" placeholder="Informe para criar um novo projeto">
+                        <small class="form-text text-muted">
+                            Este campo é usado somente se nenhum projeto existente for selecionado acima.
+                        </small>
+                    </div>
+                    <div class="form-group">
+                        <label for="forecastPortfolioSelect">Associar ao portfólio</label>
+                        <select class="form-control" id="forecastPortfolioSelect">
+                            <option value="">Não associar agora</option>
+                        </select>
+                        <small class="form-text text-muted">
+                            Ao salvar, o projeto será automaticamente vinculado a este portfólio (se ainda não estiver).
+                        </small>
                     </div>
                 </form>
             </div>
