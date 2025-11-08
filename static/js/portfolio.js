@@ -139,6 +139,11 @@ function renderCapacityAnalysis(capacity) {
         'under_utilized': 'warning'
     }[capacity.status] || 'info';
 
+    // Helper function to safely format numbers
+    const safeFixed = (value, decimals = 1) => {
+        return (value !== null && value !== undefined) ? Number(value).toFixed(decimals) : '0.0';
+    };
+
     return `
         <div class="row mb-4">
             <div class="col-12">
@@ -150,19 +155,19 @@ function renderCapacityAnalysis(capacity) {
                         <div class="row">
                             <div class="col-md-3 text-center">
                                 <h6>Capacidade Total</h6>
-                                <h3>${capacity.total_capacity.toFixed(1)} FTE</h3>
+                                <h3>${safeFixed(capacity.total_capacity)} FTE</h3>
                             </div>
                             <div class="col-md-3 text-center">
                                 <h6>Capacidade Alocada</h6>
-                                <h3>${capacity.allocated_capacity.toFixed(1)} FTE</h3>
+                                <h3>${safeFixed(capacity.allocated_capacity)} FTE</h3>
                             </div>
                             <div class="col-md-3 text-center">
                                 <h6>Capacidade Disponível</h6>
-                                <h3>${capacity.available_capacity.toFixed(1)} FTE</h3>
+                                <h3>${safeFixed(capacity.available_capacity)} FTE</h3>
                             </div>
                             <div class="col-md-3 text-center">
                                 <h6>Taxa de Utilização</h6>
-                                <h3>${capacity.utilization_rate.toFixed(1)}%</h3>
+                                <h3>${safeFixed(capacity.utilization_rate)}%</h3>
                             </div>
                         </div>
                         <hr>
@@ -182,6 +187,11 @@ function renderHealthScoresTable(healthScores) {
         return '';
     }
 
+    // Helper function to safely format numbers
+    const safeFixed = (value, decimals = 1) => {
+        return (value !== null && value !== undefined) ? Number(value).toFixed(decimals) : '0.0';
+    };
+
     let rows = '';
     healthScores.forEach(hs => {
         const statusClass = {
@@ -195,12 +205,12 @@ function renderHealthScoresTable(healthScores) {
             <tr>
                 <td><strong>${hs.project_name}</strong></td>
                 <td><span class="badge badge-${statusClass}">${hs.health_status.toUpperCase()}</span></td>
-                <td>${hs.overall_score.toFixed(1)}</td>
-                <td>${hs.forecast_accuracy_score.toFixed(1)}</td>
-                <td>${hs.mape ? hs.mape.toFixed(1) + '%' : '-'}</td>
-                <td>${hs.forecast_count}</td>
-                <td>${hs.actual_count}</td>
-                <td>${hs.alerts.length > 0 ? `<span class="text-danger">${hs.alerts.length} alertas</span>` : '-'}</td>
+                <td>${safeFixed(hs.overall_score)}</td>
+                <td>${safeFixed(hs.forecast_accuracy_score)}</td>
+                <td>${hs.mape !== null && hs.mape !== undefined ? safeFixed(hs.mape) + '%' : '-'}</td>
+                <td>${hs.forecast_count || 0}</td>
+                <td>${hs.actual_count || 0}</td>
+                <td>${hs.alerts && hs.alerts.length > 0 ? `<span class="text-danger">${hs.alerts.length} alertas</span>` : '-'}</td>
             </tr>
         `;
     });

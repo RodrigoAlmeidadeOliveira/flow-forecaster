@@ -227,13 +227,17 @@ def analyze_portfolio_capacity(
     Returns:
         CapacityAnalysis object
     """
-    # Calculate total allocated capacity
-    allocated_capacity = sum(p.capacity_allocated for p in projects if p.status == 'active')
+    # Calculate total allocated capacity (handle None values)
+    allocated_capacity = sum(
+        (p.capacity_allocated or 0) for p in projects if p.status == 'active'
+    )
 
     # Estimate total capacity if not provided
     if total_available_capacity is None:
-        # Estimate: sum of all team sizes
-        total_available_capacity = sum(p.team_size for p in projects if p.status == 'active')
+        # Estimate: sum of all team sizes (handle None values)
+        total_available_capacity = sum(
+            (p.team_size or 0) for p in projects if p.status == 'active'
+        )
 
     available_capacity = max(0, total_available_capacity - allocated_capacity)
     utilization_rate = (allocated_capacity / total_available_capacity * 100) if total_available_capacity > 0 else 0
@@ -246,21 +250,25 @@ def analyze_portfolio_capacity(
         if project.status != 'active':
             continue
 
-        if project.capacity_allocated > project.team_size * 1.1:
+        # Handle None values for capacity and team_size
+        capacity = project.capacity_allocated or 0
+        team_sz = project.team_size or 1  # Avoid division by zero
+
+        if capacity > team_sz * 1.1:
             over_allocated.append({
                 'id': project.id,
                 'name': project.name,
-                'allocated': project.capacity_allocated,
-                'team_size': project.team_size,
-                'over_allocation_pct': ((project.capacity_allocated / project.team_size) - 1) * 100
+                'allocated': capacity,
+                'team_size': team_sz,
+                'over_allocation_pct': ((capacity / team_sz) - 1) * 100
             })
-        elif project.capacity_allocated < project.team_size * 0.5:
+        elif capacity < team_sz * 0.5:
             under_allocated.append({
                 'id': project.id,
                 'name': project.name,
-                'allocated': project.capacity_allocated,
-                'team_size': project.team_size,
-                'under_allocation_pct': (1 - (project.capacity_allocated / project.team_size)) * 100
+                'allocated': capacity,
+                'team_size': team_sz,
+                'under_allocation_pct': (1 - (capacity / team_sz)) * 100
             })
 
     # Determine status
