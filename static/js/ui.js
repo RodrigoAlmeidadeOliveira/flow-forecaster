@@ -2595,7 +2595,6 @@ ${generateProgressBar(p50Items, backlog, 'P50 (arriscado)  ', Math.round((p50Ite
         '#dependency-analysis',
         '#executive-dashboard',
         '#dashboard',
-        '#portfolio-dashboard',
         '#portfolio',
         '#tpsamples'
     ]);

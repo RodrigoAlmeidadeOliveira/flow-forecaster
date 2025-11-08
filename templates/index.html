@@ -328,11 +328,8 @@
                         <a aria-controls="dependency-analysis-tab" aria-selected="false" class="nav-link" data-toggle="tab" href="#dependency-analysis-tab" id="dependency-tab-link" role="tab" data-i18n="dependency_analysis_tab">Análise de Dependências</a>
 </li>
 <li class="nav-item">
-<a aria-controls="executive-dashboard" aria-selected="false" class="nav-link" data-toggle="tab" href="#executive-dashboard" id="tab-dashboard-link" role="tab">Dashboard Executivo</a>
-</li>
-<li class="nav-item">
-<a aria-controls="portfolio-dashboard" aria-selected="false" class="nav-link" data-toggle="tab" href="#portfolio-dashboard" id="tab-portfolio-link" role="tab">
-<i class="fas fa-briefcase"></i> Portfolio
+<a aria-controls="executive-dashboard" aria-selected="false" class="nav-link" data-toggle="tab" href="#executive-dashboard" id="tab-dashboard-link" role="tab">
+<i class="fas fa-chart-pie"></i> Dashboard & Portfolio
 </a>
 </li>
 <li class="nav-item">
@@ -2990,13 +2987,27 @@ a probabilidade de todas serem entregues no prazo é de <strong>1 em 2^n</strong
 </div>
 </div>
 
-<!-- Executive Dashboard Tab -->
+<!-- Dashboard & Portfolio Tab -->
 <div aria-labelledby="tab-dashboard-link" class="tab-pane fade" id="executive-dashboard" role="tabpanel">
 <div class="pt-4 pb-5">
 <div class="container text-center mb-4">
-<h2><i class="fas fa-chart-line"></i> Dashboard Executivo</h2>
-<p class="text-muted">Visão consolidada dos principais indicadores e métricas do projeto</p>
+<h2><i class="fas fa-chart-pie"></i> Dashboard & Portfolio</h2>
+<p class="text-muted">Visão consolidada do portfólio e indicadores do projeto atual</p>
 <button class="btn btn-primary btn-sm" onclick="refreshDashboard()"><i class="fas fa-sync-alt"></i> Atualizar Dashboard</button>
+</div>
+
+<!-- Portfolio Overview Section -->
+<div class="container-fluid mb-5">
+    <h4 class="mb-3"><i class="fas fa-briefcase"></i> Visão Geral do Portfólio</h4>
+    <div id="portfolio-content">
+        <!-- Content will be dynamically loaded by portfolio.js -->
+    </div>
+    <hr class="my-5">
+</div>
+
+<!-- Current Project Section -->
+<div class="container text-center mb-4">
+    <h4 class="mb-3"><i class="fas fa-project-diagram"></i> Projeto Atual / Análise Ativa</h4>
 </div>
 
 <!-- KPI Cards -->
@@ -3118,15 +3129,6 @@ a probabilidade de todas serem entregues no prazo é de <strong>1 em 2^n</strong
 </div>
 
 </div>
-</div>
-
-<!-- Portfolio Dashboard Tab -->
-<div aria-labelledby="tab-portfolio-link" class="tab-pane fade" id="portfolio-dashboard" role="tabpanel">
-    <div class="container-fluid pt-4">
-        <div id="portfolio-content">
-            <!-- Content will be dynamically loaded by portfolio.js -->
-        </div>
-    </div>
 </div>
 
 <!-- Backtesting Tab -->

@@ -3,9 +3,9 @@
  * Manages portfolio-level visualization and analysis
  */
 
-// Initialize portfolio when tab is shown
+// Initialize portfolio when Dashboard & Portfolio tab is shown
 $(document).ready(function() {
-    $('#tab-portfolio-link').on('shown.bs.tab', function() {
+    $('#tab-dashboard-link').on('shown.bs.tab', function() {
         loadPortfolioDashboard();
     });
 });
