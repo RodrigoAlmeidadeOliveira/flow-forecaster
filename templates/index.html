@@ -3002,6 +3002,25 @@ a probabilidade de todas serem entregues no prazo é de <strong>1 em 2^n</strong
     <div id="portfolio-content">
         <!-- Content will be dynamically loaded by portfolio.js -->
     </div>
+
+    <!-- WSJF Prioritization Section -->
+    <div class="row mt-4" id="wsjf-prioritization" style="display:none;">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-gradient text-white" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
+                    <h5 class="mb-0"><i class="fas fa-sort-amount-down"></i> Priorização WSJF (Weighted Shortest Job First)</h5>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted mb-3">
+                        WSJF = (Business Value + Time Criticality + Risk Reduction) / Job Size
+                        <br><small>Projetos ordenados por maior valor de WSJF (maior retorno/custo)</small>
+                    </p>
+                    <div id="wsjf-ranking"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <hr class="my-5">
 </div>
 

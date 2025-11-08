@@ -97,6 +97,9 @@ function renderPortfolioDashboard(data) {
     `;
 
     $('#portfolio-content').html(html);
+
+    // Load WSJF/CoD analysis
+    loadWSJFAnalysis(data.projects);
 }
 
 function renderAlerts(alerts) {
@@ -317,4 +320,107 @@ function renderProjectList(projects, colorClass) {
     html += '</ul>';
     return html;
 }
+
+/**
+ * Load and display WSJF/Cost of Delay analysis
+ */
+function loadWSJFAnalysis(projects) {
+    if (!projects || projects.length === 0) {
+        $('#wsjf-prioritization').hide();
+        return;
+    }
+
+    // Calculate WSJF for each project
+    const projectsWithWSJF = projects.map(p => {
+        // WSJF = (Business Value + Time Criticality + Risk Reduction) / Job Size (team_size as proxy)
+        const businessValue = p.business_value || 50;
+        const timeCriticality = 50; // Default, could be enhanced
+        const riskReduction = getRiskScore(p.risk_level);
+        const jobSize = p.team_size || 1;
+
+        const wsjf = (businessValue + timeCriticality + riskReduction) / jobSize;
+
+        return {
+            ...p,
+            wsjf_score: wsjf,
+            business_value: businessValue,
+            time_criticality: timeCriticality,
+            risk_reduction: riskReduction,
+            job_size: jobSize
+        };
+    });
+
+    // Sort by WSJF (highest first)
+    projectsWithWSJF.sort((a, b) => b.wsjf_score - a.wsjf_score);
+
+    // Render WSJF ranking table
+    renderWSJFRanking(projectsWithWSJF);
+    $('#wsjf-prioritization').show();
+}
+
+function getRiskScore(riskLevel) {
+    // Convert risk level to score (higher risk = lower score for risk reduction)
+    const riskMap = {
+        'low': 80,
+        'medium': 50,
+        'high': 20,
+        'critical': 10
+    };
+    return riskMap[riskLevel] || 50;
+}
+
+function renderWSJFRanking(projects) {
+    let html = '<div class="table-responsive"><table class="table table-hover">';
+    html += `
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Projeto</th>
+                <th>WSJF Score</th>
+                <th>Business Value</th>
+                <th>Time Criticality</th>
+                <th>Risk Reduction</th>
+                <th>Job Size</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody>
+    `;
+
+    projects.forEach((p, index) => {
+        const wsjfClass = index < 3 ? 'table-success' : index < 6 ? 'table-warning' : '';
+        html += `
+            <tr class="${wsjfClass}">
+                <td><strong>${index + 1}</strong></td>
+                <td><strong>${p.name}</strong></td>
+                <td>
+                    <span class="badge" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white; font-size: 1em; padding: 0.5em 1em;">
+                        ${p.wsjf_score.toFixed(2)}
+                    </span>
+                </td>
+                <td>${p.business_value}</td>
+                <td>${p.time_criticality}</td>
+                <td>${p.risk_reduction}</td>
+                <td>${p.job_size}</td>
+                <td><span class="badge badge-info">${p.status}</span></td>
+            </tr>
+        `;
+    });
+
+    html += '</tbody></table></div>';
+
+    html += `
+        <div class="alert alert-info mt-3">
+            <i class="fas fa-info-circle"></i> <strong>Como interpretar:</strong>
+            <ul class="mb-0 mt-2">
+                <li><strong class="text-success">Top 3 (verde):</strong> Projetos de maior prioridade - máximo retorno por esforço</li>
+                <li><strong class="text-warning">4-6 (amarelo):</strong> Prioridade média - considere recursos disponíveis</li>
+                <li>Demais: Avaliar se devem ser adiados ou reavaliados</li>
+            </ul>
+        </div>
+    `;
+
+    $('#wsjf-ranking').html(html);
+}
+
 
