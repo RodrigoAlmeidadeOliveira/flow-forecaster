@@ -3267,6 +3267,16 @@ def optimize_portfolio(portfolio_id):
             }), 400
 
         # Build project data for optimization
+        def safe_numeric(*values, default=0.0):
+            for value in values:
+                if value is None:
+                    continue
+                try:
+                    return float(value)
+                except (TypeError, ValueError):
+                    continue
+            return float(default)
+
         projects = []
         for pp in portfolio_projects:
             project = session.get(Project, pp.project_id)
@@ -3278,15 +3288,18 @@ def optimize_portfolio(portfolio_id):
                 Forecast.project_id == project.id
             ).order_by(Forecast.created_at.desc()).first()
 
-            duration_p85 = latest_forecast.projected_weeks_p85 if latest_forecast else 0
+            duration_p85 = safe_numeric(
+                latest_forecast.projected_weeks_p85 if latest_forecast else None,
+                default=0
+            )
 
             projects.append({
                 'id': project.id,
                 'name': project.name,
-                'business_value': pp.business_value_score or project.business_value,
+                'business_value': safe_numeric(pp.business_value_score, project.business_value),
                 'risk_level': project.risk_level,
-                'budget_allocated': pp.budget_allocated or 0,
-                'capacity_allocated': pp.capacity_allocated or project.capacity_allocated,
+                'budget_allocated': safe_numeric(pp.budget_allocated, default=0),
+                'capacity_allocated': safe_numeric(pp.capacity_allocated, project.capacity_allocated),
                 'wsjf_score': pp.wsjf_score,
                 'estimated_duration_p85': duration_p85
             })
