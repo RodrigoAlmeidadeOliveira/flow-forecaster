@@ -267,6 +267,20 @@ def scoped_actual_query(session):
     return query.join(Forecast).filter(Forecast.user_id == current_user.id)
 
 
+def scoped_portfolio_query(session):
+    """Return a Portfolio query scoped to the current user."""
+    query = session.query(Portfolio)
+    if current_user_is_admin():
+        return query
+
+    user_id = getattr(current_user, 'id', None)
+    if user_id is None:
+        # no authenticated context, return empty result
+        return query.filter(Portfolio.id == -1)
+
+    return query.filter(Portfolio.user_id == user_id)
+
+
 def has_record_access(record, attr='user_id') -> bool:
     """Check whether the logged-in user can access the given record."""
     if record is None:

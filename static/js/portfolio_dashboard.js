@@ -7,6 +7,19 @@ let currentPortfolioId = null;
 let resourceChart = null;
 let budgetChart = null;
 
+function hasValue(value) {
+    return value !== null && value !== undefined;
+}
+
+function safeNumber(value, fallback = 0) {
+    const num = Number(value);
+    return Number.isFinite(num) ? num : fallback;
+}
+
+function safeToFixed(value, decimals = 1, fallback = 0) {
+    return safeNumber(value, fallback).toFixed(decimals);
+}
+
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', () => {
     loadPortfolios();
@@ -73,38 +86,41 @@ async function loadDashboard() {
  */
 function renderDashboard(data) {
     // Summary metrics
-    document.getElementById('totalProjects').textContent = data.summary.total_projects;
-    document.getElementById('activeProjects').textContent = data.summary.active_projects;
-    document.getElementById('avgCompletion').textContent = data.summary.avg_completion_pct.toFixed(1);
-    document.getElementById('projectedDuration').textContent = data.timeline.projected_duration_weeks.toFixed(1);
+    const summary = data.summary || {};
+    const timeline = data.timeline || {};
+
+    document.getElementById('totalProjects').textContent = summary.total_projects ?? 0;
+    document.getElementById('activeProjects').textContent = summary.active_projects ?? 0;
+    document.getElementById('avgCompletion').textContent = safeToFixed(summary.avg_completion_pct, 1);
+    document.getElementById('projectedDuration').textContent = safeToFixed(timeline.projected_duration_weeks, 1);
 
     // Health score
-    renderHealthScore(data.health);
+    renderHealthScore(data.health || {});
 
     // Alerts
-    renderAlerts(data.alerts);
+    renderAlerts(Array.isArray(data.alerts) ? data.alerts : []);
 
     // Capacity
-    renderCapacity(data.health, data.resource_timeline);
+    renderCapacity(data.health || {}, Array.isArray(data.resource_timeline) ? data.resource_timeline : []);
 
     // Budget
-    renderBudget(data.health);
+    renderBudget(data.health || {});
 
     // Projects list
-    renderProjects(data.projects);
+    renderProjects(Array.isArray(data.projects) ? data.projects : []);
 
     // Timeline
-    renderTimeline(data.timeline_events);
+    renderTimeline(Array.isArray(data.timeline_events) ? data.timeline_events : []);
 }
 
 /**
  * Render health score
  */
-function renderHealthScore(health) {
-    const score = health.overall_score;
+function renderHealthScore(health = {}) {
+    const score = safeNumber(health.overall_score);
     const scoreEl = document.getElementById('healthScore');
 
-    scoreEl.textContent = score.toFixed(0);
+    scoreEl.textContent = safeToFixed(score, 0);
 
     // Set color based on score
     scoreEl.className = 'health-score';
@@ -118,9 +134,9 @@ function renderHealthScore(health) {
         scoreEl.classList.add('health-critical');
     }
 
-    document.getElementById('onTrackCount').textContent = health.on_track_count;
-    document.getElementById('atRiskCount').textContent = health.at_risk_count;
-    document.getElementById('criticalCount').textContent = health.critical_count;
+    document.getElementById('onTrackCount').textContent = health.on_track_count ?? 0;
+    document.getElementById('atRiskCount').textContent = health.at_risk_count ?? 0;
+    document.getElementById('criticalCount').textContent = health.critical_count ?? 0;
 }
 
 /**
@@ -159,12 +175,14 @@ function renderAlerts(alerts) {
 /**
  * Render capacity allocation
  */
-function renderCapacity(health, resourceTimeline) {
-    const utilization = health.capacity_utilization;
+function renderCapacity(health = {}, resourceTimeline = []) {
+    const utilization = safeNumber(health.capacity_utilization);
+    const allocated = safeNumber(health.capacity_allocated);
+    const total = safeNumber(health.capacity_available);
 
     document.getElementById('capacityUtilization').textContent = utilization.toFixed(1);
-    document.getElementById('capacityAllocated').textContent = health.capacity_allocated.toFixed(1);
-    document.getElementById('capacityTotal').textContent = health.capacity_available.toFixed(1);
+    document.getElementById('capacityAllocated').textContent = allocated.toFixed(1);
+    document.getElementById('capacityTotal').textContent = total.toFixed(1);
 
     const bar = document.getElementById('capacityBar');
     bar.style.width = Math.min(utilization, 100) + '%';
@@ -228,7 +246,7 @@ function renderResourceChart(timeline) {
                 tooltip: {
                     callbacks: {
                         label: function(context) {
-                            return context.dataset.label + ': ' + context.parsed.y.toFixed(1) + ' FTE';
+                            return context.dataset.label + ': ' + safeToFixed(context.parsed?.y, 1) + ' FTE';
                         }
                     }
                 }
@@ -249,17 +267,17 @@ function renderResourceChart(timeline) {
 /**
  * Render budget allocation
  */
-function renderBudget(health) {
+function renderBudget(health = {}) {
     const section = document.getElementById('budgetSection');
 
-    if (!health.budget_utilization) {
+    if (!hasValue(health.budget_utilization)) {
         section.innerHTML = '<p class="text-muted">Orçamento não configurado para este portfolio</p>';
         return;
     }
 
-    const utilization = health.budget_utilization;
-    const allocated = health.budget_allocated;
-    const available = health.budget_available;
+    const utilization = safeNumber(health.budget_utilization);
+    const allocated = safeNumber(health.budget_allocated);
+    const available = Math.max(safeNumber(health.budget_available), 0);
 
     section.innerHTML = `
         <strong>Utilização: ${utilization.toFixed(1)}%</strong>
@@ -311,9 +329,9 @@ function renderBudgetChart(allocated, available) {
                 tooltip: {
                     callbacks: {
                         label: function(context) {
-                            const value = context.parsed;
-                            const pct = (value / available * 100).toFixed(1);
-                            return context.label + ': R$ ' + formatNumber(value) + ' (' + pct + '%)';
+                            const value = safeNumber(context.parsed);
+                            const pct = available > 0 ? (value / available * 100) : 0;
+                            return context.label + ': R$ ' + formatNumber(value) + ' (' + safeToFixed(pct, 1) + '%)';
                         }
                     }
                 }
@@ -328,17 +346,22 @@ function renderBudgetChart(allocated, available) {
 function renderProjects(projects) {
     const container = document.getElementById('projectsList');
 
-    if (projects.length === 0) {
+    if (!projects || projects.length === 0) {
         container.innerHTML = '<p class="text-muted">Nenhum projeto no portfolio</p>';
         return;
     }
 
     // Sort by WSJF or priority
     projects.sort((a, b) => {
-        if (a.wsjf_score && b.wsjf_score) {
-            return b.wsjf_score - a.wsjf_score;
+        const hasWSJF_A = hasValue(a.wsjf_score);
+        const hasWSJF_B = hasValue(b.wsjf_score);
+
+        if (hasWSJF_A && hasWSJF_B) {
+            return safeNumber(b.wsjf_score) - safeNumber(a.wsjf_score);
         }
-        return a.priority - b.priority;
+        const priorityA = hasValue(a.priority) ? a.priority : Number.MAX_SAFE_INTEGER;
+        const priorityB = hasValue(b.priority) ? b.priority : Number.MAX_SAFE_INTEGER;
+        return priorityA - priorityB;
     });
 
     container.innerHTML = projects.map(p => {
@@ -368,16 +391,16 @@ function renderProjects(projects) {
                     <div class="col-md-3">
                         <div class="small text-muted">Conclusão</div>
                         <div class="progress progress-bar-custom">
-                            <div class="progress-bar bg-primary" style="width: ${p.completion_pct}%"></div>
+                            <div class="progress-bar bg-primary" style="width: ${safeNumber(p.completion_pct)}%"></div>
                         </div>
-                        <small>${p.completion_pct.toFixed(1)}%</small>
+                        <small>${safeToFixed(p.completion_pct, 1)}%</small>
                     </div>
                     <div class="col-md-2 text-end">
                         <div class="small text-muted">Duração P85</div>
-                        <strong>${p.estimated_duration_p85.toFixed(1)} sem</strong>
+                        <strong>${safeToFixed(p.estimated_duration_p85, 1)} sem</strong>
                     </div>
                     <div class="col-md-1 text-end">
-                        ${p.wsjf_score ? `<span class="badge bg-primary">WSJF: ${p.wsjf_score.toFixed(1)}</span>` : ''}
+                        ${hasValue(p.wsjf_score) ? `<span class="badge bg-primary">WSJF: ${safeToFixed(p.wsjf_score, 1)}</span>` : ''}
                     </div>
                 </div>
             </div>
@@ -391,7 +414,7 @@ function renderProjects(projects) {
 function renderTimeline(events) {
     const container = document.getElementById('timelineEvents');
 
-    if (events.length === 0) {
+    if (!events || events.length === 0) {
         container.innerHTML = '<p class="text-muted">Nenhum evento na timeline</p>';
         return;
     }
