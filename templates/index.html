@@ -1485,6 +1485,38 @@
 <h2 data-i18n="historical_throughput_lead">Gráficos Históricos de Throughput e Lead Time</h2>
 <p class="mb-4" data-i18n="visualize_distribution">Visualize a distribuição e estabilidade das amostras fornecidas. Atualize os campos acima para atualizar esses gráficos.</p>
 </div>
+<div class="container mb-4">
+<div class="card">
+<div class="card-header bg-info text-white">
+<h5 class="mb-0" data-i18n="process_behavior_chart_title">📊 Process Behavior Charts (Gráficos de Controle Estatístico)</h5>
+</div>
+<div class="card-body">
+<p data-i18n="process_behavior_chart_description">
+Os gráficos de controle utilizam limites estatísticos baseados no método de <strong>Moving Range</strong> para distinguir entre variação natural e sinais especiais no processo.
+</p>
+<div class="row">
+<div class="col-md-6">
+<h6 data-i18n="control_limits_title">Limites de Controle:</h6>
+<ul class="text-left">
+<li><strong>UCL</strong> (Limite Superior): <span data-i18n="ucl_description">Média + 2.66 × Moving Range</span></li>
+<li><strong>Linha Central</strong>: <span data-i18n="mean_description">Média do processo</span></li>
+<li><strong>LCL</strong> (Limite Inferior): <span data-i18n="lcl_description">Média - 2.66 × Moving Range</span></li>
+</ul>
+</div>
+<div class="col-md-6">
+<h6 data-i18n="special_signals_title">Sinais Especiais (pontos em vermelho):</h6>
+<ul class="text-left">
+<li><span data-i18n="beyond_limits">🔴 Pontos além dos limites de controle</span></li>
+<li><span data-i18n="shift_pattern">🔴 8+ pontos consecutivos acima ou abaixo da média (mudança no processo)</span></li>
+</ul>
+</div>
+</div>
+<p class="mt-2 mb-0 text-muted small" data-i18n="process_behavior_note">
+<em>Nota: Sinais especiais indicam que o processo pode ter mudado e requer investigação. Processos estáveis apresentam apenas variação natural.</em>
+</p>
+</div>
+</div>
+</div>
 <div class="container-fluid">
 <div class="row">
 <div class="col-lg-6 mb-4">
@@ -1505,11 +1537,11 @@ Forneça ao menos 3 amostras de throughput para gerar o histograma.
 <div class="col-lg-6 mb-4">
 <div class="card h-100">
 <div class="card-header bg-secondary text-white">
-<h5 class="mb-0" data-i18n="throughput_control_title">Gráfico de Controle de Throughput</h5>
+<h5 class="mb-0" data-i18n="throughput_control_title">Process Behavior Chart - Throughput</h5>
 </div>
 <div class="card-body">
 <div class="alert alert-info" id="tp-control-empty" role="alert" style="display:none;" data-i18n="min_samples_control">
-Forneça amostras de throughput para visualizar o gráfico de controle.
+Forneça ao menos 2 amostras de throughput para gerar o gráfico de controle estatístico.
 </div>
 <div class="chart-container" id="tp-control-container">
 <canvas id="tp-control-chart"></canvas>
@@ -1537,11 +1569,11 @@ Forneça ao menos 3 amostras de lead time para gerar o histograma.
 <div class="col-lg-6 mb-4">
 <div class="card h-100">
 <div class="card-header bg-dark text-white">
-<h5 class="mb-0" data-i18n="lead_time_control_title">Gráfico de Controle de Lead Time</h5>
+<h5 class="mb-0" data-i18n="lead_time_control_title">Process Behavior Chart - Lead Time</h5>
 </div>
 <div class="card-body">
 <div class="alert alert-info" id="lt-control-empty" role="alert" style="display:none;" data-i18n="min_samples_lt_control">
-Forneça amostras de lead time para visualizar o gráfico de controle.
+Forneça ao menos 2 amostras de lead time para gerar o gráfico de controle estatístico.
 </div>
 <div class="chart-container" id="lt-control-container">
 <canvas id="lt-control-chart"></canvas>
