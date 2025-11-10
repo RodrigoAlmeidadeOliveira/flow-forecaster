@@ -47,6 +47,134 @@
     window.__PF_formatInteger = formatInteger;
     window.__PF_formatPercent = formatPercent;
 
+    function computeProcessBehaviorLimits(values, options = {}) {
+        const series = Array.isArray(values) ? values : [];
+        const clean = series
+            .map(value => Number(value))
+            .filter(num => Number.isFinite(num));
+
+        const minPoints = typeof options.minPoints === 'number' ? Math.max(options.minPoints, 2) : 2;
+        if (clean.length < minPoints) {
+            return null;
+        }
+
+        const mean = clean.reduce((sum, value) => sum + value, 0) / clean.length;
+        const movingRanges = [];
+        for (let index = 1; index < clean.length; index += 1) {
+            movingRanges.push(Math.abs(clean[index] - clean[index - 1]));
+        }
+
+        const movingRangeAverage = movingRanges.length
+            ? movingRanges.reduce((sum, value) => sum + value, 0) / movingRanges.length
+            : 0;
+
+        const factor = typeof options.factor === 'number' ? options.factor : 2.66;
+        let ucl = mean + factor * movingRangeAverage;
+        let lcl = mean - factor * movingRangeAverage;
+
+        if (typeof options.lowerBound === 'number' && Number.isFinite(options.lowerBound)) {
+            lcl = Math.max(lcl, options.lowerBound);
+        }
+        if (typeof options.upperBound === 'number' && Number.isFinite(options.upperBound)) {
+            ucl = Math.min(ucl, options.upperBound);
+        }
+
+        return {
+            mean,
+            ucl,
+            lcl,
+            movingRangeAverage,
+            movingRanges,
+            sampleCount: clean.length
+        };
+    }
+
+    function detectSpecialCauses(values, limits, options = {}) {
+        const result = {
+            beyondLimits: [],
+            longRuns: [],
+            specialPointIndices: [],
+            runIndices: [],
+            totalSpecialPoints: 0,
+            hasSignals: false
+        };
+
+        if (!limits || !Number.isFinite(limits.mean)) {
+            return result;
+        }
+
+        const series = Array.isArray(values) ? values : [];
+        const clean = series.map(value => Number(value));
+        if (!clean.length) {
+            return result;
+        }
+
+        const upper = Number.isFinite(limits.ucl) ? limits.ucl : Infinity;
+        const lower = Number.isFinite(limits.lcl) ? limits.lcl : -Infinity;
+        const minRunLength = Math.max(2, options.minRunLength || 8);
+        const specialPointSet = new Set();
+        const runPointSet = new Set();
+
+        clean.forEach((value, index) => {
+            if (!Number.isFinite(value)) {
+                return;
+            }
+            if (value > upper || value < lower) {
+                result.beyondLimits.push({ index, value });
+                specialPointSet.add(index);
+            }
+        });
+
+        let currentSide = null;
+        let currentStart = null;
+        let currentLength = 0;
+
+        clean.forEach((value, index) => {
+            if (!Number.isFinite(value) || value === limits.mean) {
+                currentSide = null;
+                currentStart = null;
+                currentLength = 0;
+                return;
+            }
+
+            const side = value > limits.mean ? 'above' : 'below';
+            if (side === currentSide) {
+                currentLength += 1;
+            } else {
+                currentSide = side;
+                currentStart = index;
+                currentLength = 1;
+            }
+
+            if (currentLength === minRunLength) {
+                const run = { start: currentStart, end: index, side };
+                result.longRuns.push(run);
+                for (let pointer = run.start; pointer <= run.end; pointer += 1) {
+                    runPointSet.add(pointer);
+                }
+            } else if (currentLength > minRunLength) {
+                const lastRun = result.longRuns[result.longRuns.length - 1];
+                if (lastRun && lastRun.side === side && lastRun.start === currentStart) {
+                    lastRun.end = index;
+                    for (let pointer = lastRun.start; pointer <= lastRun.end; pointer += 1) {
+                        runPointSet.add(pointer);
+                    }
+                }
+            }
+        });
+
+        runPointSet.forEach(index => specialPointSet.add(index));
+
+        result.specialPointIndices = Array.from(specialPointSet).sort((a, b) => a - b);
+        result.runIndices = Array.from(runPointSet).sort((a, b) => a - b);
+        result.totalSpecialPoints = result.specialPointIndices.length;
+        result.hasSignals = result.beyondLimits.length > 0 || result.longRuns.length > 0;
+        return result;
+    }
+
+    window.computeProcessBehaviorLimits = computeProcessBehaviorLimits;
+    window.detectSpecialCauses = detectSpecialCauses;
+
     function translate(key, fallback, params) {
         if (typeof window.i18n === 'function') {
             try {

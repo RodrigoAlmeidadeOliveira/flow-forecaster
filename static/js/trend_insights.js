@@ -4,6 +4,7 @@
     const METRIC_CONFIG = {
         throughput: {
             container: '#throughput-metric-section',
+            processKey: 'throughput',
             statusValue: '#trend-status-value',
             statusDetail: '#trend-status-detail',
             changeValue: '#trend-change-value',
@@ -26,6 +27,7 @@
         },
         lead_time: {
             container: '#lead-time-metric-section',
+            processKey: 'lead_time',
             statusValue: '#lt-trend-status-value',
             statusDetail: '#lt-trend-status-detail',
             changeValue: '#lt-trend-change-value',
@@ -47,6 +49,62 @@
             volatilityDetailDefault: 'Desvio padrão das últimas observações'
         }
     };
+
+    const PROCESS_BEHAVIOR_CONFIG = {
+        throughput: {
+            emptySelector: '#tp-pbc-empty',
+            contentSelector: '#tp-pbc-content',
+            meanValue: '#tp-pbc-mean',
+            uclValue: '#tp-pbc-ucl',
+            lclValue: '#tp-pbc-lcl',
+            mrValue: '#tp-pbc-mr',
+            summaryText: '#tp-special-cause-summary',
+            detailText: '#tp-special-cause-detail',
+            canvasId: 'tp-process-behavior-chart',
+            normalColor: '#0d6efd',
+            specialColor: '#dc3545',
+            runColor: '#fd7e14',
+            lowerBound: 0
+        },
+        lead_time: {
+            emptySelector: '#lt-pbc-empty',
+            contentSelector: '#lt-pbc-content',
+            meanValue: '#lt-pbc-mean',
+            uclValue: '#lt-pbc-ucl',
+            lclValue: '#lt-pbc-lcl',
+            mrValue: '#lt-pbc-mr',
+            summaryText: '#lt-special-cause-summary',
+            detailText: '#lt-special-cause-detail',
+            canvasId: 'lt-process-behavior-chart',
+            normalColor: '#20c997',
+            specialColor: '#dc3545',
+            runColor: '#ffc107',
+            lowerBound: 0
+        }
+    };
+
+    const processBehaviorCharts = {};
+    const lastTrendSamples = {
+        throughput: [],
+        lead_time: []
+    };
+
+    function t(key, fallback, params) {
+        if (typeof window.i18n === 'function') {
+            try {
+                return window.i18n(key, params);
+            } catch (error) {
+                console.warn('[PBC/i18n] Failed to translate key:', key, error);
+            }
+        }
+        let text = fallback != null ? fallback : key;
+        if (params) {
+            Object.keys(params).forEach(param => {
+                text = text.replace(new RegExp(`{{${param}}}`, 'g'), params[param]);
+            });
+        }
+        return text;
+    }
 
     function parseSamplesFrom(selector) {
         const raw = ($(selector).val() || '').trim();
@@ -70,6 +128,292 @@
     function formatPercent(value, decimals = 1) {
         if (!Number.isFinite(value)) return '—';
         return `${formatNumber(value, decimals)}%`;
+    }
+
+    function destroyProcessBehaviorChart(metricKey) {
+        const chart = processBehaviorCharts[metricKey];
+        if (chart && typeof chart.destroy === 'function') {
+            chart.destroy();
+        }
+        delete processBehaviorCharts[metricKey];
+    }
+
+    function resetProcessBehaviorSection(metricKey, mode = 'hidden') {
+        const config = PROCESS_BEHAVIOR_CONFIG[metricKey];
+        if (!config) return;
+
+        destroyProcessBehaviorChart(metricKey);
+
+        const $emptyState = $(config.emptySelector);
+        const $content = $(config.contentSelector);
+        if (mode === 'insufficient') {
+            $emptyState.removeClass('d-none');
+        } else {
+            $emptyState.addClass('d-none');
+        }
+        $content.addClass('d-none');
+
+        $(config.meanValue).text('—');
+        $(config.uclValue).text('—');
+        $(config.lclValue).text('—');
+        $(config.mrValue).text('—');
+
+        if (mode === 'insufficient') {
+            $(config.summaryText).text(t('pbc_empty_message', 'Forneça pelo menos 4 amostras para gerar o Process Behavior Chart.'));
+        } else {
+            $(config.summaryText).text(t('pbc_special_causes_none', 'Nenhum sinal especial detectado. Processo está sob controle estatístico.'));
+        }
+        $(config.detailText).text('');
+    }
+
+    function updateProcessBehaviorStats(metricKey, limits, sampleCount) {
+        const config = PROCESS_BEHAVIOR_CONFIG[metricKey];
+        if (!config || !limits) return;
+
+        $(config.meanValue).text(formatNumber(limits.mean));
+        $(config.uclValue).text(formatNumber(limits.ucl));
+        $(config.lclValue).text(formatNumber(limits.lcl));
+        $(config.mrValue).text(formatNumber(limits.movingRangeAverage));
+        $(config.detailText).text(t('pbc_sample_count', '{{count}} observações analisadas.', { count: sampleCount }));
+    }
+
+    function updateSpecialCauseSummary(metricKey, signals) {
+        const config = PROCESS_BEHAVIOR_CONFIG[metricKey];
+        if (!config) return;
+
+        const statements = [];
+        if (signals && signals.beyondLimits && signals.beyondLimits.length) {
+            statements.push(t('pbc_special_causes_points', '{{count}} ponto(s) além dos limites de controle.', { count: signals.beyondLimits.length }));
+        }
+        if (signals && signals.longRuns && signals.longRuns.length) {
+            statements.push(t('pbc_special_causes_runs', '{{count}} sequência(s) sustentada(s) (8+ pontos de um lado).', { count: signals.longRuns.length }));
+        }
+
+        if (statements.length) {
+            $(config.summaryText).text(statements.join(' · '));
+        } else {
+            $(config.summaryText).text(t('pbc_special_causes_none', 'Nenhum sinal especial detectado. Processo está sob controle estatístico.'));
+        }
+    }
+
+    function buildProcessBehaviorAnnotations(limits) {
+        const annotations = [];
+        const meanLabel = t('pbc_stat_mean_label', 'Média do processo');
+        const uclLabel = t('pbc_stat_ucl_label', 'Limite superior (UCL)');
+        const lclLabel = t('pbc_stat_lcl_label', 'Limite inferior (LCL)');
+
+        if (Number.isFinite(limits.mean)) {
+            annotations.push({
+                type: 'line',
+                mode: 'horizontal',
+                scaleID: 'y-axis-0',
+                value: limits.mean,
+                borderColor: '#6c757d',
+                borderDash: [6, 4],
+                borderWidth: 1.5,
+                label: {
+                    enabled: true,
+                    content: `${meanLabel}: ${formatNumber(limits.mean)}`,
+                    position: 'right',
+                    backgroundColor: '#6c757d',
+                    fontColor: '#fff',
+                    fontSize: 10,
+                    xAdjust: -6,
+                    padding: 4
+                }
+            });
+        }
+        if (Number.isFinite(limits.ucl)) {
+            annotations.push({
+                type: 'line',
+                mode: 'horizontal',
+                scaleID: 'y-axis-0',
+                value: limits.ucl,
+                borderColor: '#198754',
+                borderDash: [4, 4],
+                borderWidth: 1.5,
+                label: {
+                    enabled: true,
+                    content: `${uclLabel}: ${formatNumber(limits.ucl)}`,
+                    position: 'right',
+                    backgroundColor: '#198754',
+                    fontColor: '#fff',
+                    fontSize: 10,
+                    xAdjust: -6,
+                    padding: 4
+                }
+            });
+        }
+        if (Number.isFinite(limits.lcl)) {
+            annotations.push({
+                type: 'line',
+                mode: 'horizontal',
+                scaleID: 'y-axis-0',
+                value: limits.lcl,
+                borderColor: '#dc3545',
+                borderDash: [4, 4],
+                borderWidth: 1.5,
+                label: {
+                    enabled: true,
+                    content: `${lclLabel}: ${formatNumber(limits.lcl)}`,
+                    position: 'right',
+                    backgroundColor: '#dc3545',
+                    fontColor: '#fff',
+                    fontSize: 10,
+                    xAdjust: -6,
+                    padding: 4
+                }
+            });
+        }
+
+        return annotations;
+    }
+
+    function drawProcessBehaviorChart(metricKey, samples, limits, signals) {
+        const config = PROCESS_BEHAVIOR_CONFIG[metricKey];
+        if (!config || typeof Chart === 'undefined') return;
+
+        const canvas = document.getElementById(config.canvasId);
+        if (!canvas) return;
+
+        destroyProcessBehaviorChart(metricKey);
+
+        const ctx = canvas.getContext('2d');
+        const labels = samples.map((_value, index) => index + 1);
+        const runIndices = new Set((signals && signals.runIndices) || []);
+        const beyondIndices = new Set(((signals && signals.beyondLimits) || []).map(point => point.index));
+
+        const pointColors = samples.map((_value, index) => {
+            if (beyondIndices.has(index)) return config.specialColor;
+            if (runIndices.has(index)) return config.runColor;
+            return config.normalColor;
+        });
+        const pointRadius = samples.map((_value, index) => {
+            if (beyondIndices.has(index)) return 6;
+            if (runIndices.has(index)) return 5;
+            return 4;
+        });
+
+        const datasetLabel = metricKey === 'lead_time'
+            ? t('lead_time_control', 'Gráfico de Controle de Lead Time')
+            : t('throughput_control', 'Gráfico de Controle de Throughput');
+
+        processBehaviorCharts[metricKey] = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels,
+                datasets: [{
+                    label: datasetLabel,
+                    data: samples,
+                    borderColor: config.normalColor,
+                    backgroundColor: 'transparent',
+                    fill: false,
+                    lineTension: 0,
+                    pointBackgroundColor: pointColors,
+                    pointBorderColor: pointColors,
+                    pointRadius,
+                    pointHoverRadius: pointRadius.map(value => value + 1),
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                maintainAspectRatio: false,
+                responsive: true,
+                legend: { display: false },
+                animation: { duration: 200 },
+                tooltips: {
+                    mode: 'nearest',
+                    intersect: false,
+                    backgroundColor: 'rgba(0,0,0,0.8)',
+                    callbacks: {
+                        label: function(tooltipItem) {
+                            const index = tooltipItem.index;
+                            const value = tooltipItem.yLabel;
+                            const badges = [];
+                            if (beyondIndices.has(index)) {
+                                badges.push(t('pbc_legend_special', 'Pontos fora de controle'));
+                            } else if (runIndices.has(index)) {
+                                badges.push(t('pbc_legend_run', 'Pontos em sequência longa'));
+                            }
+                            const badgeText = badges.length ? ` • ${badges.join(' / ')}` : '';
+                            return `${formatNumber(value)}${badgeText}`;
+                        },
+                        afterLabel: function() {
+                            return `UCL: ${formatNumber(limits.ucl)} · LCL: ${formatNumber(limits.lcl)}`;
+                        }
+                    }
+                },
+                scales: {
+                    xAxes: [{
+                        gridLines: { display: false },
+                        ticks: { fontSize: 11 }
+                    }],
+                    yAxes: [{
+                        ticks: {
+                            fontSize: 11,
+                            beginAtZero: limits.lcl >= 0
+                        }
+                    }]
+                },
+                annotation: {
+                    drawTime: 'beforeDatasetsDraw',
+                    annotations: buildProcessBehaviorAnnotations(limits)
+                }
+            }
+        });
+    }
+
+    function renderProcessBehaviorChart(metricKey, rawSamples, options = {}) {
+        const config = PROCESS_BEHAVIOR_CONFIG[metricKey];
+        if (!config) return;
+
+        const samples = Array.isArray(rawSamples)
+            ? rawSamples
+                .map(value => Number(value))
+                .filter(value => Number.isFinite(value))
+            : [];
+
+        const minPoints = options.minPoints || 4;
+        const $emptyState = $(config.emptySelector);
+        const $content = $(config.contentSelector);
+
+        if (samples.length < minPoints) {
+            destroyProcessBehaviorChart(metricKey);
+            $content.addClass('d-none');
+            $emptyState.removeClass('d-none');
+            $(config.summaryText).text(t('pbc_empty_message', 'Forneça pelo menos 4 amostras para gerar o Process Behavior Chart.'));
+            $(config.detailText).text('');
+            $(config.meanValue).text('—');
+            $(config.uclValue).text('—');
+            $(config.lclValue).text('—');
+            $(config.mrValue).text('—');
+            return;
+        }
+
+        if (typeof window.computeProcessBehaviorLimits !== 'function') {
+            console.warn('[PBC] computeProcessBehaviorLimits is unavailable.');
+            return;
+        }
+
+        $emptyState.addClass('d-none');
+        $content.removeClass('d-none');
+
+        const limits = window.computeProcessBehaviorLimits(samples, {
+            lowerBound: typeof config.lowerBound === 'number' ? config.lowerBound : undefined,
+            minPoints: 2
+        });
+        if (!limits) {
+            resetProcessBehaviorSection(metricKey, 'insufficient');
+            return;
+        }
+
+        updateProcessBehaviorStats(metricKey, limits, samples.length);
+
+        const signals = typeof window.detectSpecialCauses === 'function'
+            ? window.detectSpecialCauses(samples, limits, { minRunLength: options.minRunLength || 8 })
+            : { beyondLimits: [], longRuns: [], runIndices: [] };
+        updateSpecialCauseSummary(metricKey, signals);
+        drawProcessBehaviorChart(metricKey, samples, limits, signals);
     }
 
     function setStatusClass($element, status) {
@@ -275,6 +619,9 @@
         $(config.confidenceDetail).text('Aguardando análise');
         $(config.volatilityValue).text('—');
         $(config.volatilityDetail).text(config.volatilityDetailDefault || 'Desvio padrão das últimas observações');
+        if (config.processKey) {
+            resetProcessBehaviorSection(config.processKey);
+        }
         renderSeasonality(null, config);
         renderAnomalies(null, null, config);
         renderProjections([], config);
@@ -283,7 +630,7 @@
         $(config.container).addClass('d-none');
     }
 
-    function showMetric(metricData) {
+    function showMetric(metricData, samples) {
         const key = (metricData.metric_key || metricData.metric_name || '').toLowerCase();
         const config = METRIC_CONFIG[key];
         if (!config) return;
@@ -300,6 +647,9 @@
         renderAnomalies(metricData.anomalies || null, trend, config);
         renderProjections(metricData.projections || [], config);
         renderAlerts(metricData.alerts || [], config);
+        if (config.processKey) {
+            renderProcessBehaviorChart(config.processKey, samples || [], { minPoints: 4 });
+        }
         $(config.container).removeClass('d-none');
     }
 
@@ -340,6 +690,9 @@
             $('#trend-analysis-results').addClass('d-none');
             return;
         }
+
+        lastTrendSamples.throughput = throughputSamples.slice();
+        lastTrendSamples.lead_time = leadTimeSamples.slice();
 
         hideAllMetricSections();
         toggleLoading(true);
@@ -383,7 +736,7 @@
                 let displayed = false;
 
                 if (metricMap.throughput) {
-                    showMetric(metricMap.throughput);
+                    showMetric(metricMap.throughput, lastTrendSamples.throughput);
                     displayed = true;
                 } else if (result.metric_name && result.metric_name.toLowerCase() === 'throughput' && result.trend) {
                     showMetric({
@@ -396,14 +749,14 @@
                         alerts: result.alerts,
                         summary: result.summary,
                         higher_is_better: result.higher_is_better
-                    });
+                    }, lastTrendSamples.throughput);
                     displayed = true;
                 } else {
                     resetMetricSection(METRIC_CONFIG.throughput);
                 }
 
                 if (metricMap['lead_time']) {
-                    showMetric(metricMap['lead_time']);
+                    showMetric(metricMap['lead_time'], lastTrendSamples.lead_time);
                     displayed = true;
                 } else {
                     resetMetricSection(METRIC_CONFIG.lead_time);
