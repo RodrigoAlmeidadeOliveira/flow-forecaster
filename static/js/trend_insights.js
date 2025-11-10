@@ -733,13 +733,8 @@
                     metricMap[key] = metric;
                 });
 
-                let displayed = false;
-
-                if (metricMap.throughput) {
-                    showMetric(metricMap.throughput, lastTrendSamples.throughput);
-                    displayed = true;
-                } else if (result.metric_name && result.metric_name.toLowerCase() === 'throughput' && result.trend) {
-                    showMetric({
+                const fallbackThroughput = (!metricMap.throughput && result.metric_name && result.metric_name.toLowerCase() === 'throughput' && result.trend)
+                    ? {
                         metric_key: 'throughput',
                         metric_name: result.metric_name,
                         trend: result.trend,
@@ -749,24 +744,31 @@
                         alerts: result.alerts,
                         summary: result.summary,
                         higher_is_better: result.higher_is_better
-                    }, lastTrendSamples.throughput);
-                    displayed = true;
+                    }
+                    : null;
+
+                const throughputMetric = metricMap.throughput || fallbackThroughput;
+                const leadTimeMetric = metricMap['lead_time'] || null;
+                const hasAnyMetric = Boolean(throughputMetric || leadTimeMetric);
+
+                if (!hasAnyMetric) {
+                    $('#trend-analysis-results').addClass('d-none');
+                    showFeedback('Não foi possível calcular tendências com os dados fornecidos.');
+                    return;
+                }
+
+                $('#trend-analysis-results').removeClass('d-none');
+
+                if (throughputMetric) {
+                    showMetric(throughputMetric, lastTrendSamples.throughput);
                 } else {
                     resetMetricSection(METRIC_CONFIG.throughput);
                 }
 
-                if (metricMap['lead_time']) {
-                    showMetric(metricMap['lead_time'], lastTrendSamples.lead_time);
-                    displayed = true;
+                if (leadTimeMetric) {
+                    showMetric(leadTimeMetric, lastTrendSamples.lead_time);
                 } else {
                     resetMetricSection(METRIC_CONFIG.lead_time);
-                }
-
-                if (displayed) {
-                    $('#trend-analysis-results').removeClass('d-none');
-                } else {
-                    $('#trend-analysis-results').addClass('d-none');
-                    showFeedback('Não foi possível calcular tendências com os dados fornecidos.');
                 }
 
                 if (Array.isArray(result.warnings) && result.warnings.length) {
