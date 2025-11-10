@@ -578,6 +578,109 @@
         };
     }
 
+    /**
+     * Calcula os limites de controle para Process Behavior Chart (XmR Chart)
+     * usando o método de Moving Range
+     */
+    function computeProcessBehaviorLimits(values) {
+        if (!values || values.length < 2) return null;
+
+        // Calcular média (linha central)
+        const sum = values.reduce((acc, val) => acc + val, 0);
+        const mean = sum / values.length;
+
+        // Calcular Moving Ranges (diferenças absolutas entre valores consecutivos)
+        const movingRanges = [];
+        for (let i = 1; i < values.length; i++) {
+            movingRanges.push(Math.abs(values[i] - values[i - 1]));
+        }
+
+        // Calcular média dos Moving Ranges
+        const mRSum = movingRanges.reduce((acc, val) => acc + val, 0);
+        const mRBar = mRSum / movingRanges.length;
+
+        // Constante para limites de controle em gráficos XmR (aproximadamente 3 sigma)
+        // 2.66 é derivado de 3/d2, onde d2 para n=2 é aproximadamente 1.128
+        const controlLimitMultiplier = 2.66;
+
+        // Calcular limites de controle
+        const ucl = mean + (controlLimitMultiplier * mRBar);
+        const lcl = Math.max(0, mean - (controlLimitMultiplier * mRBar)); // LCL não pode ser negativo
+
+        return {
+            mean,
+            ucl,
+            lcl,
+            mRBar,
+            movingRanges
+        };
+    }
+
+    /**
+     * Detecta sinais especiais em Process Behavior Chart
+     * Retorna array de índices dos pontos que são sinais especiais
+     */
+    function detectSpecialCauses(values, limits) {
+        if (!values || !limits) return [];
+
+        const specialPoints = [];
+
+        // Regra 1: Pontos além dos limites de controle
+        values.forEach((value, index) => {
+            if (value > limits.ucl || value < limits.lcl) {
+                specialPoints.push({
+                    index,
+                    reason: 'beyond_limits',
+                    value
+                });
+            }
+        });
+
+        // Regra 2: 8 ou mais pontos consecutivos de um lado da linha central
+        let countAbove = 0;
+        let countBelow = 0;
+        values.forEach((value, index) => {
+            if (value > limits.mean) {
+                countAbove++;
+                countBelow = 0;
+                if (countAbove >= 8) {
+                    // Marcar os últimos 8 pontos
+                    for (let j = 0; j < 8; j++) {
+                        const idx = index - j;
+                        if (idx >= 0 && !specialPoints.find(p => p.index === idx)) {
+                            specialPoints.push({
+                                index: idx,
+                                reason: 'shift_above',
+                                value: values[idx]
+                            });
+                        }
+                    }
+                }
+            } else if (value < limits.mean) {
+                countBelow++;
+                countAbove = 0;
+                if (countBelow >= 8) {
+                    // Marcar os últimos 8 pontos
+                    for (let j = 0; j < 8; j++) {
+                        const idx = index - j;
+                        if (idx >= 0 && !specialPoints.find(p => p.index === idx)) {
+                            specialPoints.push({
+                                index: idx,
+                                reason: 'shift_below',
+                                value: values[idx]
+                            });
+                        }
+                    }
+                }
+            } else {
+                countAbove = 0;
+                countBelow = 0;
+            }
+        });
+
+        return specialPoints;
+    }
+
     function buildHistogramSeries(values) {
         const stats = computePercentileStats(values);
         if (!stats) return null;
@@ -864,7 +967,7 @@
 
     function renderControlChart(config) {
         const values = Array.isArray(config.values) ? config.values : [];
-        const hasData = values.length >= 1;
+        const hasData = values.length >= 2; // Precisa de pelo menos 2 pontos para calcular limites
 
         toggleChartVisibility(hasData, config.emptySelector, config.containerSelector);
         destroyHistoricalChart(config.chartKey);
@@ -873,19 +976,36 @@
             return;
         }
 
-        const stats = computePercentileStats(values);
-        if (!stats) return;
+        // Calcular limites de controle do Process Behavior Chart
+        const limits = computeProcessBehaviorLimits(values);
+        if (!limits) return;
+
+        // Detectar sinais especiais
+        const specialCauses = detectSpecialCauses(values, limits);
+        const specialIndices = new Set(specialCauses.map(s => s.index));
 
         const ctxElement = document.getElementById(config.canvasId);
         if (!ctxElement) return;
 
         const labels = values.map((_value, index) => index + 1);
+
+        // Criar anotações para os limites de controle
         const annotations = [
-            buildHorizontalAnnotation(stats.p15, 'P15', chartColors.percentiles.p15, [12, 6]),
-            buildHorizontalAnnotation(stats.p85, 'P85', chartColors.percentiles.p85, [8, 6]),
-            buildHorizontalAnnotation(stats.p95, 'P95', chartColors.percentiles.p95, [6, 4]),
-            buildHorizontalAnnotation(stats.mean, 'Média', '#6c757d', [4, 2])
+            buildHorizontalAnnotation(limits.ucl, 'UCL (Limite Superior)', '#C73E1D', [6, 4]),
+            buildHorizontalAnnotation(limits.mean, 'Média (Linha Central)', '#2E86AB', [4, 2]),
+            buildHorizontalAnnotation(limits.lcl, 'LCL (Limite Inferior)', '#C73E1D', [6, 4])
         ].filter(Boolean);
+
+        // Preparar cores dos pontos (pontos especiais em vermelho)
+        const pointColors = values.map((_, index) =>
+            specialIndices.has(index) ? '#C73E1D' : config.colors.series
+        );
+        const pointBackgroundColors = values.map((_, index) =>
+            specialIndices.has(index) ? '#C73E1D' : '#ffffff'
+        );
+        const pointRadii = values.map((_, index) =>
+            specialIndices.has(index) ? 6 : 4
+        );
 
         historicalCharts[config.chartKey] = new Chart(ctxElement.getContext('2d'), {
             type: 'line',
@@ -897,11 +1017,11 @@
                     borderColor: config.colors.series,
                     backgroundColor: config.colors.seriesFill,
                     fill: false,
-                    lineTension: 0.2,
-                    pointRadius: 4,
-                    pointBackgroundColor: '#ffffff',
-                    pointBorderColor: config.colors.series,
-                    pointHoverRadius: 6,
+                    lineTension: 0,
+                    pointRadius: pointRadii,
+                    pointBackgroundColor: pointBackgroundColors,
+                    pointBorderColor: pointColors,
+                    pointHoverRadius: 8,
                     borderWidth: 2
                 }]
             },
@@ -925,7 +1045,29 @@
                     callbacks: {
                         label: function(tooltipItem, data) {
                             const datasetLabel = data.datasets[tooltipItem.datasetIndex].label || '';
-                            return `${datasetLabel}: ${formatNumber(tooltipItem.yLabel)}`;
+                            const value = formatNumber(tooltipItem.yLabel);
+                            let label = `${datasetLabel}: ${value}`;
+
+                            // Adicionar informação se é ponto especial
+                            const index = tooltipItem.index;
+                            const specialCause = specialCauses.find(s => s.index === index);
+                            if (specialCause) {
+                                if (specialCause.reason === 'beyond_limits') {
+                                    label += ' (Fora dos limites)';
+                                } else if (specialCause.reason === 'shift_above') {
+                                    label += ' (Mudança acima da média)';
+                                } else if (specialCause.reason === 'shift_below') {
+                                    label += ' (Mudança abaixo da média)';
+                                }
+                            }
+                            return label;
+                        },
+                        afterLabel: function(tooltipItem) {
+                            const lines = [];
+                            lines.push(`UCL: ${formatNumber(limits.ucl)}`);
+                            lines.push(`Média: ${formatNumber(limits.mean)}`);
+                            lines.push(`LCL: ${formatNumber(limits.lcl)}`);
+                            return lines;
                         }
                     }
                 },
@@ -933,7 +1075,28 @@
                     mode: 'nearest',
                     intersect: true
                 },
-                legend: { display: false },
+                legend: {
+                    display: true,
+                    position: 'bottom',
+                    labels: {
+                        generateLabels: function(chart) {
+                            return [
+                                {
+                                    text: config.seriesLabel,
+                                    fillStyle: config.colors.series,
+                                    strokeStyle: config.colors.series,
+                                    lineWidth: 2
+                                },
+                                {
+                                    text: 'Ponto com sinal especial',
+                                    fillStyle: '#C73E1D',
+                                    strokeStyle: '#C73E1D',
+                                    lineWidth: 2
+                                }
+                            ];
+                        }
+                    }
+                },
                 scales: {
                     xAxes: [{
                         scaleLabel: {

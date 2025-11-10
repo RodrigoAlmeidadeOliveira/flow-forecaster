@@ -249,9 +249,23 @@
             historical_throughput_lead: 'Gráficos Históricos de Throughput e Lead Time',
             visualize_distribution: 'Visualize a distribuição e estabilidade das amostras fornecidas. Atualize os campos acima para atualizar esses gráficos.',
             throughput_histogram_title: 'Histograma de Throughput',
-            throughput_control_title: 'Gráfico de Controle de Throughput',
+            throughput_control_title: 'Process Behavior Chart - Throughput',
             lead_time_histogram_title: 'Histograma de Lead Time',
-            lead_time_control_title: 'Gráfico de Controle de Lead Time',
+            lead_time_control_title: 'Process Behavior Chart - Lead Time',
+
+            // Process Behavior Charts
+            process_behavior_chart_title: '📊 Process Behavior Charts (Gráficos de Controle Estatístico)',
+            process_behavior_chart_description: 'Os gráficos de controle utilizam limites estatísticos baseados no método de Moving Range para distinguir entre variação natural e sinais especiais no processo.',
+            control_limits_title: 'Limites de Controle:',
+            ucl_description: 'Média + 2.66 × Moving Range',
+            mean_description: 'Média do processo',
+            lcl_description: 'Média - 2.66 × Moving Range',
+            special_signals_title: 'Sinais Especiais (pontos em vermelho):',
+            beyond_limits: '🔴 Pontos além dos limites de controle',
+            shift_pattern: '🔴 8+ pontos consecutivos acima ou abaixo da média (mudança no processo)',
+            process_behavior_note: 'Nota: Sinais especiais indicam que o processo pode ter mudado e requer investigação. Processos estáveis apresentam apenas variação natural.',
+            min_samples_control: 'Forneça ao menos 2 amostras de throughput para gerar o gráfico de controle estatístico.',
+            min_samples_lt_control: 'Forneça ao menos 2 amostras de lead time para gerar o gráfico de controle estatístico.',
 
             // Additional fields
             task_lead_times: 'Lead Time de entregas',
@@ -528,9 +542,23 @@
             historical_throughput_lead: 'Historical Throughput & Lead Time Charts',
             visualize_distribution: 'Visualize the distribution and stability of the samples you provided. Update the fields above to refresh these charts.',
             throughput_histogram_title: 'Throughput Histogram',
-            throughput_control_title: 'Throughput Control Chart',
+            throughput_control_title: 'Process Behavior Chart - Throughput',
             lead_time_histogram_title: 'Lead Time Histogram',
-            lead_time_control_title: 'Lead Time Control Chart',
+            lead_time_control_title: 'Process Behavior Chart - Lead Time',
+
+            // Process Behavior Charts
+            process_behavior_chart_title: '📊 Process Behavior Charts (Statistical Process Control)',
+            process_behavior_chart_description: 'Control charts use statistical limits based on the Moving Range method to distinguish between natural variation and special signals in the process.',
+            control_limits_title: 'Control Limits:',
+            ucl_description: 'Mean + 2.66 × Moving Range',
+            mean_description: 'Process mean',
+            lcl_description: 'Mean - 2.66 × Moving Range',
+            special_signals_title: 'Special Signals (red points):',
+            beyond_limits: '🔴 Points beyond control limits',
+            shift_pattern: '🔴 8+ consecutive points above or below the mean (process shift)',
+            process_behavior_note: 'Note: Special signals indicate that the process may have changed and requires investigation. Stable processes show only natural variation.',
+            min_samples_control: 'Provide at least 2 throughput samples to generate the statistical control chart.',
+            min_samples_lt_control: 'Provide at least 2 lead time samples to generate the statistical control chart.',
 
             // Additional fields
             task_lead_times: 'Task lead-times',
@@ -800,9 +828,23 @@
             historical_throughput_lead: 'Gráficos Históricos de Rendimiento y Tiempo de Entrega',
             visualize_distribution: 'Visualice la distribución y estabilidad de las muestras proporcionadas. Actualice los campos arriba para actualizar estos gráficos.',
             throughput_histogram_title: 'Histograma de Rendimiento',
-            throughput_control_title: 'Gráfico de Control de Rendimiento',
+            throughput_control_title: 'Process Behavior Chart - Rendimiento',
             lead_time_histogram_title: 'Histograma de Tiempo de Entrega',
-            lead_time_control_title: 'Gráfico de Control de Tiempo de Entrega',
+            lead_time_control_title: 'Process Behavior Chart - Tiempo de Entrega',
+
+            // Process Behavior Charts
+            process_behavior_chart_title: '📊 Process Behavior Charts (Control Estadístico de Procesos)',
+            process_behavior_chart_description: 'Los gráficos de control utilizan límites estadísticos basados en el método de Rango Móvil para distinguir entre variación natural y señales especiales en el proceso.',
+            control_limits_title: 'Límites de Control:',
+            ucl_description: 'Media + 2.66 × Rango Móvil',
+            mean_description: 'Media del proceso',
+            lcl_description: 'Media - 2.66 × Rango Móvil',
+            special_signals_title: 'Señales Especiales (puntos en rojo):',
+            beyond_limits: '🔴 Puntos más allá de los límites de control',
+            shift_pattern: '🔴 8+ puntos consecutivos por encima o por debajo de la media (cambio en el proceso)',
+            process_behavior_note: 'Nota: Las señales especiales indican que el proceso puede haber cambiado y requiere investigación. Los procesos estables muestran solo variación natural.',
+            min_samples_control: 'Proporcione al menos 2 muestras de rendimiento para generar el gráfico de control estadístico.',
+            min_samples_lt_control: 'Proporcione al menos 2 muestras de tiempo de entrega para generar el gráfico de control estadístico.',
 
             // Additional fields
             task_lead_times: 'Tiempos de entrega de tareas',
