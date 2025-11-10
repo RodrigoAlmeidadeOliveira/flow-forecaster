@@ -463,77 +463,67 @@ async function runSimulation() {
  * Render simulation results
  */
 function renderSimulationResults(result) {
-    const parallel = result.parallel;
-    const sequential = result.sequential;
-    const comparison = result.comparison;
+    const parallel = result.parallel || {};
+    const sequential = result.sequential || {};
+    const comparison = result.comparison || {};
+    const projectResults = (parallel.project_results || []);
 
-    const html = `
-        <div class="row mb-4">
-            <div class="col-md-12">
-                <h5><i class="fas fa-chart-line"></i> Comparação: Execução Paralela vs Sequencial</h5>
-                <div class="alert alert-info">
-                    <strong>Recomendação:</strong> Execução ${comparison.recommendation === 'parallel' ? 'Paralela' : 'Sequencial'}
-                    ${comparison.time_diff_p85 ? ` (economia de ${Math.abs(comparison.time_diff_p85).toFixed(1)} semanas)` : ''}
+    const formatWeeks = (value) => Number.isFinite(value) ? value.toFixed(2) : '—';
+    const formatRiskBadge = (score) => {
+        if (!Number.isFinite(score)) return '<span class="badge bg-secondary">—</span>';
+        const badgeClass = score >= 70 ? 'bg-danger' : score >= 40 ? 'bg-warning' : 'bg-success';
+        return `<span class="badge ${badgeClass}">${score.toFixed(1)}</span>`;
+    };
+
+    const renderScenarioRow = (label, subtitle, scenario, tone) => {
+        const forecast = scenario.completion_forecast || {};
+        const totalCod = scenario.cost_of_delay ? scenario.cost_of_delay.total_cod : null;
+        const riskScore = scenario.risk ? scenario.risk.score : null;
+        return `
+            <tr class="${tone === 'highlight' ? 'table-success' : ''}">
+                <td class="text-left">
+                    <div class="scenario-label ${tone === 'positive' ? 'text-success' : tone === 'primary' ? 'text-primary' : ''}">${label}</div>
+                    <small class="text-muted">${subtitle}</small>
+                </td>
+                <td>${formatWeeks(forecast.p50_weeks)}</td>
+                <td>${formatWeeks(forecast.p85_weeks)}</td>
+                <td>${formatWeeks(forecast.p95_weeks)}</td>
+                <td>${totalCod ? `R$ ${formatNumber(totalCod)}` : '—'}</td>
+                <td>${formatRiskBadge(riskScore)}</td>
+            </tr>
+        `;
+    };
+
+    const comparisonTable = `
+        <div class="card simulation-comparison mb-4">
+            <div class="card-header bg-white border-0 d-flex justify-content-between align-items-center flex-wrap">
+                <div>
+                    <h5 class="mb-1"><i class="fas fa-exchange-alt mr-2 text-primary"></i>Comparação de Execuções</h5>
+                    <small class="text-muted">Percentis de conclusão e impacto financeiro</small>
+                </div>
+                <div class="text-right">
+                    <span class="badge badge-pill badge-primary">
+                        Recomendação: ${comparison.recommendation === 'parallel' ? 'Execução Paralela' : 'Execução Sequencial'}
+                    </span>
+                    ${comparison.time_diff_p85 ? `<p class="small text-muted mb-0">Diferença P85: ${Math.abs(comparison.time_diff_p85).toFixed(1)} semanas</p>` : ''}
                 </div>
             </div>
-        </div>
-
-        <div class="row">
-            <div class="col-md-6">
-                <div class="card mb-3">
-                    <div class="card-header bg-success text-white">
-                        <strong>Execução Paralela</strong>
-                        <small class="float-end">(Projetos simultâneos)</small>
-                    </div>
-                    <div class="card-body">
-                        ${renderCompletionMetrics(parallel.completion_forecast)}
-                        ${parallel.cost_of_delay.total_cod ? `<p><strong>Cost of Delay Total:</strong> <span class="text-danger">R$ ${formatNumber(parallel.cost_of_delay.total_cod)}</span></p>` : ''}
-                        <p><strong>Risco:</strong> <span class="badge ${parallel.risk.score > 50 ? 'bg-danger' : 'bg-success'}">${parallel.risk.score.toFixed(1)}</span></p>
-                    </div>
-                </div>
-            </div>
-
-            <div class="col-md-6">
-                <div class="card mb-3">
-                    <div class="card-header bg-primary text-white">
-                        <strong>Execução Sequencial</strong>
-                        <small class="float-end">(Projetos um após o outro)</small>
-                    </div>
-                    <div class="card-body">
-                        ${renderCompletionMetrics(sequential.completion_forecast)}
-                        ${sequential.cost_of_delay.total_cod ? `<p><strong>Cost of Delay Total:</strong> <span class="text-danger">R$ ${formatNumber(sequential.cost_of_delay.total_cod)}</span></p>` : ''}
-                        <p><strong>Risco:</strong> <span class="badge ${sequential.risk.score > 50 ? 'bg-danger' : 'bg-success'}">${sequential.risk.score.toFixed(1)}</span></p>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="card">
-            <div class="card-header">
-                <strong>Previsão por Projeto (Execução Paralela)</strong>
-            </div>
-            <div class="card-body">
+            <div class="card-body pt-0">
                 <div class="table-responsive">
-                    <table class="table table-striped">
-                        <thead>
+                    <table class="table table-sm table-striped align-middle simulation-compare-table">
+                        <thead class="table-light">
                             <tr>
-                                <th>Projeto</th>
+                                <th class="text-left">Cenário</th>
                                 <th>P50</th>
                                 <th>P85</th>
                                 <th>P95</th>
                                 <th>Cost of Delay</th>
+                                <th>Risco</th>
                             </tr>
                         </thead>
                         <tbody>
-                            ${parallel.project_results.map(pr => `
-                                <tr>
-                                    <td><strong>${escapeHtml(pr.project_name)}</strong></td>
-                                    <td>${pr.p50_weeks} sem</td>
-                                    <td>${pr.p85_weeks} sem</td>
-                                    <td>${pr.p95_weeks} sem</td>
-                                    <td>${pr.cod_total ? `R$ ${formatNumber(pr.cod_total)}` : '-'}</td>
-                                </tr>
-                            `).join('')}
+                            ${renderScenarioRow('Execução Paralela', 'Projetos simultâneos', parallel, comparison.recommendation === 'parallel' ? 'highlight' : 'positive')}
+                            ${renderScenarioRow('Execução Sequencial', 'Projetos um após o outro', sequential, comparison.recommendation === 'sequential' ? 'highlight' : 'primary')}
                         </tbody>
                     </table>
                 </div>
@@ -541,36 +531,41 @@ function renderSimulationResults(result) {
         </div>
     `;
 
-    document.getElementById('simulationContent').innerHTML = html;
-}
-
-/**
- * Render completion metrics
- */
-function renderCompletionMetrics(forecast) {
-    const fallback = (value) => Number.isFinite(value) ? value : '—';
-    return `
-        <div class="row text-center mb-3">
-            <div class="col-md-4 mb-3">
-                <div class="metric-card compact">
-                    <div class="metric-value">${fallback(forecast.p50_weeks)}</div>
-                    <div class="metric-label">P50 (semanas)</div>
-                </div>
+    const projectTable = `
+        <div class="card">
+            <div class="card-header bg-white border-0">
+                <strong>Previsão por Projeto (Execução Paralela)</strong>
             </div>
-            <div class="col-md-4 mb-3">
-                <div class="metric-card compact">
-                    <div class="metric-value">${fallback(forecast.p85_weeks)}</div>
-                    <div class="metric-label">P85 (semanas)</div>
-                </div>
-            </div>
-            <div class="col-md-4 mb-3">
-                <div class="metric-card compact">
-                    <div class="metric-value">${fallback(forecast.p95_weeks)}</div>
-                    <div class="metric-label">P95 (semanas)</div>
+            <div class="card-body pt-0">
+                <div class="table-responsive">
+                    <table class="table table-hover table-sm align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Projeto</th>
+                                <th>P50 (sem)</th>
+                                <th>P85 (sem)</th>
+                                <th>P95 (sem)</th>
+                                <th>Cost of Delay</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${projectResults.length ? projectResults.map(pr => `
+                                <tr>
+                                    <td><strong>${escapeHtml(pr.project_name)}</strong></td>
+                                    <td>${formatWeeks(pr.p50_weeks)}</td>
+                                    <td>${formatWeeks(pr.p85_weeks)}</td>
+                                    <td>${formatWeeks(pr.p95_weeks)}</td>
+                                    <td>${pr.cod_total ? `R$ ${formatNumber(pr.cod_total)}` : '—'}</td>
+                                </tr>
+                            `).join('') : `<tr><td colspan="5" class="text-muted text-center">Nenhum projeto encontrado.</td></tr>`}
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>
     `;
+
+    document.getElementById('simulationContent').innerHTML = comparisonTable + projectTable;
 }
 
 /**
