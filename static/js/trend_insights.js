@@ -609,15 +609,11 @@
                 ? formatNumber(projection.projected_values[3])
                 : '—';
             const note = projection.notes || '—';
-            const target = projection.time_to_target
-                ? `${projection.time_to_target} períodos`
-                : 'Não atinge a meta';
             $tbody.append(`
                 <tr>
                     <td>${projection.scenario_name}</td>
                     <td>${formatPercent(projection.improvement_rate, 0)}</td>
                     <td>${afterFour}</td>
-                    <td>${target}</td>
                     <td>${note}</td>
                 </tr>
             `);
