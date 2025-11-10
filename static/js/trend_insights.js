@@ -84,6 +84,7 @@
     };
 
     const processBehaviorCharts = {};
+    const pendingProcessBehaviorMetrics = new Set();
     const lastTrendSamples = {
         throughput: [],
         lead_time: []
@@ -136,7 +137,48 @@
             chart.destroy();
         }
         delete processBehaviorCharts[metricKey];
+        pendingProcessBehaviorMetrics.delete(metricKey);
     }
+
+    function scheduleProcessBehaviorResize(metricKey, canvas, attempt = 0) {
+        const chart = processBehaviorCharts[metricKey];
+        if (!chart || !canvas) return;
+
+        const isVisible = canvas.offsetParent !== null && canvas.offsetWidth > 0 && canvas.offsetHeight > 0;
+        if (isVisible) {
+            chart.resize();
+            pendingProcessBehaviorMetrics.delete(metricKey);
+            return;
+        }
+
+        pendingProcessBehaviorMetrics.add(metricKey);
+
+        if (attempt >= 30) {
+            return;
+        }
+
+        setTimeout(() => scheduleProcessBehaviorResize(metricKey, canvas, attempt + 1), 150);
+    }
+
+    function refreshHiddenProcessBehaviorCharts() {
+        pendingProcessBehaviorMetrics.forEach((metricKey) => {
+            const config = PROCESS_BEHAVIOR_CONFIG[metricKey];
+            if (!config) return;
+            const canvas = document.getElementById(config.canvasId);
+            if (canvas) {
+                scheduleProcessBehaviorResize(metricKey, canvas, 0);
+            }
+        });
+    }
+
+    $(document).on('shown.bs.tab', 'a[data-toggle="tab"][href="#trend-analysis"]', () => {
+        Object.values(processBehaviorCharts).forEach((chart) => {
+            if (chart && typeof chart.resize === 'function') {
+                chart.resize();
+            }
+        });
+        refreshHiddenProcessBehaviorCharts();
+    });
 
     function resetProcessBehaviorSection(metricKey, mode = 'hidden') {
         const config = PROCESS_BEHAVIOR_CONFIG[metricKey];
@@ -361,6 +403,8 @@
                 }
             }
         });
+
+        scheduleProcessBehaviorResize(metricKey, canvas);
     }
 
     function renderProcessBehaviorChart(metricKey, rawSamples, options = {}) {
