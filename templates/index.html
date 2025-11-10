@@ -187,6 +187,22 @@
         .pbc-legend-swatch.bg-gradient {
             background: linear-gradient(90deg, #6c757d 0%, #adb5bd 100%);
         }
+        .executive-shell .nav-pills .nav-link {
+            border-radius: 40px;
+            font-weight: 600;
+            color: #6c757d;
+            margin: 4px 8px;
+            padding: 8px 18px;
+            transition: all 0.2s ease;
+        }
+        .executive-shell .nav-pills .nav-link.active {
+            color: #fff;
+            background: linear-gradient(135deg, #2563eb 0%, #9333ea 100%);
+            box-shadow: 0 0.5rem 1rem rgba(37, 99, 235, 0.25);
+        }
+        .executive-shell .tab-pane {
+            animation: fadeIn 0.2s ease;
+        }
     </style>
 </head>
 <body>
@@ -197,37 +213,11 @@
 </button>
 <div class="collapse navbar-collapse" id="navbarsExampleDefault">
 <ul class="navbar-nav mr-auto">
-</li>
-<li class="nav-item">
-<a class="nav-link" href="/portfolio">
-<i class="fas fa-briefcase"></i> Portfolio
-</a>
-</li>
-<li class="nav-item">
-<a class="nav-link" href="/portfolio/dashboard">
-<i class="fas fa-tachometer-alt"></i> Dashboard
-</a>
-</li>
-<li class="nav-item">
-<a class="nav-link" href="/portfolio/risks">
-<i class="fas fa-shield-alt"></i> Risks
-</a>
-</li>
-<li class="nav-item">
-<a class="nav-link" href="/portfolio/optimize">
-<i class="fas fa-magic"></i> Optimize
-</a>
-</li>
-<li class="nav-item">
-<a class="nav-link" href="/portfolio/executive">
-<i class="fas fa-chart-line"></i> Executive
-</a>
-</li>
-<li class="nav-item">
-<a class="nav-link" href="/documentacao" target="_blank" rel="noopener noreferrer">
-<i class="fas fa-book"></i> Documentação
-</a>
-</li>
+    <li class="nav-item">
+        <a class="nav-link" href="/documentacao" target="_blank" rel="noopener noreferrer">
+            <i class="fas fa-book"></i> Documentação
+        </a>
+    </li>
 </ul>
 <div class="ml-auto d-flex align-items-center user-menu">
 <div class="language-selector mr-3">
@@ -360,7 +350,7 @@
 </li>
 <li class="nav-item">
 <a aria-controls="executive-dashboard" aria-selected="false" class="nav-link" data-toggle="tab" href="#executive-dashboard" id="tab-dashboard-link" role="tab">
-<i class="fas fa-chart-pie"></i> Dashboard & Portfolio
+<i class="fas fa-chart-pie"></i> Portfolio
 </a>
 </li>
 <li class="nav-item">
@@ -3201,226 +3191,250 @@ a probabilidade de todas serem entregues no prazo é de <strong>1 em 2^n</strong
 
 <!-- Dashboard & Portfolio Tab -->
 <div aria-labelledby="tab-dashboard-link" class="tab-pane fade" id="executive-dashboard" role="tabpanel">
-<div class="pt-4 pb-5">
-<div class="container text-center mb-4">
-<h2><i class="fas fa-chart-pie"></i> Dashboard & Portfolio</h2>
-<p class="text-muted">Visão consolidada do portfólio e indicadores do projeto atual</p>
-<button class="btn btn-primary btn-sm" onclick="refreshDashboard()"><i class="fas fa-sync-alt"></i> Atualizar Dashboard</button>
-</div>
-
-<!-- Portfolio Filters -->
-<div class="container mb-4">
-    <div class="card shadow-sm">
-        <div class="card-body">
-            <div class="form-row align-items-end">
-                <div class="form-group col-md-4">
-                    <label class="text-muted mb-1" for="portfolio-dashboard-select">
-                        Selecionar portfolio
-                    </label>
-                    <select class="form-control" id="portfolio-dashboard-select">
-                        <option value="all">Todos os projetos</option>
-                    </select>
-                </div>
-                <div class="form-group col-md-6">
-                    <label class="text-muted mb-1" for="portfolio-project-select">
-                        Filtrar projetos (opcional)
-                    </label>
-                    <select class="form-control" id="portfolio-project-select" multiple size="4" disabled></select>
-                    <small class="text-muted d-block mt-1" id="project-filter-hint">
-                        Selecione um portfolio para habilitar o filtro por projetos.
-                    </small>
-                </div>
-                <div class="form-group col-md-2">
-                    <button class="btn btn-outline-secondary w-100" id="project-filter-clear" disabled>
-                        Limpar filtro
-                    </button>
-                </div>
-            </div>
+    <div class="pt-4 pb-5">
+        <div class="container text-center mb-4">
+            <h2><i class="fas fa-chart-pie"></i> Portfolio</h2>
+            <p class="text-muted mb-3">Visão consolidada do portfólio e indicadores do projeto atual</p>
+            <button class="btn btn-primary" onclick="refreshDashboard()"><i class="fas fa-sync-alt mr-2"></i>Atualizar Dashboard</button>
         </div>
-    </div>
-</div>
 
-<!-- Portfolio Overview Section -->
-<div class="container-fluid mb-5">
-    <h4 class="mb-3"><i class="fas fa-briefcase"></i> Visão Geral do Portfólio</h4>
-    <div id="portfolio-content">
-        <!-- Content will be dynamically loaded by portfolio.js -->
-    </div>
-
-    <!-- WSJF Prioritization Section -->
-    <div class="row mt-4" id="wsjf-prioritization" style="display:none;">
-        <div class="col-12">
-            <div class="card">
-                <div class="card-header bg-gradient text-white" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
-                    <h5 class="mb-0"><i class="fas fa-sort-amount-down"></i> Priorização WSJF (Weighted Shortest Job First)</h5>
-                </div>
-                <div class="card-body">
-                    <p class="text-muted mb-3">
-                        WSJF = (Business Value + Time Criticality + Risk Reduction) / Job Size
-                        <br><small>Projetos ordenados por maior valor de WSJF (maior retorno/custo)</small>
-                    </p>
-                    <div id="wsjf-ranking"></div>
-                </div>
+        <div class="card shadow-sm executive-shell">
+            <div class="card-header bg-white border-0">
+                <ul class="nav nav-pills justify-content-center flex-wrap" id="executiveSubTabs" role="tablist">
+                    <li class="nav-item">
+                        <a class="nav-link active" id="exec-portfolio-tab-link" data-toggle="pill" href="#exec-portfolio-tab" role="tab" aria-controls="exec-portfolio-tab" aria-selected="true">
+                            <i class="fas fa-briefcase mr-1"></i>Portfolio
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" id="exec-dashboard-tab-link" data-toggle="pill" href="#exec-dashboard-tab" role="tab" aria-controls="exec-dashboard-tab" aria-selected="false">
+                            <i class="fas fa-tachometer-alt mr-1"></i>Dashboard
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" id="exec-risks-tab-link" data-toggle="pill" href="#exec-risks-tab" role="tab" aria-controls="exec-risks-tab" aria-selected="false">
+                            <i class="fas fa-shield-alt mr-1"></i>Risks
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" id="exec-optimize-tab-link" data-toggle="pill" href="#exec-optimize-tab" role="tab" aria-controls="exec-optimize-tab" aria-selected="false">
+                            <i class="fas fa-magic mr-1"></i>Optimize
+                        </a>
+                    </li>
+                </ul>
             </div>
-        </div>
-    </div>
-
-    <!-- Efficient Frontier Section -->
-    <div class="row mt-4" id="efficient-frontier-section" style="display:none;">
-        <div class="col-12">
-            <div class="card">
-                <div class="card-header">
-                    <h5 class="mb-0">
-                        <i class="fas fa-wave-square"></i> Fronteira Eficiente (Markowitz)
-                    </h5>
-                </div>
-                <div class="card-body" id="efficient-frontier-card-body">
-                    <p class="text-muted small mb-3" id="efficient-frontier-info">
-                        Selecione um portfolio para visualizar risco x retorno, Monte Carlo e fronteira eficiente.
-                    </p>
-                    <div id="efficient-frontier-message" class="alert alert-info" style="display:none;"></div>
-                    <div class="row align-items-center">
-                        <div class="col-lg-8 mb-3 mb-lg-0">
-                            <div class="chart-container" style="height: 360px;">
-                                <canvas id="efficientFrontierChart"></canvas>
+            <div class="card-body p-4">
+                <div class="tab-content" id="executiveSubTabsContent">
+                    <div class="tab-pane fade show active" id="exec-portfolio-tab" role="tabpanel" aria-labelledby="exec-portfolio-tab-link">
+                        <div class="mb-4">
+                            <div class="card shadow-sm border-0">
+                                <div class="card-body">
+                                    <div class="form-row align-items-end">
+                                        <div class="form-group col-md-4">
+                                            <label class="text-muted mb-1" for="portfolio-dashboard-select">
+                                                Selecionar portfolio
+                                            </label>
+                                            <select class="form-control" id="portfolio-dashboard-select">
+                                                <option value="all">Todos os projetos</option>
+                                            </select>
+                                        </div>
+                                        <div class="form-group col-md-6">
+                                            <label class="text-muted mb-1" for="portfolio-project-select">
+                                                Filtrar projetos (opcional)
+                                            </label>
+                                            <select class="form-control" id="portfolio-project-select" multiple size="4" disabled></select>
+                                            <small class="text-muted d-block mt-1" id="project-filter-hint">
+                                                Selecione um portfolio para habilitar o filtro por projetos.
+                                            </small>
+                                        </div>
+                                        <div class="form-group col-md-2">
+                                            <button class="btn btn-outline-secondary w-100" id="project-filter-clear" disabled>
+                                                Limpar filtro
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
-                        <div class="col-lg-4">
-                            <div id="efficient-frontier-summary"></div>
+
+                        <div id="portfolio-content">
+                            <div class="text-center py-5">
+                                <div class="spinner-border text-primary" role="status">
+                                    <span class="sr-only">Carregando...</span>
+                                </div>
+                                <p class="mt-3 text-muted mb-0">Carregando dados do portfolio...</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="tab-pane fade" id="exec-dashboard-tab" role="tabpanel" aria-labelledby="exec-dashboard-tab-link">
+                        <div class="text-center mb-4">
+                            <h4 class="mb-3"><i class="fas fa-project-diagram"></i> Projeto Atual / Análise Ativa</h4>
+                        </div>
+
+                        <div class="mb-4">
+                            <div class="row">
+                                <div class="col-md-3 mb-3">
+                                    <div class="card border-primary h-100">
+                                        <div class="card-body text-center">
+                                            <h6 class="card-title text-muted">Throughput Médio</h6>
+                                            <h2 class="text-primary"><span id="kpi-throughput">-</span></h2>
+                                            <small class="text-muted">itens/semana</small>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3 mb-3">
+                                    <div class="card border-success h-100">
+                                        <div class="card-body text-center">
+                                            <h6 class="card-title text-muted">Prob. Sucesso no Prazo</h6>
+                                            <h2 class="text-success"><span id="kpi-deadline-prob">-</span></h2>
+                                            <small class="text-muted">chance de sucesso</small>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3 mb-3">
+                                    <div class="card border-warning h-100">
+                                        <div class="card-body text-center">
+                                            <h6 class="card-title text-muted">Backlog Atual</h6>
+                                            <h2 class="text-warning"><span id="kpi-backlog">-</span></h2>
+                                            <small class="text-muted">itens pendentes</small>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3 mb-3">
+                                    <div class="card border-info h-100">
+                                        <div class="card-body text-center">
+                                            <h6 class="card-title text-muted">Tempo Projetado (P85)</h6>
+                                            <h2 class="text-info"><span id="kpi-duration">-</span></h2>
+                                            <small class="text-muted">semanas</small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-4">
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <div class="card h-100">
+                                        <div class="card-header bg-dark text-white">
+                                            <h5 class="mb-0"><i class="fas fa-history"></i> Análises Históricas</h5>
+                                        </div>
+                                        <div class="card-body">
+                                            <div id="dashboard-loading" class="text-center" style="display:none;">
+                                                <div class="spinner-border text-primary" role="status">
+                                                    <span class="sr-only">Carregando...</span>
+                                                </div>
+                                            </div>
+                                            <div id="dashboard-historical-list">
+                                                <p class="text-muted mb-0">Nenhuma análise salva ainda.</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <div class="card h-100">
+                                        <div class="card-header bg-dark text-white">
+                                            <h5 class="mb-0"><i class="fas fa-chart-bar"></i> Tendência de Throughput</h5>
+                                        </div>
+                                        <div class="card-body">
+                                            <canvas id="dashboard-throughput-chart" height="200"></canvas>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div>
+                            <div class="card">
+                                <div class="card-header bg-dark text-white">
+                                    <h5 class="mb-0"><i class="fas fa-heartbeat"></i> Saúde do Projeto</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="row">
+                                        <div class="col-md-4 text-center mb-3">
+                                            <div id="health-capacity" class="alert alert-secondary">
+                                                <h6>Capacidade</h6>
+                                                <div class="progress" style="height: 30px;">
+                                                    <div class="progress-bar" id="health-capacity-bar" role="progressbar" style="width: 0%">0%</div>
+                                                </div>
+                                                <small class="text-muted mt-2 d-block">Carga de trabalho atual</small>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4 text-center mb-3">
+                                            <div id="health-risk" class="alert alert-secondary">
+                                                <h6>Nível de Risco</h6>
+                                                <h3><span id="health-risk-level">Baixo</span></h3>
+                                                <small class="text-muted">Riscos identificados: <span id="health-risk-count">0</span></small>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4 text-center mb-3">
+                                            <div id="health-confidence" class="alert alert-secondary">
+                                                <h6>Confiança na Previsão</h6>
+                                                <h3><span id="health-confidence-level">Alta</span></h3>
+                                                <small class="text-muted">Baseado em <span id="health-samples-count">0</span> amostras</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="tab-pane fade" id="exec-risks-tab" role="tabpanel" aria-labelledby="exec-risks-tab-link">
+                        <div id="portfolio-risk-content">
+                            <div class="alert alert-info mb-0">
+                                <i class="fas fa-info-circle mr-2"></i>Selecione um portfólio para visualizar o mapa de riscos e ações recomendadas.
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="tab-pane fade" id="exec-optimize-tab" role="tabpanel" aria-labelledby="exec-optimize-tab-link">
+                        <div class="mb-4" id="wsjf-prioritization" style="display:none;">
+                            <div class="card">
+                                <div class="card-header bg-gradient text-white" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
+                                    <h5 class="mb-0"><i class="fas fa-sort-amount-down"></i> Priorização WSJF (Weighted Shortest Job First)</h5>
+                                </div>
+                                <div class="card-body">
+                                    <p class="text-muted mb-3">
+                                        WSJF = (Business Value + Time Criticality + Risk Reduction) / Job Size
+                                        <br><small>Projetos ordenados por maior valor de WSJF (maior retorno/custo)</small>
+                                    </p>
+                                    <div id="wsjf-ranking"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="efficient-frontier-section" style="display:none;">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5 class="mb-0">
+                                        <i class="fas fa-wave-square"></i> Fronteira Eficiente (Markowitz)
+                                    </h5>
+                                </div>
+                                <div class="card-body" id="efficient-frontier-card-body">
+                                    <p class="text-muted small mb-3" id="efficient-frontier-info">
+                                        Selecione um portfolio para visualizar risco x retorno, Monte Carlo e fronteira eficiente.
+                                    </p>
+                                    <div id="efficient-frontier-message" class="alert alert-info" style="display:none;"></div>
+                                    <div class="row align-items-center">
+                                        <div class="col-lg-8 mb-3 mb-lg-0">
+                                            <div class="chart-container" style="height: 360px;">
+                                                <canvas id="efficientFrontierChart"></canvas>
+                                            </div>
+                                        </div>
+                                        <div class="col-lg-4">
+                                            <div id="efficient-frontier-summary"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
     </div>
-
-    <hr class="my-5">
-</div>
-
-<!-- Current Project Section -->
-<div class="container text-center mb-4">
-    <h4 class="mb-3"><i class="fas fa-project-diagram"></i> Projeto Atual / Análise Ativa</h4>
-</div>
-
-<!-- KPI Cards -->
-<div class="container-fluid mb-4">
-<div class="row">
-<!-- Current Analysis KPIs -->
-<div class="col-md-3 mb-3">
-<div class="card border-primary">
-<div class="card-body text-center">
-<h6 class="card-title text-muted">Throughput Médio</h6>
-<h2 class="text-primary"><span id="kpi-throughput">-</span></h2>
-<small class="text-muted">itens/semana</small>
-</div>
-</div>
-</div>
-
-<div class="col-md-3 mb-3">
-<div class="card border-success">
-<div class="card-body text-center">
-<h6 class="card-title text-muted">Prob. Sucesso no Prazo</h6>
-<h2 class="text-success"><span id="kpi-deadline-prob">-</span></h2>
-<small class="text-muted">chance de sucesso</small>
-</div>
-</div>
-</div>
-
-<div class="col-md-3 mb-3">
-<div class="card border-warning">
-<div class="card-body text-center">
-<h6 class="card-title text-muted">Backlog Atual</h6>
-<h2 class="text-warning"><span id="kpi-backlog">-</span></h2>
-<small class="text-muted">itens pendentes</small>
-</div>
-</div>
-</div>
-
-<div class="col-md-3 mb-3">
-<div class="card border-info">
-<div class="card-body text-center">
-<h6 class="card-title text-muted">Tempo Projetado (P85)</h6>
-<h2 class="text-info"><span id="kpi-duration">-</span></h2>
-<small class="text-muted">semanas</small>
-</div>
-</div>
-</div>
-</div>
-</div>
-
-<!-- Historical Metrics -->
-<div class="container-fluid mb-4">
-<div class="row">
-<div class="col-md-6 mb-3">
-<div class="card">
-<div class="card-header bg-dark text-white">
-<h5 class="mb-0"><i class="fas fa-history"></i> Análises Históricas</h5>
-</div>
-<div class="card-body">
-<div id="dashboard-loading" class="text-center" style="display:none;">
-<div class="spinner-border text-primary" role="status">
-<span class="sr-only">Carregando...</span>
-</div>
-</div>
-<div id="dashboard-historical-list">
-<p class="text-muted">Nenhuma análise salva ainda.</p>
-</div>
-</div>
-</div>
-</div>
-
-<div class="col-md-6 mb-3">
-<div class="card">
-<div class="card-header bg-dark text-white">
-<h5 class="mb-0"><i class="fas fa-chart-bar"></i> Tendência de Throughput</h5>
-</div>
-<div class="card-body">
-<canvas id="dashboard-throughput-chart" height="200"></canvas>
-</div>
-</div>
-</div>
-</div>
-</div>
-
-<!-- Project Health Summary -->
-<div class="container-fluid">
-<div class="card">
-<div class="card-header bg-dark text-white">
-<h5 class="mb-0"><i class="fas fa-heartbeat"></i> Saúde do Projeto</h5>
-</div>
-<div class="card-body">
-<div class="row">
-<div class="col-md-4 text-center mb-3">
-<div id="health-capacity" class="alert alert-secondary">
-<h6>Capacidade</h6>
-<div class="progress" style="height: 30px;">
-<div class="progress-bar" id="health-capacity-bar" role="progressbar" style="width: 0%">0%</div>
-</div>
-<small class="text-muted mt-2 d-block">Carga de trabalho atual</small>
-</div>
-</div>
-
-<div class="col-md-4 text-center mb-3">
-<div id="health-risk" class="alert alert-secondary">
-<h6>Nível de Risco</h6>
-<h3><span id="health-risk-level">Baixo</span></h3>
-<small class="text-muted">Riscos identificados: <span id="health-risk-count">0</span></small>
-</div>
-</div>
-
-<div class="col-md-4 text-center mb-3">
-<div id="health-confidence" class="alert alert-secondary">
-<h6>Confiança na Previsão</h6>
-<h3><span id="health-confidence-level">Alta</span></h3>
-<small class="text-muted">Baseado em <span id="health-samples-count">0</span> amostras</small>
-</div>
-</div>
-</div>
-</div>
-</div>
-</div>
-
-</div>
 </div>
 
 <!-- Backtesting Tab -->

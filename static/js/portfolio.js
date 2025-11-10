@@ -154,6 +154,21 @@ function showPortfolioLoading() {
     `);
     $('#wsjf-ranking').empty();
     $('#wsjf-prioritization').hide();
+    updateRiskContent(`
+        <div class="text-center py-4 text-muted">
+            <div class="spinner-border text-primary" role="status">
+                <span class="sr-only">Carregando...</span>
+            </div>
+            <p class="mt-3 mb-0">Calculando mapa de riscos...</p>
+        </div>
+    `);
+}
+
+function updateRiskContent(html) {
+    const container = $('#portfolio-risk-content');
+    if (container.length) {
+        container.html(html);
+    }
 }
 
 async function loadPortfolioDashboard() {
@@ -223,12 +238,22 @@ function renderEmptyState(message) {
             <p class="text-muted">Crie projetos na seção "Dashboard Executivo" ou use a API</p>
         </div>
     `);
+    updateRiskContent(`
+        <div class="alert alert-light border text-center mb-0">
+            <i class="fas fa-info-circle mr-2"></i>${message}
+        </div>
+    `);
 }
 
 function renderError(message) {
     $('#portfolio-content').html(`
         <div class="alert alert-danger">
             <i class="fas fa-exclamation-triangle"></i> ${message}
+        </div>
+    `);
+    updateRiskContent(`
+        <div class="alert alert-danger mb-0">
+            <i class="fas fa-exclamation-triangle mr-2"></i>${message}
         </div>
     `);
 }
@@ -280,14 +305,13 @@ function renderPortfolioDashboard(data) {
         <!-- Projects Health Table -->
         ${renderHealthScoresTable(data.health_scores)}
 
-        <!-- Prioritization Matrix -->
-        ${renderPrioritizationMatrix(data.prioritization_matrix)}
     `;
 
     $('#portfolio-content').html(html);
 
     // Load WSJF/CoD analysis
     loadWSJFAnalysis(data.projects);
+    updateRiskContent(renderRiskInsights(data.prioritization_matrix, data.alerts));
 }
 
 function renderAlerts(alerts) {
@@ -486,6 +510,44 @@ function renderPrioritizationMatrix(matrix) {
             </div>
         </div>
     `;
+}
+
+function renderRiskInsights(matrix, alerts) {
+    let alertSection = '';
+    if (alerts && alerts.length) {
+        alertSection = '<div class="mb-4">';
+        alerts.forEach(alert => {
+            const severityClass = {
+                'critical': 'danger',
+                'high': 'warning',
+                'medium': 'info',
+                'low': 'secondary'
+            }[alert.severity] || 'info';
+            alertSection += `
+                <div class="alert alert-${severityClass} mb-2">
+                    <strong>${alert.type.toUpperCase()}</strong> — ${alert.message}
+                    ${alert.action ? `<br><small class="text-muted"><i class="fas fa-lightbulb mr-2"></i>${alert.action}</small>` : ''}
+                </div>
+            `;
+        });
+        alertSection += '</div>';
+    } else {
+        alertSection = `
+            <div class="alert alert-success mb-4">
+                <i class="fas fa-check-circle mr-2"></i>Portfólio saudável! Nenhum alerta crítico de risco.
+            </div>
+        `;
+    }
+
+    const matrixSection = matrix
+        ? renderPrioritizationMatrix(matrix)
+        : `
+            <div class="alert alert-light border">
+                <i class="fas fa-info-circle mr-2"></i>Dados insuficientes para gerar a matriz de riscos.
+            </div>
+        `;
+
+    return `${alertSection}${matrixSection}`;
 }
 
 function renderProjectList(projects, colorClass) {
