@@ -752,11 +752,17 @@ async function runCoDAnalysis() {
  * Render Cost of Delay analysis results
  */
 function renderCoDAnalysisResults(result) {
-    const optimization = result.optimization || {};
+    const optimizationRaw = result.optimization || {};
     const strategyComparison = result.strategy_comparison || {};
     const strategies = strategyComparison.strategies || {};
     const bestStrategy = strategyComparison.best_strategy || null;
+    const riskAssessment = result.risk_assessment || { high_cod_projects: [], critical_deadline_projects: [] };
     const totals = result.totals || {};
+
+    const savingsBlock = optimizationRaw.savings || {};
+    const optimizedBlock = optimizationRaw.optimized || {};
+    const originalBlock = optimizationRaw.original || {};
+    const projectRankingsRaw = optimizationRaw.project_rankings || {};
 
     const safeTotals = {
         parallel: totals.parallel || {},
@@ -764,23 +770,46 @@ function renderCoDAnalysisResults(result) {
         sequential_optimized: totals.sequential_optimized || {}
     };
 
+    const optimizedSequence = Array.isArray(optimizedBlock.sequence)
+        ? optimizedBlock.sequence
+        : (Array.isArray(optimizationRaw.optimized_sequence) ? optimizationRaw.optimized_sequence : []);
+
+    const projectRankings = {};
+    Object.entries(projectRankingsRaw).forEach(([key, value]) => {
+        const numericKey = Number(key);
+        projectRankings[numericKey] = value;
+    });
+
     const safeOptimization = {
-        cod_savings: optimization.cod_savings || 0,
-        cod_savings_pct: Number.isFinite(optimization.cod_savings_pct) ? optimization.cod_savings_pct : 0,
-        optimized_sequence: Array.isArray(optimization.optimized_sequence) ? optimization.optimized_sequence : [],
-        project_rankings: optimization.project_rankings || {}
+        cod_savings: Number.isFinite(savingsBlock.cod_savings)
+            ? savingsBlock.cod_savings
+            : Number.isFinite(optimizationRaw.cod_savings) ? optimizationRaw.cod_savings : 0,
+        cod_savings_pct: Number.isFinite(savingsBlock.cod_savings_pct)
+            ? savingsBlock.cod_savings_pct
+            : Number.isFinite(optimizationRaw.cod_savings_pct) ? optimizationRaw.cod_savings_pct : 0,
+        optimized_sequence: optimizedSequence,
+        project_rankings: projectRankings,
+        original_total_cod: originalBlock.total_cod || safeTotals.sequential_unoptimized.total_cod || 0,
+        optimized_total_cod: optimizedBlock.total_cod || safeTotals.sequential_optimized.total_cod || 0
     };
 
-    const formatPercent = (value) => Number.isFinite(value) ? value.toFixed(1) : '0.0';
+    const hasPositiveSavings = safeOptimization.cod_savings > 1;
+    const hasNegativeSavings = safeOptimization.cod_savings < -1;
+    const savingsAlertClass = hasPositiveSavings ? 'alert-success' : hasNegativeSavings ? 'alert-danger' : 'alert-warning';
+    const savingsMessage = hasPositiveSavings
+        ? `Economia com WSJF: <strong>R$ ${formatNumber(safeOptimization.cod_savings)}</strong> (${safeOptimization.cod_savings_pct.toFixed(1)}% de redução no CoD total)`
+        : hasNegativeSavings
+            ? `WSJF não reduziu o Cost of Delay. Diferença: <strong>+R$ ${formatNumber(Math.abs(safeOptimization.cod_savings))}</strong>`
+            : 'WSJF não gerou economia relevante com os dados atuais.';
+
     const formatWeeks = (value) => Number.isFinite(value) ? `${value.toFixed(1)} semanas` : '—';
 
     const html = `
         <div class="row mb-4">
             <div class="col-md-12">
                 <h5><i class="fas fa-dollar-sign"></i> Análise de Cost of Delay</h5>
-                <div class="alert alert-success">
-                    <strong>Economia com WSJF:</strong> R$ ${formatNumber(safeOptimization.cod_savings)}
-                    (${formatPercent(safeOptimization.cod_savings_pct)}% de redução no CoD total)
+                <div class="alert ${savingsAlertClass}">
+                    ${savingsMessage}
                 </div>
             </div>
         </div>
@@ -811,7 +840,11 @@ function renderCoDAnalysisResults(result) {
                         <h6 class="text-muted">Sequencial (WSJF otimizado)</h6>
                         <h3 class="text-success">R$ ${formatNumber(safeTotals.sequential_optimized.total_cod || 0)}</h3>
                         <p class="small mb-0">${formatWeeks(safeTotals.sequential_optimized.duration_p85)}</p>
-                        <span class="badge bg-success mt-2">Recomendado</span>
+                        ${hasPositiveSavings
+                            ? '<span class="badge bg-success mt-2">Recomendado</span>'
+                            : hasNegativeSavings
+                                ? '<span class="badge bg-danger mt-2">Não recomendado</span>'
+                                : '<span class="badge bg-secondary mt-2">Sem ganho</span>'}
                     </div>
                 </div>
             </div>
@@ -912,9 +945,9 @@ function renderCoDAnalysisResults(result) {
                 <div class="row">
                     <div class="col-md-6">
                         <h6>Projetos com Alto CoD</h6>
-                        ${result.risk_assessment.high_cod_projects.length > 0 ? `
+                        ${riskAssessment.high_cod_projects.length > 0 ? `
                             <ul class="list-unstyled">
-                                ${result.risk_assessment.high_cod_projects.map(pid => {
+                                ${riskAssessment.high_cod_projects.map(pid => {
                                     const project = result.projects.find(p => p.project_id === pid);
                                     return project ? `
                                         <li>
@@ -929,9 +962,9 @@ function renderCoDAnalysisResults(result) {
                     </div>
                     <div class="col-md-6">
                         <h6>Projetos com Prazos Críticos</h6>
-                        ${result.risk_assessment.critical_deadline_projects.length > 0 ? `
+                        ${riskAssessment.critical_deadline_projects.length > 0 ? `
                             <ul class="list-unstyled">
-                                ${result.risk_assessment.critical_deadline_projects.map(pid => {
+                                ${riskAssessment.critical_deadline_projects.map(pid => {
                                     const project = result.projects.find(p => p.project_id === pid);
                                     return project ? `
                                         <li>
