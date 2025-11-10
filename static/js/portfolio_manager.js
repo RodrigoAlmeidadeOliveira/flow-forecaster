@@ -548,23 +548,24 @@ function renderSimulationResults(result) {
  * Render completion metrics
  */
 function renderCompletionMetrics(forecast) {
+    const fallback = (value) => Number.isFinite(value) ? value : '—';
     return `
         <div class="row text-center mb-3">
-            <div class="col-md-4">
-                <div class="metric-card">
-                    <div class="metric-value">${forecast.p50_weeks}</div>
+            <div class="col-md-4 mb-3">
+                <div class="metric-card compact">
+                    <div class="metric-value">${fallback(forecast.p50_weeks)}</div>
                     <div class="metric-label">P50 (semanas)</div>
                 </div>
             </div>
-            <div class="col-md-4">
-                <div class="metric-card">
-                    <div class="metric-value">${forecast.p85_weeks}</div>
+            <div class="col-md-4 mb-3">
+                <div class="metric-card compact">
+                    <div class="metric-value">${fallback(forecast.p85_weeks)}</div>
                     <div class="metric-label">P85 (semanas)</div>
                 </div>
             </div>
-            <div class="col-md-4">
-                <div class="metric-card">
-                    <div class="metric-value">${forecast.p95_weeks}</div>
+            <div class="col-md-4 mb-3">
+                <div class="metric-card compact">
+                    <div class="metric-value">${fallback(forecast.p95_weeks)}</div>
                     <div class="metric-label">P95 (semanas)</div>
                 </div>
             </div>

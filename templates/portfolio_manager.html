@@ -77,23 +77,31 @@
 
         .metric-card {
             background: white;
-            padding: 1.5rem;
+            padding: 1rem 1.25rem;
             border-radius: 10px;
             text-align: center;
             margin-bottom: 1rem;
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
+        }
+
+        .metric-card.compact {
+            padding: 0.85rem 1rem;
+            box-shadow: none;
+            border: 1px solid #e5e7eb;
         }
 
         .metric-value {
-            font-size: 2rem;
-            font-weight: bold;
-            color: #667eea;
+            font-size: 1.65rem;
+            font-weight: 700;
+            color: #4c1d95;
         }
 
         .metric-label {
-            color: #6c757d;
-            font-size: 0.9rem;
-            margin-top: 0.5rem;
+            color: #6b7280;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-top: 0.35rem;
         }
 
         .empty-state {

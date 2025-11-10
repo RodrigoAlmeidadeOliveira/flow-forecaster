@@ -74,11 +74,28 @@
         }
 
         .metric-card {
-            background: white;
-            padding: 15px;
-            border-radius: 6px;
-            margin: 10px 0;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            background: #ffffff;
+            padding: 14px;
+            border-radius: 8px;
+            border: 1px solid #e5e7eb;
+            margin: 8px 0;
+            box-shadow: none;
+        }
+        .metric-card.compact {
+            padding: 12px;
+            border-radius: 10px;
+        }
+        .metric-card .metric-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #4c1d95;
+        }
+        .metric-card .metric-label {
+            color: #6b7280;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-top: 0.35rem;
         }
 
         .risk-high {
@@ -258,6 +275,32 @@
             border: 0;
             border-radius: 12px;
             background: #fff;
+        }
+        .portfolio-risk-summary {
+            border: 1px solid #e5e7eb;
+            border-radius: 12px;
+            padding: 1rem 1.25rem;
+            background: #f8fafc;
+            min-height: 150px;
+        }
+        .portfolio-risk-summary .risk-metric {
+            padding: 0.85rem 1rem;
+            border-radius: 10px;
+            background: #fff;
+            border: 1px solid #e2e8f0;
+            margin-bottom: 0.75rem;
+            box-shadow: 0 6px 15px rgba(15, 23, 42, 0.05);
+        }
+        .portfolio-risk-summary .risk-metric h6 {
+            margin-bottom: 0.15rem;
+            font-size: 0.85rem;
+            color: #4c1d95;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .portfolio-risk-summary .risk-metric strong {
+            font-size: 1.4rem;
+            color: #111827;
         }
     </style>
 </head>
@@ -3267,9 +3310,6 @@ a probabilidade de todas serem entregues no prazo é de <strong>1 em 2^n</strong
                     <button class="btn btn-primary" data-frame-target="portfolio-config-frame" data-frame-url="/portfolio">
                         <i class="fas fa-eye mr-1"></i> Visualizar cadastro
                     </button>
-                    <button class="btn btn-outline-primary" data-frame-target="portfolio-risks-frame" data-frame-url="/portfolio/risks">
-                        <i class="fas fa-shield-alt mr-1"></i> Gestão de riscos
-                    </button>
                     <a class="btn btn-link text-primary" href="/portfolio">
                         Abrir em tela cheia
                     </a>
@@ -3282,13 +3322,40 @@ a probabilidade de todas serem entregues no prazo é de <strong>1 em 2^n</strong
                     <div class="alert alert-danger portfolio-frame-error mt-3"></div>
                     <iframe id="portfolio-config-frame" title="Cadastro do Portfólio"></iframe>
                 </div>
-                <div class="portfolio-frame-wrapper d-none" id="portfolio-risks-frame-wrapper">
-                    <div class="portfolio-frame-loading">
-                        <div class="spinner-border text-primary" role="status"></div>
-                        <span>Carregando gestão de riscos...</span>
+                <div class="mt-4">
+                    <div class="d-flex flex-wrap justify-content-between align-items-center mb-3">
+                        <div>
+                            <h5 class="mb-1"><i class="fas fa-shield-alt text-primary mr-2"></i>Resumo de Riscos Atual</h5>
+                            <p class="mb-0 text-muted small">Escolha um portfólio para visualizar o mapa de riscos, alertas e recomendações.</p>
+                        </div>
+                        <div class="d-flex flex-wrap align-items-center" style="gap: 0.5rem;">
+                            <label class="mb-0 mr-2 text-muted small" for="risk-portfolio-select">Portfólio</label>
+                            <select class="form-control form-control-sm" id="risk-portfolio-select" style="min-width: 220px;">
+                                <option value="">Selecione...</option>
+                            </select>
+                        </div>
                     </div>
-                    <div class="alert alert-danger portfolio-frame-error mt-3"></div>
-                    <iframe id="portfolio-risks-frame" title="Gestão de Riscos"></iframe>
+                    <div class="portfolio-risk-summary" id="portfolio-risk-content">
+                        <div class="text-muted py-4 text-center">
+                            <i class="fas fa-info-circle mr-2"></i>Selecione um portfólio para carregar o resumo de riscos.
+                        </div>
+                    </div>
+                    <div class="step-actions mt-3">
+                        <button class="btn btn-outline-primary" data-frame-target="portfolio-risks-frame" data-frame-url="/portfolio/risks">
+                            <i class="fas fa-layer-group mr-1"></i> Abrir tela detalhada de riscos
+                        </button>
+                        <a class="btn btn-link text-primary" href="/portfolio/risks">
+                            Abrir em tela cheia
+                        </a>
+                    </div>
+                    <div class="portfolio-frame-wrapper d-none" id="portfolio-risks-frame-wrapper">
+                        <div class="portfolio-frame-loading">
+                            <div class="spinner-border text-primary" role="status"></div>
+                            <span>Carregando gestão de riscos...</span>
+                        </div>
+                        <div class="alert alert-danger portfolio-frame-error mt-3"></div>
+                        <iframe id="portfolio-risks-frame" title="Gestão de Riscos"></iframe>
+                    </div>
                 </div>
             </section>
 
@@ -3726,6 +3793,173 @@ a probabilidade de todas serem entregues no prazo é de <strong>1 em 2^n</strong
                 });
             });
         });
+    })();
+</script>
+<script>
+    (function() {
+        const select = document.getElementById('risk-portfolio-select');
+        const summaryContainer = document.getElementById('portfolio-risk-content');
+        if (!select || !summaryContainer) return;
+
+        function setSummary(html) {
+            summaryContainer.innerHTML = html;
+        }
+
+        function showLoading(message = 'Carregando análise de riscos...') {
+            setSummary(`
+                <div class="text-center py-4 text-muted">
+                    <div class="spinner-border text-primary mb-3" role="status"></div>
+                    <p class="mb-0">${message}</p>
+                </div>
+            `);
+        }
+
+        function showError(message) {
+            setSummary(`
+                <div class="alert alert-danger mb-0">
+                    <i class="fas fa-exclamation-triangle mr-2"></i>${message}
+                </div>
+            `);
+        }
+
+        function formatCurrency(value) {
+            if (!Number.isFinite(value)) return '—';
+            return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(value);
+        }
+
+        function renderAlerts(alerts) {
+            if (!Array.isArray(alerts) || !alerts.length) {
+                return '<p class="text-success mb-0"><i class="fas fa-check-circle mr-1"></i>Nenhum alerta crítico registrado.</p>';
+            }
+            return alerts.map(alert => {
+                const severity = alert.severity || 'info';
+                const badgeClass = severity === 'critical' ? 'danger' : severity === 'high' ? 'warning' : severity === 'medium' ? 'info' : 'secondary';
+                return `
+                    <div class="alert alert-${badgeClass} mb-2">
+                        <strong>${(alert.title || alert.type || 'Alerta').toUpperCase()}</strong> — ${alert.message || ''}
+                        ${alert.recommendation ? `<br><small>${alert.recommendation}</small>` : ''}
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function renderRiskSummary(data) {
+            if (!data || !data.metrics) {
+                setSummary('<div class="text-muted">Sem dados suficientes para esta seleção.</div>');
+                return;
+            }
+
+            const metrics = data.metrics;
+            const levels = metrics.by_level || {};
+            const costs = metrics.costs || {};
+            const alerts = data.alerts || [];
+            const hotspots = metrics.high_risk_categories || [];
+
+            setSummary(`
+                <div class="row">
+                    <div class="col-lg-3 col-md-6">
+                        <div class="risk-metric">
+                            <h6>Total de riscos</h6>
+                            <strong>${metrics.total_risks || 0}</strong>
+                            <p class="text-muted small mb-0">Críticos: ${levels.critical || 0} • Altos: ${levels.high || 0}</p>
+                        </div>
+                    </div>
+                    <div class="col-lg-3 col-md-6">
+                        <div class="risk-metric">
+                            <h6>Risco médio</h6>
+                            <strong>${(metrics.scores && Number.isFinite(metrics.scores.average)) ? metrics.scores.average.toFixed(1) : '—'}</strong>
+                            <p class="text-muted small mb-0">Score ponderado: ${(metrics.scores && Number.isFinite(metrics.scores.weighted)) ? metrics.scores.weighted.toFixed(1) : '—'}</p>
+                        </div>
+                    </div>
+                    <div class="col-lg-3 col-md-6">
+                        <div class="risk-metric">
+                            <h6>Custos potenciais</h6>
+                            <strong>${formatCurrency(costs.total_potential)}</strong>
+                            <p class="text-muted small mb-0">EMV: ${formatCurrency(costs.expected_monetary_value)}</p>
+                        </div>
+                    </div>
+                    <div class="col-lg-3 col-md-6">
+                        <div class="risk-metric">
+                            <h6>Mitigações</h6>
+                            <strong>${formatCurrency(costs.total_mitigation)}</strong>
+                            <p class="text-muted small mb-0">Ativos: ${metrics.by_status ? metrics.by_status.active : 0}</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="row mt-3">
+                    <div class="col-md-6">
+                        <h6 class="text-uppercase text-muted small">Alertas recentes</h6>
+                        ${renderAlerts(alerts)}
+                    </div>
+                    <div class="col-md-6">
+                        <h6 class="text-uppercase text-muted small">Hotspots</h6>
+                        ${hotspots.length ? `
+                            <ul class="mb-0">
+                                ${hotspots.map(item => `<li>${item.category}: <strong>${item.total_risks}</strong> riscos</li>`).join('')}
+                            </ul>
+                        ` : '<p class="text-muted">Nenhum hotspot identificado.</p>'}
+                    </div>
+                </div>
+            `);
+        }
+
+        function loadRiskSummary(portfolioId) {
+            if (!portfolioId) {
+                setSummary('<div class="text-muted">Selecione um portfólio para carregar o resumo.</div>');
+                return;
+            }
+            showLoading();
+            fetch(`/api/portfolios/${portfolioId}/risks/analysis`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Falha ao carregar análise de riscos');
+                    }
+                    return response.json();
+                })
+                .then(renderRiskSummary)
+                .catch(error => {
+                    console.error('[Portfolio Risks] Error:', error);
+                    showError(error.message || 'Erro ao carregar análise de riscos');
+                });
+        }
+
+        function populateRiskPortfolios() {
+            fetch('/api/portfolios')
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Falha ao carregar portfólios');
+                    }
+                    return response.json();
+                })
+                .then(portfolios => {
+                    select.innerHTML = '<option value="">Selecione...</option>';
+                    portfolios.forEach(p => {
+                        const option = document.createElement('option');
+                        option.value = p.id;
+                        option.textContent = `${p.name} (${p.projects_count} projetos)`;
+                        select.appendChild(option);
+                    });
+                    if (portfolios.length) {
+                        select.value = portfolios[0].id;
+                        loadRiskSummary(portfolios[0].id);
+                    }
+                })
+                .catch(error => {
+                    console.error('[Portfolio Risks] Error loading portfolios:', error);
+                    showError('Não foi possível carregar a lista de portfólios.');
+                });
+        }
+
+        select.addEventListener('change', () => {
+            const id = select.value;
+            if (!id) {
+                setSummary('<div class="text-muted">Selecione um portfólio para carregar o resumo.</div>');
+                return;
+            }
+            loadRiskSummary(id);
+        });
+
+        populateRiskPortfolios();
     })();
 </script>
     <script>
