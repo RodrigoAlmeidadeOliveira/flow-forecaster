@@ -169,6 +169,14 @@
             margin-right: 16px;
             margin-bottom: 8px;
         }
+        .pbc-chart-wrapper {
+            min-height: 320px;
+        }
+        .pbc-chart-wrapper canvas {
+            width: 100% !important;
+            min-height: 260px;
+            max-height: 360px;
+        }
         .pbc-legend-swatch {
             width: 14px;
             height: 14px;
@@ -2522,7 +2530,7 @@ Consider this when making prioritization decisions.
                             </div>
                         </div>
                         <div class="col-lg-9">
-                            <div class="position-relative">
+                            <div class="position-relative pbc-chart-wrapper">
                                 <canvas id="tp-process-behavior-chart" height="260" aria-label="Process Behavior Chart - Throughput"></canvas>
                             </div>
                             <div class="pbc-legend d-flex flex-wrap align-items-center mt-3 small">
@@ -2689,7 +2697,7 @@ Consider this when making prioritization decisions.
                             </div>
                         </div>
                         <div class="col-lg-9">
-                            <div class="position-relative">
+                            <div class="position-relative pbc-chart-wrapper">
                                 <canvas id="lt-process-behavior-chart" height="260" aria-label="Process Behavior Chart - Lead Time"></canvas>
                             </div>
                             <div class="pbc-legend d-flex flex-wrap align-items-center mt-3 small">

@@ -320,6 +320,11 @@
 
         destroyProcessBehaviorChart(metricKey);
 
+        canvas.style.width = '100%';
+        canvas.style.height = '260px';
+        canvas.height = 260;
+        canvas.width = canvas.parentElement ? canvas.parentElement.clientWidth : canvas.width || 600;
+
         const ctx = canvas.getContext('2d');
         const labels = samples.map((_value, index) => index + 1);
         const runIndices = new Set((signals && signals.runIndices) || []);
