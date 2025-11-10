@@ -187,21 +187,77 @@
         .pbc-legend-swatch.bg-gradient {
             background: linear-gradient(90deg, #6c757d 0%, #adb5bd 100%);
         }
-        .executive-shell .nav-pills .nav-link {
-            border-radius: 40px;
-            font-weight: 600;
-            color: #6c757d;
-            margin: 4px 8px;
-            padding: 8px 18px;
-            transition: all 0.2s ease;
+        .portfolio-journey {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
         }
-        .executive-shell .nav-pills .nav-link.active {
-            color: #fff;
+        .portfolio-step {
+            background: #fff;
+            border-radius: 18px;
+            border: 1px solid #e5e7eb;
+            box-shadow: 0 25px 45px rgba(15, 23, 42, 0.08);
+            padding: 1.75rem;
+        }
+        .portfolio-step .step-header {
+            display: flex;
+            align-items: flex-start;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+        .portfolio-step .step-badge {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
             background: linear-gradient(135deg, #2563eb 0%, #9333ea 100%);
-            box-shadow: 0 0.5rem 1rem rgba(37, 99, 235, 0.25);
+            color: #fff;
+            font-weight: 700;
+            font-size: 1.15rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 1.5rem 2.5rem rgba(79, 70, 229, 0.35);
         }
-        .executive-shell .tab-pane {
-            animation: fadeIn 0.2s ease;
+        .portfolio-step h4 {
+            margin-bottom: 0.35rem;
+        }
+        .portfolio-step p {
+            margin-bottom: 0.25rem;
+            color: #4b5563;
+        }
+        .portfolio-step .step-actions {
+            margin-top: 1rem;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.75rem;
+        }
+        .portfolio-frame-wrapper {
+            margin-top: 1.25rem;
+            border: 1px dashed #cbd5f5;
+            border-radius: 14px;
+            background: #f8fafc;
+            padding: 1rem;
+            position: relative;
+        }
+        .portfolio-frame-wrapper.d-none {
+            display: none !important;
+        }
+        .portfolio-frame-loading {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            font-weight: 600;
+            color: #4c1d95;
+        }
+        .portfolio-frame-error {
+            display: none;
+        }
+        .portfolio-frame-wrapper iframe {
+            width: 100%;
+            min-height: 900px;
+            border: 0;
+            border-radius: 12px;
+            background: #fff;
         }
     </style>
 </head>
@@ -3194,305 +3250,128 @@ a probabilidade de todas serem entregues no prazo é de <strong>1 em 2^n</strong
     <div class="pt-4 pb-5">
         <div class="container text-center mb-4">
             <h2><i class="fas fa-chart-pie"></i> Portfolio</h2>
-            <p class="text-muted mb-3">Visão consolidada do portfólio e indicadores do projeto atual</p>
-            <button class="btn btn-primary" onclick="refreshDashboard()"><i class="fas fa-sync-alt mr-2"></i>Atualizar Dashboard</button>
+            <p class="text-muted mb-0">Siga o fluxo completo: cadastre o portfólio, rode simulações, otimize e acompanhe indicadores executivos sem sair do Flow Forecaster.</p>
         </div>
 
-        <div class="card shadow-sm executive-shell">
-            <div class="card-header bg-white border-0">
-                <ul class="nav nav-pills justify-content-center flex-wrap" id="executiveSubTabs" role="tablist">
-                    <li class="nav-item">
-                        <a class="nav-link active" id="exec-portfolio-tab-link" data-toggle="pill" href="#exec-portfolio-tab" role="tab" aria-controls="exec-portfolio-tab" aria-selected="true">
-                            <i class="fas fa-briefcase mr-1"></i>Portfolio
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" id="exec-dashboard-tab-link" data-toggle="pill" href="#exec-dashboard-tab" role="tab" aria-controls="exec-dashboard-tab" aria-selected="false">
-                            <i class="fas fa-tachometer-alt mr-1"></i>Dashboard
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" id="exec-risks-tab-link" data-toggle="pill" href="#exec-risks-tab" role="tab" aria-controls="exec-risks-tab" aria-selected="false">
-                            <i class="fas fa-shield-alt mr-1"></i>Risks
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" id="exec-optimize-tab-link" data-toggle="pill" href="#exec-optimize-tab" role="tab" aria-controls="exec-optimize-tab" aria-selected="false">
-                            <i class="fas fa-magic mr-1"></i>Optimize
-                        </a>
-                    </li>
-                </ul>
-            </div>
-            <div class="card-body p-4">
-                <div class="tab-content" id="executiveSubTabsContent">
-                    <div class="tab-pane fade show active" id="exec-portfolio-tab" role="tabpanel" aria-labelledby="exec-portfolio-tab-link">
-                        <div class="mb-4">
-                            <div class="card shadow-sm border-0">
-                                <div class="card-body">
-                                    <div class="form-row align-items-end">
-                                        <div class="form-group col-md-4">
-                                            <label class="text-muted mb-1" for="portfolio-dashboard-select">
-                                                Selecionar portfolio
-                                            </label>
-                                            <select class="form-control" id="portfolio-dashboard-select">
-                                                <option value="all">Todos os projetos</option>
-                                            </select>
-                                        </div>
-                                        <div class="form-group col-md-6">
-                                            <label class="text-muted mb-1" for="portfolio-project-select">
-                                                Filtrar projetos (opcional)
-                                            </label>
-                                            <select class="form-control" id="portfolio-project-select" multiple size="4" disabled></select>
-                                            <small class="text-muted d-block mt-1" id="project-filter-hint">
-                                                Selecione um portfolio para habilitar o filtro por projetos.
-                                            </small>
-                                        </div>
-                                        <div class="form-group col-md-2">
-                                            <button class="btn btn-outline-secondary w-100" id="project-filter-clear" disabled>
-                                                Limpar filtro
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div id="portfolio-content">
-                            <div class="text-center py-5">
-                                <div class="spinner-border text-primary" role="status">
-                                    <span class="sr-only">Carregando...</span>
-                                </div>
-                                <p class="mt-3 text-muted mb-0">Carregando dados do portfolio...</p>
-                            </div>
-                        </div>
-
-                        <div class="alert alert-light border">
-                            <div class="d-flex flex-wrap justify-content-between align-items-center">
-                                <div>
-                                    <h5 class="mb-1"><i class="fas fa-sliders-h mr-2 text-primary"></i>Cadastro e Configuração Completa</h5>
-                                    <p class="mb-0 text-muted small">Use o formulário completo de portfólio quando precisar ajustar squads, orçamento ou variáveis avançadas.</p>
-                                </div>
-                                <a class="btn btn-outline-primary mt-3 mt-sm-0" href="/portfolio" target="_blank" rel="noopener">
-                                    Abrir tela completa
-                                </a>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="tab-pane fade" id="exec-dashboard-tab" role="tabpanel" aria-labelledby="exec-dashboard-tab-link">
-                        <div class="text-center mb-4">
-                            <h4 class="mb-3"><i class="fas fa-project-diagram"></i> Projeto Atual / Análise Ativa</h4>
-                        </div>
-
-                        <div class="mb-4">
-                            <div class="row">
-                                <div class="col-md-3 mb-3">
-                                    <div class="card border-primary h-100">
-                                        <div class="card-body text-center">
-                                            <h6 class="card-title text-muted">Throughput Médio</h6>
-                                            <h2 class="text-primary"><span id="kpi-throughput">-</span></h2>
-                                            <small class="text-muted">itens/semana</small>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="col-md-3 mb-3">
-                                    <div class="card border-success h-100">
-                                        <div class="card-body text-center">
-                                            <h6 class="card-title text-muted">Prob. Sucesso no Prazo</h6>
-                                            <h2 class="text-success"><span id="kpi-deadline-prob">-</span></h2>
-                                            <small class="text-muted">chance de sucesso</small>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="col-md-3 mb-3">
-                                    <div class="card border-warning h-100">
-                                        <div class="card-body text-center">
-                                            <h6 class="card-title text-muted">Backlog Atual</h6>
-                                            <h2 class="text-warning"><span id="kpi-backlog">-</span></h2>
-                                            <small class="text-muted">itens pendentes</small>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="col-md-3 mb-3">
-                                    <div class="card border-info h-100">
-                                        <div class="card-body text-center">
-                                            <h6 class="card-title text-muted">Tempo Projetado (P85)</h6>
-                                            <h2 class="text-info"><span id="kpi-duration">-</span></h2>
-                                            <small class="text-muted">semanas</small>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="mb-4">
-                            <div class="row">
-                                <div class="col-md-6 mb-3">
-                                    <div class="card h-100">
-                                        <div class="card-header bg-dark text-white">
-                                            <h5 class="mb-0"><i class="fas fa-history"></i> Análises Históricas</h5>
-                                        </div>
-                                        <div class="card-body">
-                                            <div id="dashboard-loading" class="text-center" style="display:none;">
-                                                <div class="spinner-border text-primary" role="status">
-                                                    <span class="sr-only">Carregando...</span>
-                                                </div>
-                                            </div>
-                                            <div id="dashboard-historical-list">
-                                                <p class="text-muted mb-0">Nenhuma análise salva ainda.</p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="col-md-6 mb-3">
-                                    <div class="card h-100">
-                                        <div class="card-header bg-dark text-white">
-                                            <h5 class="mb-0"><i class="fas fa-chart-bar"></i> Tendência de Throughput</h5>
-                                        </div>
-                                        <div class="card-body">
-                                            <canvas id="dashboard-throughput-chart" height="200"></canvas>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div>
-                            <div class="card">
-                                <div class="card-header bg-dark text-white">
-                                    <h5 class="mb-0"><i class="fas fa-heartbeat"></i> Saúde do Projeto</h5>
-                                </div>
-                                <div class="card-body">
-                                    <div class="row">
-                                        <div class="col-md-4 text-center mb-3">
-                                            <div id="health-capacity" class="alert alert-secondary">
-                                                <h6>Capacidade</h6>
-                                                <div class="progress" style="height: 30px;">
-                                                    <div class="progress-bar" id="health-capacity-bar" role="progressbar" style="width: 0%">0%</div>
-                                                </div>
-                                                <small class="text-muted mt-2 d-block">Carga de trabalho atual</small>
-                                            </div>
-                                        </div>
-                                        <div class="col-md-4 text-center mb-3">
-                                            <div id="health-risk" class="alert alert-secondary">
-                                                <h6>Nível de Risco</h6>
-                                                <h3><span id="health-risk-level">Baixo</span></h3>
-                                                <small class="text-muted">Riscos identificados: <span id="health-risk-count">0</span></small>
-                                            </div>
-                                        </div>
-                                        <div class="col-md-4 text-center mb-3">
-                                            <div id="health-confidence" class="alert alert-secondary">
-                                                <h6>Confiança na Previsão</h6>
-                                                <h3><span id="health-confidence-level">Alta</span></h3>
-                                                <small class="text-muted">Baseado em <span id="health-samples-count">0</span> amostras</small>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="alert alert-light border mb-3">
-                            <div class="d-flex flex-wrap justify-content-between align-items-center">
-                                <div>
-                                    <h5 class="mb-1"><i class="fas fa-chart-line mr-2 text-primary"></i>Painel Executivo Completo</h5>
-                                    <p class="mb-0 text-muted small">Precisa da visualização detalhada? Abra o dashboard original em uma nova aba.</p>
-                                </div>
-                                <a class="btn btn-outline-primary mt-3 mt-sm-0" href="/portfolio/dashboard" target="_blank" rel="noopener">
-                                    Abrir dashboard completo
-                                </a>
-                            </div>
-                        </div>
-
-                        <div class="alert alert-light border">
-                            <div class="d-flex flex-wrap justify-content-between align-items-center">
-                                <div>
-                                    <h5 class="mb-1"><i class="fas fa-layer-group mr-2 text-primary"></i>Painel Executive Original</h5>
-                                    <p class="mb-0 text-muted small">Inclui relatórios, narrativas e exportações avançadas.</p>
-                                </div>
-                                <a class="btn btn-outline-primary mt-3 mt-sm-0" href="/portfolio/executive" target="_blank" rel="noopener">
-                                    Abrir painel executive
-                                </a>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="tab-pane fade" id="exec-risks-tab" role="tabpanel" aria-labelledby="exec-risks-tab-link">
-                        <div id="portfolio-risk-content">
-                            <div class="alert alert-info mb-0">
-                                <i class="fas fa-info-circle mr-2"></i>Selecione um portfólio para visualizar o mapa de riscos e ações recomendadas.
-                            </div>
-                        </div>
-
-                        <div class="alert alert-light border">
-                            <div class="d-flex flex-wrap justify-content-between align-items-center">
-                                <div>
-                                    <h5 class="mb-1"><i class="fas fa-shield-alt mr-2 text-primary"></i>Cadastro de Riscos do Projeto</h5>
-                                    <p class="mb-0 text-muted small">Utilize a tela completa para incluir planos de mitigação, owners e anexos.</p>
-                                </div>
-                                <a class="btn btn-outline-primary mt-3 mt-sm-0" href="/portfolio/risks" target="_blank" rel="noopener">
-                                    Abrir cadastro de riscos
-                                </a>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="tab-pane fade" id="exec-optimize-tab" role="tabpanel" aria-labelledby="exec-optimize-tab-link">
-                        <div class="mb-4" id="wsjf-prioritization" style="display:none;">
-                            <div class="card">
-                                <div class="card-header bg-gradient text-white" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
-                                    <h5 class="mb-0"><i class="fas fa-sort-amount-down"></i> Priorização WSJF (Weighted Shortest Job First)</h5>
-                                </div>
-                                <div class="card-body">
-                                    <p class="text-muted mb-3">
-                                        WSJF = (Business Value + Time Criticality + Risk Reduction) / Job Size
-                                        <br><small>Projetos ordenados por maior valor de WSJF (maior retorno/custo)</small>
-                                    </p>
-                                    <div id="wsjf-ranking"></div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div id="efficient-frontier-section" style="display:none;">
-                            <div class="card">
-                                <div class="card-header">
-                                    <h5 class="mb-0">
-                                        <i class="fas fa-wave-square"></i> Fronteira Eficiente (Markowitz)
-                                    </h5>
-                                </div>
-                                <div class="card-body" id="efficient-frontier-card-body">
-                                    <p class="text-muted small mb-3" id="efficient-frontier-info">
-                                        Selecione um portfolio para visualizar risco x retorno, Monte Carlo e fronteira eficiente.
-                                    </p>
-                                    <div id="efficient-frontier-message" class="alert alert-info" style="display:none;"></div>
-                                    <div class="row align-items-center">
-                                        <div class="col-lg-8 mb-3 mb-lg-0">
-                                            <div class="chart-container" style="height: 360px;">
-                                                <canvas id="efficientFrontierChart"></canvas>
-                                            </div>
-                                        </div>
-                                        <div class="col-lg-4">
-                                            <div id="efficient-frontier-summary"></div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="alert alert-light border">
-                            <div class="d-flex flex-wrap justify-content-between align-items-center">
-                                <div>
-                                    <h5 class="mb-1"><i class="fas fa-magic mr-2 text-primary"></i>Ambiente de Otimização Completo</h5>
-                                    <p class="mb-0 text-muted small">Execute simulações completas, ajuste parâmetros de foco e exporte relatórios dedicados.</p>
-                                </div>
-                                <a class="btn btn-outline-primary mt-3 mt-sm-0" href="/portfolio/optimize" target="_blank" rel="noopener">
-                                    Abrir ambiente de otimização
-                                </a>
-                            </div>
-                        </div>
+        <div class="portfolio-journey">
+            <section class="portfolio-step" id="portfolio-step-config">
+                <div class="step-header">
+                    <span class="step-badge">1</span>
+                    <div>
+                        <h4>Cadastro e Configuração</h4>
+                        <p>Monte o portfólio de projetos, defina prioridades, cadastre riscos e mantenha o baseline organizado antes de simular.</p>
+                        <p class="small text-muted mb-0">Inclui cadastro de portfólios, projetos, squads e matriz de riscos.</p>
                     </div>
                 </div>
-            </div>
+                <div class="step-actions">
+                    <button class="btn btn-primary" data-frame-target="portfolio-config-frame" data-frame-url="/portfolio">
+                        <i class="fas fa-eye mr-1"></i> Visualizar cadastro
+                    </button>
+                    <button class="btn btn-outline-primary" data-frame-target="portfolio-risks-frame" data-frame-url="/portfolio/risks">
+                        <i class="fas fa-shield-alt mr-1"></i> Gestão de riscos
+                    </button>
+                    <a class="btn btn-link text-primary" href="/portfolio">
+                        Abrir em tela cheia
+                    </a>
+                </div>
+                <div class="portfolio-frame-wrapper d-none" id="portfolio-config-frame-wrapper">
+                    <div class="portfolio-frame-loading">
+                        <div class="spinner-border text-primary" role="status"></div>
+                        <span>Carregando tela de cadastro do portfólio...</span>
+                    </div>
+                    <div class="alert alert-danger portfolio-frame-error mt-3"></div>
+                    <iframe id="portfolio-config-frame" title="Cadastro do Portfólio"></iframe>
+                </div>
+                <div class="portfolio-frame-wrapper d-none" id="portfolio-risks-frame-wrapper">
+                    <div class="portfolio-frame-loading">
+                        <div class="spinner-border text-primary" role="status"></div>
+                        <span>Carregando gestão de riscos...</span>
+                    </div>
+                    <div class="alert alert-danger portfolio-frame-error mt-3"></div>
+                    <iframe id="portfolio-risks-frame" title="Gestão de Riscos"></iframe>
+                </div>
+            </section>
+
+            <section class="portfolio-step" id="portfolio-step-simulation">
+                <div class="step-header">
+                    <span class="step-badge">2</span>
+                    <div>
+                        <h4>Simulação e Cost of Delay</h4>
+                        <p>Execute simulações Monte Carlo, compare cenários e calcule Cost of Delay com priorização WSJF.</p>
+                        <p class="small text-muted mb-0">Use os botões Simular e CoD Analysis para ver resultados atualizados.</p>
+                    </div>
+                </div>
+                <div class="step-actions">
+                    <button class="btn btn-primary" data-frame-target="portfolio-simulation-frame" data-frame-url="/portfolio" data-frame-scroll="#simulationResults">
+                        <i class="fas fa-play mr-1"></i> Rodar simulações aqui
+                    </button>
+                    <a class="btn btn-link text-primary" href="/portfolio#simulationResults">
+                        Abrir em tela cheia
+                    </a>
+                </div>
+                <div class="portfolio-frame-wrapper d-none" id="portfolio-simulation-frame-wrapper">
+                    <div class="portfolio-frame-loading">
+                        <div class="spinner-border text-primary" role="status"></div>
+                        <span>Preparando ambiente de simulação...</span>
+                    </div>
+                    <div class="alert alert-danger portfolio-frame-error mt-3"></div>
+                    <iframe id="portfolio-simulation-frame" title="Simulação do Portfólio e Cost of Delay"></iframe>
+                </div>
+            </section>
+
+            <section class="portfolio-step" id="portfolio-step-optimize">
+                <div class="step-header">
+                    <span class="step-badge">3</span>
+                    <div>
+                        <h4>Otimização do Portfólio</h4>
+                        <p>Explore WSJF, fronteira eficiente e recomendações de sequência para maximizar valor entregue.</p>
+                        <p class="small text-muted mb-0">Ajuste parâmetros e exporte relatórios sob demanda.</p>
+                    </div>
+                </div>
+                <div class="step-actions">
+                    <button class="btn btn-primary" data-frame-target="portfolio-optimize-frame" data-frame-url="/portfolio/optimize">
+                        <i class="fas fa-magic mr-1"></i> Visualizar otimização
+                    </button>
+                    <a class="btn btn-link text-primary" href="/portfolio/optimize">
+                        Abrir em tela cheia
+                    </a>
+                </div>
+                <div class="portfolio-frame-wrapper d-none" id="portfolio-optimize-frame-wrapper">
+                    <div class="portfolio-frame-loading">
+                        <div class="spinner-border text-primary" role="status"></div>
+                        <span>Carregando ambiente de otimização...</span>
+                    </div>
+                    <div class="alert alert-danger portfolio-frame-error mt-3"></div>
+                    <iframe id="portfolio-optimize-frame" title="Otimização de Portfólio"></iframe>
+                </div>
+            </section>
+
+            <section class="portfolio-step" id="portfolio-step-dashboard">
+                <div class="step-header">
+                    <span class="step-badge">4</span>
+                    <div>
+                        <h4>Dashboard Executivo</h4>
+                        <p>Acompanhe indicadores de throughput, riscos, saúde do portfólio e narrativas executivas em tempo real.</p>
+                        <p class="small text-muted mb-0">Ideal para reuniões com diretoria e steering committees.</p>
+                    </div>
+                </div>
+                <div class="step-actions">
+                    <button class="btn btn-primary" data-frame-target="portfolio-dashboard-frame" data-frame-url="/portfolio/executive">
+                        <i class="fas fa-chart-line mr-1"></i> Ver dashboard aqui
+                    </button>
+                    <a class="btn btn-link text-primary" href="/portfolio/executive">
+                        Abrir em tela cheia
+                    </a>
+                </div>
+                <div class="portfolio-frame-wrapper d-none" id="portfolio-dashboard-frame-wrapper">
+                    <div class="portfolio-frame-loading">
+                        <div class="spinner-border text-primary" role="status"></div>
+                        <span>Carregando painel executivo...</span>
+                    </div>
+                    <div class="alert alert-danger portfolio-frame-error mt-3"></div>
+                    <iframe id="portfolio-dashboard-frame" title="Dashboard Executivo"></iframe>
+                </div>
+            </section>
         </div>
     </div>
 </div>
@@ -3730,6 +3609,125 @@ a probabilidade de todas serem entregues no prazo é de <strong>1 em 2^n</strong
 <script src="{{ url_for('static', filename='js/forecast-persistence.js') }}"></script>
 <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
 <script src="{{ url_for('static', filename='js/trend_insights.js') }}"></script>
+<script>
+    (function() {
+        const frameCache = new Map();
+
+        function adjustFrameHeight(frame) {
+            try {
+                const doc = frame.contentDocument || frame.contentWindow.document;
+                if (!doc || !doc.body) return;
+                const height = Math.max(doc.body.scrollHeight, 900);
+                frame.style.height = height + 'px';
+            } catch (error) {
+                console.warn('[Portfolio Frames] Unable to adjust frame height:', error);
+            }
+        }
+
+        function showError(wrapper, message) {
+            const errorBox = wrapper.querySelector('.portfolio-frame-error');
+            if (errorBox) {
+                errorBox.style.display = 'block';
+                errorBox.textContent = message;
+            }
+        }
+
+        function hideError(wrapper) {
+            const errorBox = wrapper.querySelector('.portfolio-frame-error');
+            if (errorBox) {
+                errorBox.style.display = 'none';
+                errorBox.textContent = '';
+            }
+        }
+
+        function toggleLoader(wrapper, isVisible) {
+            const loader = wrapper.querySelector('.portfolio-frame-loading');
+            if (loader) {
+                loader.style.display = isVisible ? 'flex' : 'none';
+            }
+        }
+
+        function loadEmbeddedFrame(frameId, url, options = {}) {
+            const frame = document.getElementById(frameId);
+            const wrapper = document.getElementById(`${frameId}-wrapper`);
+            if (!frame || !wrapper) {
+                console.warn('[Portfolio Frames] Wrapper or frame not found for', frameId);
+                return;
+            }
+
+            wrapper.classList.remove('d-none');
+            hideError(wrapper);
+
+            if (frame.dataset.loaded === 'true') {
+                adjustFrameHeight(frame);
+                if (options.scrollSelector) {
+                    try {
+                        const anchor = frame.contentDocument?.querySelector(options.scrollSelector);
+                        if (anchor) {
+                            anchor.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        }
+                    } catch (error) {
+                        console.warn('[Portfolio Frames] Unable to scroll inside frame:', error);
+                    }
+                }
+                return;
+            }
+
+            toggleLoader(wrapper, true);
+
+            const fetchHtml = frameCache.has(url)
+                ? Promise.resolve(frameCache.get(url))
+                : fetch(url, { credentials: 'same-origin' })
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error(`Falha ao carregar ${url} (HTTP ${response.status})`);
+                        }
+                        return response.text();
+                    })
+                    .then(html => {
+                        frameCache.set(url, html);
+                        return html;
+                    });
+
+            fetchHtml
+                .then(html => {
+                    frame.onload = () => {
+                        frame.dataset.loaded = 'true';
+                        adjustFrameHeight(frame);
+                        if (options.scrollSelector) {
+                            try {
+                                const anchor = frame.contentDocument?.querySelector(options.scrollSelector);
+                                if (anchor) {
+                                    anchor.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                }
+                            } catch (error) {
+                                console.warn('[Portfolio Frames] Unable to scroll inside frame:', error);
+                            }
+                        }
+                        toggleLoader(wrapper, false);
+                    };
+                    frame.srcdoc = html;
+                })
+                .catch(error => {
+                    console.error('[Portfolio Frames] Error loading inline view:', error);
+                    toggleLoader(wrapper, false);
+                    showError(wrapper, 'Erro ao carregar: ' + error.message);
+                });
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            document.querySelectorAll('[data-frame-target]').forEach(button => {
+                button.addEventListener('click', () => {
+                    const frameId = button.getAttribute('data-frame-target');
+                    const url = button.getAttribute('data-frame-url');
+                    const scrollSelector = button.getAttribute('data-frame-scroll');
+                    if (!frameId || !url) return;
+                    loadEmbeddedFrame(frameId, url, { scrollSelector });
+                });
+            });
+        });
+    })();
+</script>
     <script>
         $(function () {
             $('[data-toggle="tooltip"]').tooltip();
@@ -3842,7 +3840,6 @@ a probabilidade de todas serem entregues no prazo é de <strong>1 em 2^n</strong
             handleHashChange();
         });
     </script>
-    <script src="{{ url_for('static', filename='js/portfolio.js') }}"></script>
     <script src="{{ url_for('static', filename='js/forecast-vs-actual.js') }}"></script>
 
     <!-- Backtesting JavaScript -->

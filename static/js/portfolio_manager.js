@@ -756,17 +756,35 @@ async function runCoDAnalysis() {
  * Render Cost of Delay analysis results
  */
 function renderCoDAnalysisResults(result) {
-    const optimization = result.optimization;
-    const strategies = result.strategy_comparison.strategies;
-    const bestStrategy = result.strategy_comparison.best_strategy;
+    const optimization = result.optimization || {};
+    const strategyComparison = result.strategy_comparison || {};
+    const strategies = strategyComparison.strategies || {};
+    const bestStrategy = strategyComparison.best_strategy || null;
+    const totals = result.totals || {};
+
+    const safeTotals = {
+        parallel: totals.parallel || {},
+        sequential_unoptimized: totals.sequential_unoptimized || {},
+        sequential_optimized: totals.sequential_optimized || {}
+    };
+
+    const safeOptimization = {
+        cod_savings: optimization.cod_savings || 0,
+        cod_savings_pct: Number.isFinite(optimization.cod_savings_pct) ? optimization.cod_savings_pct : 0,
+        optimized_sequence: Array.isArray(optimization.optimized_sequence) ? optimization.optimized_sequence : [],
+        project_rankings: optimization.project_rankings || {}
+    };
+
+    const formatPercent = (value) => Number.isFinite(value) ? value.toFixed(1) : '0.0';
+    const formatWeeks = (value) => Number.isFinite(value) ? `${value.toFixed(1)} semanas` : '—';
 
     const html = `
         <div class="row mb-4">
             <div class="col-md-12">
                 <h5><i class="fas fa-dollar-sign"></i> Análise de Cost of Delay</h5>
                 <div class="alert alert-success">
-                    <strong>Economia com WSJF:</strong> R$ ${formatNumber(optimization.cod_savings)}
-                    (${optimization.cod_savings_pct.toFixed(1)}% de redução no CoD total)
+                    <strong>Economia com WSJF:</strong> R$ ${formatNumber(safeOptimization.cod_savings)}
+                    (${formatPercent(safeOptimization.cod_savings_pct)}% de redução no CoD total)
                 </div>
             </div>
         </div>
@@ -777,8 +795,8 @@ function renderCoDAnalysisResults(result) {
                 <div class="card text-center">
                     <div class="card-body">
                         <h6 class="text-muted">Paralelo</h6>
-                        <h3 class="text-success">R$ ${formatNumber(result.totals.parallel.total_cod)}</h3>
-                        <p class="small mb-0">${result.totals.parallel.duration_p85.toFixed(1)} semanas</p>
+                        <h3 class="text-success">R$ ${formatNumber(safeTotals.parallel.total_cod || 0)}</h3>
+                        <p class="small mb-0">${formatWeeks(safeTotals.parallel.duration_p85)}</p>
                     </div>
                 </div>
             </div>
@@ -786,8 +804,8 @@ function renderCoDAnalysisResults(result) {
                 <div class="card text-center">
                     <div class="card-body">
                         <h6 class="text-muted">Sequencial (não otimizado)</h6>
-                        <h3 class="text-danger">R$ ${formatNumber(result.totals.sequential_unoptimized.total_cod)}</h3>
-                        <p class="small mb-0">${result.totals.sequential_unoptimized.duration_p85.toFixed(1)} semanas</p>
+                        <h3 class="text-danger">R$ ${formatNumber(safeTotals.sequential_unoptimized.total_cod || 0)}</h3>
+                        <p class="small mb-0">${formatWeeks(safeTotals.sequential_unoptimized.duration_p85)}</p>
                     </div>
                 </div>
             </div>
@@ -795,8 +813,8 @@ function renderCoDAnalysisResults(result) {
                 <div class="card text-center border-success">
                     <div class="card-body">
                         <h6 class="text-muted">Sequencial (WSJF otimizado)</h6>
-                        <h3 class="text-success">R$ ${formatNumber(result.totals.sequential_optimized.total_cod)}</h3>
-                        <p class="small mb-0">${result.totals.sequential_optimized.duration_p85.toFixed(1)} semanas</p>
+                        <h3 class="text-success">R$ ${formatNumber(safeTotals.sequential_optimized.total_cod || 0)}</h3>
+                        <p class="small mb-0">${formatWeeks(safeTotals.sequential_optimized.duration_p85)}</p>
                         <span class="badge bg-success mt-2">Recomendado</span>
                     </div>
                 </div>
@@ -821,8 +839,9 @@ function renderCoDAnalysisResults(result) {
                             </tr>
                         </thead>
                         <tbody>
-                            ${optimization.optimized_sequence.map((projectId, index) => {
-                                const ranking = optimization.project_rankings[projectId];
+                            ${safeOptimization.optimized_sequence.map((projectId, index) => {
+                                const ranking = safeOptimization.project_rankings[projectId];
+                                if (!ranking) return '';
                                 return `
                                     <tr>
                                         <td><strong>${index + 1}</strong></td>
@@ -853,6 +872,7 @@ function renderCoDAnalysisResults(result) {
                 <div class="row">
                     ${Object.keys(strategies).map(strategyName => {
                         const strategy = strategies[strategyName];
+                        if (!strategy) return '';
                         const isBest = strategy.is_best;
                         const strategyLabel = {
                             'wsjf': 'WSJF (Recomendado)',
