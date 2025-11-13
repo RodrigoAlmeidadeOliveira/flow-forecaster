@@ -2645,6 +2645,234 @@ def simulate_portfolio(portfolio_id):
         session.close()
 
 
+@app.route('/api/portfolios/<int:portfolio_id>/simulate-with-dependencies', methods=['POST'])
+@login_required
+def simulate_portfolio_with_dependencies_endpoint(portfolio_id):
+    """
+    Run Monte Carlo simulation for a portfolio WITH dependency analysis.
+
+    This endpoint implements multi-team forecasting with dependencies as described
+    in Nick Brown's article. It:
+    - Analyzes dependencies using the 2^n probabilistic model
+    - Calculates combined probabilities across teams
+    - Simulates delays caused by dependencies
+    - Provides baseline vs adjusted forecasts
+    """
+    session = get_session()
+    try:
+        # Import here to avoid circular dependencies
+        from portfolio_simulator import (
+            ProjectForecastInput,
+            simulate_portfolio_with_dependencies
+        )
+        from dependency_analyzer import Dependency, create_dependencies_from_dict
+
+        # Verify portfolio ownership
+        portfolio = session.query(Portfolio).filter(
+            Portfolio.id == portfolio_id,
+            Portfolio.user_id == current_user.id
+        ).one_or_none()
+
+        if not portfolio:
+            return jsonify({'error': 'Portfolio not found'}), 404
+
+        # Get simulation parameters
+        data = request.json or {}
+        n_simulations = data.get('n_simulations', 10000)
+        confidence_level = data.get('confidence_level', 'P85')
+
+        def extract_tp_samples(input_payload):
+            if not isinstance(input_payload, dict):
+                return []
+
+            raw_samples = (
+                input_payload.get('tp_samples') or
+                input_payload.get('tpSamples') or
+                input_payload.get('throughput_samples') or
+                input_payload.get('tp_samples_raw')
+            )
+
+            if isinstance(raw_samples, str):
+                raw_samples = [chunk.strip() for chunk in raw_samples.replace(';', ',').split(',') if chunk.strip()]
+
+            if not isinstance(raw_samples, list):
+                return []
+
+            cleaned = []
+            for sample in raw_samples:
+                try:
+                    value = float(sample)
+                except (TypeError, ValueError):
+                    continue
+                if value > 0:
+                    cleaned.append(value)
+            return cleaned
+
+        # Get all active projects in portfolio
+        portfolio_projects = session.query(PortfolioProject).filter(
+            PortfolioProject.portfolio_id == portfolio_id,
+            PortfolioProject.is_active == True
+        ).all()
+
+        if not portfolio_projects:
+            return jsonify({'error': 'No projects in portfolio'}), 400
+
+        # Prepare project forecast inputs
+        project_inputs = []
+        project_id_to_name = {}  # Mapping for dependency creation
+
+        for pp in portfolio_projects:
+            project = pp.project
+            project_id_to_name[project.id] = project.name
+
+            # Get most recent forecast for this project (to get tp_samples)
+            latest_forecast = session.query(Forecast).filter(
+                Forecast.project_id == project.id
+            ).order_by(Forecast.created_at.desc()).first()
+
+            if not latest_forecast:
+                continue
+
+            # Extract throughput samples from forecast
+            try:
+                input_data = json.loads(latest_forecast.input_data)
+            except Exception:
+                input_data = {}
+
+            tp_samples = extract_tp_samples(input_data)
+
+            if not tp_samples:
+                continue
+
+            # Get backlog from latest forecast or use a default
+            backlog = (
+                latest_forecast.backlog or
+                input_data.get('backlog') or
+                input_data.get('numberOfTasks') or
+                input_data.get('number_of_tasks') or
+                0
+            )
+
+            backlog = int(backlog) if backlog else 0
+
+            if backlog <= 0:
+                continue
+
+            project_input = ProjectForecastInput(
+                project_id=project.id,
+                project_name=project.name,
+                backlog=backlog,
+                tp_samples=tp_samples,
+                priority=pp.portfolio_priority,
+                cod_weekly=pp.cod_weekly,
+                wsjf_score=pp.wsjf_score,
+                depends_on=json.loads(pp.depends_on) if pp.depends_on else []
+            )
+
+            project_inputs.append(project_input)
+
+        if not project_inputs:
+            return jsonify({
+                'error': (
+                    'Nenhum projeto do portfólio possui forecasts salvos. '
+                    'Execute pelo menos uma previsão (Monte Carlo ou ML) e salve o resultado '
+                    'para cada projeto antes de simular o portfólio.'
+                )
+            }), 400
+
+        # Build dependencies list from project dependencies
+        dependencies = []
+        dep_id_counter = 1
+
+        for project_input in project_inputs:
+            if project_input.depends_on:
+                for dep_project_id in project_input.depends_on:
+                    # Get the target project name
+                    dep_project_name = project_id_to_name.get(dep_project_id, f'Project {dep_project_id}')
+
+                    # Create dependency object
+                    # Default: 70% on-time probability, 7 days delay impact, HIGH criticality
+                    dependency = Dependency(
+                        id=f'DEP-{dep_id_counter:03d}',
+                        name=f'{project_input.project_name} depends on {dep_project_name}',
+                        source_project=project_input.project_name,
+                        target_project=dep_project_name,
+                        on_time_probability=0.7,  # Default 70%
+                        delay_impact_days=7.0,  # Default 7 days
+                        criticality='HIGH'
+                    )
+                    dependencies.append(dependency)
+                    dep_id_counter += 1
+
+        # Run simulation with dependencies
+        result = simulate_portfolio_with_dependencies(
+            projects=project_inputs,
+            dependencies=dependencies,
+            n_simulations=n_simulations,
+            confidence_level=confidence_level
+        )
+
+        # Save simulation run to database
+        simulation_run = SimulationRun(
+            portfolio_id=portfolio_id,
+            user_id=current_user.id,
+            simulation_name=data.get('simulation_name', f'Simulation with Dependencies {datetime.utcnow().strftime("%Y-%m-%d %H:%M")}'),
+            simulation_type='portfolio_with_dependencies',
+            description=data.get('description', 'Multi-team forecasting with dependency analysis'),
+            n_simulations=n_simulations,
+            confidence_level=confidence_level,
+            input_data=json.dumps({
+                'projects': [
+                    {
+                        'project_id': pi.project_id,
+                        'project_name': pi.project_name,
+                        'backlog': pi.backlog,
+                        'depends_on': pi.depends_on
+                    }
+                    for pi in project_inputs
+                ],
+                'dependencies': [
+                    {
+                        'id': dep.id,
+                        'name': dep.name,
+                        'source': dep.source_project,
+                        'target': dep.target_project
+                    }
+                    for dep in dependencies
+                ]
+            }),
+            results_data=json.dumps(result),
+            portfolio_completion_p50=result['adjusted_forecast']['p50_weeks'],
+            portfolio_completion_p85=result['adjusted_forecast']['p85_weeks'],
+            portfolio_completion_p95=result['adjusted_forecast']['p95_weeks'],
+            total_cost_of_delay=None,  # CoD calculation handled separately
+            critical_path_projects=json.dumps([]),  # Dependencies handle critical path
+            risk_score=result.get('dependency_analysis', {}).get('risk_score', 0) if result.get('dependency_analysis') else 0,
+            high_risk_projects_count=len(dependencies),
+            status='completed',
+            created_by=current_user.name
+        )
+
+        session.add(simulation_run)
+        session.commit()
+
+        # Add simulation_run_id to result
+        result['simulation_run_id'] = simulation_run.id
+
+        return jsonify(result), 200
+
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+    except Exception as e:
+        session.rollback()
+        import traceback
+        print(f"Error in simulate_portfolio_with_dependencies: {e}")
+        print(traceback.format_exc())
+        return jsonify({'error': str(e)}), 500
+    finally:
+        session.close()
+
+
 @app.route('/api/portfolios/<int:portfolio_id>/simulations', methods=['GET'])
 @login_required
 def get_portfolio_simulations(portfolio_id):

@@ -460,6 +460,266 @@ async function runSimulation() {
 }
 
 /**
+ * Run portfolio simulation WITH DEPENDENCIES
+ * Implements multi-team forecasting with dependency analysis
+ */
+async function runSimulationWithDependencies() {
+    if (!currentPortfolioId) return;
+
+    // Show loading
+    document.getElementById('simulationResults').style.display = 'block';
+    document.getElementById('simulationContent').innerHTML = `
+        <div class="text-center p-5">
+            <div class="spinner-border text-primary mb-3" style="width: 3rem; height: 3rem;" role="status"></div>
+            <p class="lead">Executando simulação com análise de dependências...</p>
+            <p class="text-muted">Calculando combined probabilities e impacto das dependências</p>
+        </div>
+    `;
+
+    try {
+        const response = await fetch(`/api/portfolios/${currentPortfolioId}/simulate-with-dependencies`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                n_simulations: 10000,
+                confidence_level: 'P85'
+            })
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Simulation failed');
+        }
+
+        const result = await response.json();
+        renderDependencySimulationResults(result);
+
+    } catch (error) {
+        console.error('Error running dependency simulation:', error);
+        document.getElementById('simulationContent').innerHTML = `
+            <div class="alert alert-danger">
+                <i class="fas fa-exclamation-triangle"></i>
+                <strong>Erro:</strong> ${error.message}
+            </div>
+        `;
+    }
+}
+
+/**
+ * Render dependency simulation results
+ * Shows combined probabilities and dependency impact
+ */
+function renderDependencySimulationResults(result) {
+    const baseline = result.baseline_forecast || {};
+    const adjusted = result.adjusted_forecast || {};
+    const impact = result.dependency_impact || {};
+    const depAnalysis = result.dependency_analysis || {};
+    const combinedProbs = result.combined_probabilities || {};
+    const projectResults = result.project_results || {};
+
+    const formatWeeks = (value) => Number.isFinite(value) ? value.toFixed(2) : '—';
+    const formatPercent = (value) => Number.isFinite(value) ? value.toFixed(1) + '%' : '—';
+
+    // Combined Probabilities Card
+    const combinedProbsCard = `
+        <div class="card mb-4 border-primary">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">
+                    <i class="fas fa-calculator mr-2"></i>
+                    Combined Probabilities (Multi-Team)
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4">
+                        <div class="text-center p-3 bg-light rounded">
+                            <h6 class="text-muted mb-2">Dependency On-Time</h6>
+                            <h3 class="text-primary mb-0">${formatPercent(combinedProbs.dependency_on_time_probability)}</h3>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="text-center p-3 bg-light rounded">
+                            <h6 class="text-muted mb-2">Team Combined</h6>
+                            <h3 class="text-info mb-0">${formatPercent(combinedProbs.team_combined_probability)}</h3>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="text-center p-3 bg-warning rounded">
+                            <h6 class="text-dark mb-2">Overall Probability ⭐</h6>
+                            <h3 class="text-dark mb-0">${formatPercent(combinedProbs.overall_on_time_probability)}</h3>
+                        </div>
+                    </div>
+                </div>
+                <div class="alert alert-info mt-3 mb-0">
+                    <i class="fas fa-info-circle mr-2"></i>
+                    ${combinedProbs.explanation || 'Combined probability across all teams and dependencies.'}
+                </div>
+            </div>
+        </div>
+    `;
+
+    // Baseline vs Adjusted Forecast
+    const forecastComparisonCard = `
+        <div class="card mb-4">
+            <div class="card-header bg-white">
+                <h5 class="mb-0">
+                    <i class="fas fa-chart-line mr-2"></i>
+                    Forecast Comparison: Baseline vs With Dependencies
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Scenario</th>
+                                <th>P50 (weeks)</th>
+                                <th>P85 (weeks)</th>
+                                <th>P95 (weeks)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>Baseline (No Dependencies)</strong></td>
+                                <td>${formatWeeks(baseline.p50_weeks)}</td>
+                                <td>${formatWeeks(baseline.p85_weeks)}</td>
+                                <td>${formatWeeks(baseline.p95_weeks)}</td>
+                            </tr>
+                            <tr class="table-warning">
+                                <td><strong>Adjusted (With Dependencies)</strong></td>
+                                <td>${formatWeeks(adjusted.p50_weeks)}</td>
+                                <td>${formatWeeks(adjusted.p85_weeks)}</td>
+                                <td>${formatWeeks(adjusted.p95_weeks)}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="alert alert-warning mt-3">
+                    <h6 class="alert-heading"><i class="fas fa-exclamation-triangle mr-2"></i>Dependency Impact</h6>
+                    <ul class="mb-0">
+                        <li>Additional delay (P85): <strong>+${formatWeeks(impact.delay_weeks_p85)} weeks</strong> (${formatPercent(impact.delay_percentage_p85)} increase)</li>
+                        <li>Additional delay (P95): <strong>+${formatWeeks(impact.delay_weeks_p95)} weeks</strong></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    `;
+
+    // Dependency Analysis
+    const depAnalysisCard = depAnalysis.total_dependencies ? `
+        <div class="card mb-4">
+            <div class="card-header bg-white">
+                <h5 class="mb-0">
+                    <i class="fas fa-project-diagram mr-2"></i>
+                    Dependency Analysis
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row mb-3">
+                    <div class="col-md-3">
+                        <strong>Total Dependencies:</strong> ${depAnalysis.total_dependencies}
+                    </div>
+                    <div class="col-md-3">
+                        <strong>Risk Score:</strong>
+                        <span class="badge ${depAnalysis.risk_score >= 70 ? 'bg-danger' : depAnalysis.risk_score >= 40 ? 'bg-warning' : 'bg-success'}">
+                            ${depAnalysis.risk_score}/100
+                        </span>
+                    </div>
+                    <div class="col-md-3">
+                        <strong>Risk Level:</strong>
+                        <span class="badge ${depAnalysis.risk_level === 'CRITICAL' ? 'bg-danger' : depAnalysis.risk_level === 'HIGH' ? 'bg-warning' : 'bg-info'}">
+                            ${depAnalysis.risk_level}
+                        </span>
+                    </div>
+                    <div class="col-md-3">
+                        <strong>Expected Delay:</strong> ${depAnalysis.expected_delay_days?.toFixed(1) || 0} days
+                    </div>
+                </div>
+
+                ${depAnalysis.critical_path && depAnalysis.critical_path.length > 0 ? `
+                    <div class="mb-3">
+                        <h6>Critical Path (Top Dependencies):</h6>
+                        <ul class="list-unstyled">
+                            ${depAnalysis.critical_path.slice(0, 5).map(dep => `<li><i class="fas fa-link text-danger mr-2"></i>${dep}</li>`).join('')}
+                        </ul>
+                    </div>
+                ` : ''}
+            </div>
+        </div>
+    ` : '';
+
+    // Project-Level Results
+    const projectLevelCard = projectResults.adjusted && projectResults.adjusted.length > 0 ? `
+        <div class="card">
+            <div class="card-header bg-white">
+                <h5 class="mb-0">
+                    <i class="fas fa-list mr-2"></i>
+                    Project-Level Forecasts
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Project</th>
+                                <th>Baseline P85</th>
+                                <th>Adjusted P85</th>
+                                <th>Delay vs Baseline</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${projectResults.adjusted.map(pr => {
+                                const baseline_pr = projectResults.baseline.find(b => b.project_id === pr.project_id);
+                                return `
+                                    <tr>
+                                        <td><strong>${escapeHtml(pr.project_name)}</strong></td>
+                                        <td>${formatWeeks(baseline_pr?.p85_weeks || 0)}</td>
+                                        <td>${formatWeeks(pr.p85_weeks)}</td>
+                                        <td>
+                                            ${pr.delay_vs_baseline > 0 ?
+                                                `<span class="text-danger">+${formatWeeks(pr.delay_vs_baseline)}</span>` :
+                                                '<span class="text-success">No delay</span>'}
+                                        </td>
+                                    </tr>
+                                `;
+                            }).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    ` : '';
+
+    // Recommendations
+    const recommendationsCard = result.recommendations && result.recommendations.length > 0 ? `
+        <div class="card mt-4 border-info">
+            <div class="card-header bg-info text-white">
+                <h5 class="mb-0">
+                    <i class="fas fa-lightbulb mr-2"></i>
+                    Recommendations
+                </h5>
+            </div>
+            <div class="card-body">
+                <ul class="mb-0">
+                    ${result.recommendations.map(rec => `<li>${rec}</li>`).join('')}
+                </ul>
+            </div>
+        </div>
+    ` : '';
+
+    // Render everything
+    document.getElementById('simulationContent').innerHTML = `
+        ${combinedProbsCard}
+        ${forecastComparisonCard}
+        ${depAnalysisCard}
+        ${projectLevelCard}
+        ${recommendationsCard}
+    `;
+}
+
+/**
  * Render simulation results
  */
 function renderSimulationResults(result) {
