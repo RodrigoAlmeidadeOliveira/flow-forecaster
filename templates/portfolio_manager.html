@@ -294,6 +294,37 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- Simulation with Dependencies -->
+                <div class="mt-4">
+                    <div class="card">
+                        <div class="card-header bg-success text-white">
+                            <h5 class="mb-0">
+                                <i class="fas fa-play-circle"></i> Multi-Team Forecasting with Dependencies
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <p class="text-muted mb-3">
+                                Run Monte Carlo simulation considering all dependencies between projects.
+                                This will calculate combined probabilities, dependency impact, and validate data quality using Process Behaviour Charts.
+                            </p>
+                            <button class="btn btn-success btn-lg" onclick="runSimulationWithDependencies()" id="btnRunSimulation">
+                                <i class="fas fa-calculator"></i> Run Simulation with Dependencies
+                            </button>
+                            <div id="simulationSpinner" class="mt-3" style="display: none;">
+                                <div class="spinner-border text-success" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                                <span class="ms-2">Running simulation...</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Simulation Results Container -->
+                <div id="dependencySimulationResults" class="mt-4" style="display: none;">
+                    <!-- Results will be dynamically inserted here by renderDependencySimulationResults() -->
+                </div>
             </div>
         </div>
     </div>

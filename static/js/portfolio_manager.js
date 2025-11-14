@@ -467,14 +467,13 @@ async function runSimulationWithDependencies() {
     if (!currentPortfolioId) return;
 
     // Show loading
-    document.getElementById('simulationResults').style.display = 'block';
-    document.getElementById('simulationContent').innerHTML = `
-        <div class="text-center p-5">
-            <div class="spinner-border text-primary mb-3" style="width: 3rem; height: 3rem;" role="status"></div>
-            <p class="lead">Executando simulação com análise de dependências...</p>
-            <p class="text-muted">Calculando combined probabilities e impacto das dependências</p>
-        </div>
-    `;
+    const btnSimulation = document.getElementById('btnRunSimulation');
+    const spinner = document.getElementById('simulationSpinner');
+    const resultsContainer = document.getElementById('dependencySimulationResults');
+
+    btnSimulation.disabled = true;
+    spinner.style.display = 'block';
+    resultsContainer.style.display = 'none';
 
     try {
         const response = await fetch(`/api/portfolios/${currentPortfolioId}/simulate-with-dependencies`, {
@@ -496,12 +495,21 @@ async function runSimulationWithDependencies() {
 
     } catch (error) {
         console.error('Error running dependency simulation:', error);
-        document.getElementById('simulationContent').innerHTML = `
-            <div class="alert alert-danger">
-                <i class="fas fa-exclamation-triangle"></i>
-                <strong>Erro:</strong> ${error.message}
+        const resultsContainer = document.getElementById('dependencySimulationResults');
+        resultsContainer.style.display = 'block';
+        resultsContainer.innerHTML = `
+            <div class="card border-danger">
+                <div class="card-body">
+                    <div class="alert alert-danger mb-0">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <strong>Erro:</strong> ${error.message}
+                    </div>
+                </div>
             </div>
         `;
+    } finally {
+        btnSimulation.disabled = false;
+        spinner.style.display = 'none';
     }
 }
 
@@ -840,7 +848,9 @@ function renderDependencySimulationResults(result) {
     ` : '';
 
     // Render everything
-    document.getElementById('simulationContent').innerHTML = `
+    const resultsContainer = document.getElementById('dependencySimulationResults');
+    resultsContainer.style.display = 'block';
+    resultsContainer.innerHTML = `
         ${combinedProbsCard}
         ${forecastComparisonCard}
         ${depAnalysisCard}
