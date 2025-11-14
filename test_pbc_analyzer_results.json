@@ -1,0 +1,286 @@
+{
+  "test_1_predictable": {
+    "data_points": 25,
+    "average": 2.996,
+    "unpl": 3.628,
+    "lnl": 2.364,
+    "average_moving_range": 0.238,
+    "unpl_mr": 0.777,
+    "is_predictable": true,
+    "signals": [],
+    "points_beyond_limits": [],
+    "run_signals": [],
+    "trend_signals": [],
+    "predictability_score": 100.0,
+    "recommendation": "✓ Excellent data quality. Process is highly predictable. Safe to use for forecasting with high confidence.",
+    "interpretation": {
+      "process_state": "Predictable",
+      "quality": "Excellent",
+      "can_forecast": true
+    }
+  },
+  "test_2_outliers": {
+    "data_points": 20,
+    "average": 3.455,
+    "unpl": 7.907,
+    "lnl": 0.0,
+    "average_moving_range": 1.674,
+    "unpl_mr": 5.473,
+    "is_predictable": false,
+    "signals": [
+      "2 point(s) beyond limits (UNPL=7.91, LNL=0.00)",
+      "Run of 9 points below average (indices 4-12)"
+    ],
+    "points_beyond_limits": [
+      {
+        "index": 3,
+        "value": 9.5,
+        "type": "above_unpl",
+        "limit": 7.907,
+        "deviation": 1.593
+      },
+      {
+        "index": 13,
+        "value": 8.2,
+        "type": "above_unpl",
+        "limit": 7.907,
+        "deviation": 0.29299999999999926
+      }
+    ],
+    "run_signals": [
+      {
+        "start_index": 4,
+        "end_index": 12,
+        "length": 9,
+        "side": "below",
+        "type": "run"
+      }
+    ],
+    "trend_signals": [],
+    "predictability_score": 60.0,
+    "recommendation": "⚠️ Fair data quality. Process shows some variation but can be used for forecasting with caution. Monitor for process changes.",
+    "interpretation": {
+      "process_state": "Unpredictable",
+      "quality": "Fair",
+      "can_forecast": true
+    }
+  },
+  "test_3_runs": {
+    "data_points": 20,
+    "average": 3.55,
+    "unpl": 4.306,
+    "lnl": 2.794,
+    "average_moving_range": 0.284,
+    "unpl_mr": 0.929,
+    "is_predictable": false,
+    "signals": [
+      "1 point(s) beyond limits (UNPL=4.31, LNL=2.79)",
+      "Run of 10 points above average (indices 0-9)",
+      "Run of 10 points below average (indices 10-19)"
+    ],
+    "points_beyond_limits": [
+      {
+        "index": 16,
+        "value": 2.7,
+        "type": "below_lnl",
+        "limit": 2.7939999999999996,
+        "deviation": 0.09399999999999942
+      }
+    ],
+    "run_signals": [
+      {
+        "start_index": 0,
+        "end_index": 9,
+        "length": 10,
+        "side": "above",
+        "type": "run"
+      },
+      {
+        "start_index": 10,
+        "end_index": 19,
+        "length": 10,
+        "side": "below",
+        "type": "run"
+      }
+    ],
+    "trend_signals": [],
+    "predictability_score": 65.0,
+    "recommendation": "⚠️ Fair data quality. Process shows some variation but can be used for forecasting with caution. Monitor for process changes.",
+    "interpretation": {
+      "process_state": "Unpredictable",
+      "quality": "Fair",
+      "can_forecast": true
+    }
+  },
+  "test_4_trends": {
+    "data_points": 17,
+    "average": 2.824,
+    "unpl": 3.522,
+    "lnl": 2.125,
+    "average_moving_range": 0.263,
+    "unpl_mr": 0.858,
+    "is_predictable": false,
+    "signals": [
+      "1 point(s) beyond limits (UNPL=3.52, LNL=2.13)",
+      "Trend of 7 points increasing (indices 0-6)"
+    ],
+    "points_beyond_limits": [
+      {
+        "index": 0,
+        "value": 2.0,
+        "type": "below_lnl",
+        "limit": 2.125279411764706,
+        "deviation": 0.1252794117647058
+      }
+    ],
+    "run_signals": [],
+    "trend_signals": [
+      {
+        "start_index": 0,
+        "end_index": 6,
+        "length": 7,
+        "direction": "increasing",
+        "type": "trend"
+      }
+    ],
+    "predictability_score": 72.0,
+    "recommendation": "⚠️ Fair data quality. Process shows some variation but can be used for forecasting with caution. Monitor for process changes.",
+    "interpretation": {
+      "process_state": "Unpredictable",
+      "quality": "Fair",
+      "can_forecast": true
+    }
+  },
+  "test_5_portfolio": {
+    "pbc_analysis": {
+      "by_project": {
+        "1": {
+          "data_points": 8,
+          "average": 3.0,
+          "unpl": 3.798,
+          "lnl": 2.202,
+          "average_moving_range": 0.3,
+          "unpl_mr": 0.981,
+          "is_predictable": true,
+          "signals": [],
+          "points_beyond_limits": [],
+          "run_signals": [],
+          "trend_signals": [],
+          "predictability_score": 90.0,
+          "recommendation": "✓ Excellent data quality. Process is highly predictable. Safe to use for forecasting with high confidence.",
+          "interpretation": {
+            "process_state": "Predictable",
+            "quality": "Excellent",
+            "can_forecast": true
+          }
+        },
+        "2": {
+          "data_points": 10,
+          "average": 3.61,
+          "unpl": 17.235,
+          "lnl": 0.0,
+          "average_moving_range": 5.122,
+          "unpl_mr": 16.75,
+          "is_predictable": true,
+          "signals": [],
+          "points_beyond_limits": [],
+          "run_signals": [],
+          "trend_signals": [],
+          "predictability_score": 95.0,
+          "recommendation": "✓ Excellent data quality. Process is highly predictable. Safe to use for forecasting with high confidence.",
+          "interpretation": {
+            "process_state": "Predictable",
+            "quality": "Excellent",
+            "can_forecast": true
+          }
+        },
+        "3": {
+          "data_points": 7,
+          "average": 2.543,
+          "unpl": 3.208,
+          "lnl": 1.878,
+          "average_moving_range": 0.25,
+          "unpl_mr": 0.818,
+          "is_predictable": true,
+          "signals": [],
+          "points_beyond_limits": [],
+          "run_signals": [],
+          "trend_signals": [],
+          "predictability_score": 90.0,
+          "recommendation": "✓ Excellent data quality. Process is highly predictable. Safe to use for forecasting with high confidence.",
+          "interpretation": {
+            "process_state": "Predictable",
+            "quality": "Excellent",
+            "can_forecast": true
+          }
+        }
+      },
+      "warnings": [],
+      "summary": {
+        "total_projects_analyzed": 3,
+        "projects_with_poor_data": 0,
+        "overall_data_quality": "Good"
+      }
+    },
+    "baseline_p85": 150.0,
+    "adjusted_p85": 155.95
+  },
+  "test_6_chart_data": {
+    "x_chart": {
+      "values": [
+        3.0,
+        2.8,
+        3.2,
+        2.9,
+        3.1,
+        3.0,
+        2.7,
+        3.3,
+        2.8,
+        3.0
+      ],
+      "average": 2.98,
+      "unpl": 3.8075555555555556,
+      "lnl": 2.1524444444444444,
+      "indices": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9
+      ]
+    },
+    "mr_chart": {
+      "values": [
+        0.20000000000000018,
+        0.40000000000000036,
+        0.30000000000000027,
+        0.20000000000000018,
+        0.10000000000000009,
+        0.2999999999999998,
+        0.5999999999999996,
+        0.5,
+        0.20000000000000018
+      ],
+      "average": 0.31111111111111117,
+      "unpl": 1.0173333333333336,
+      "lnl": 0.0,
+      "indices": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9
+      ]
+    }
+  }
+}

@@ -733,10 +733,13 @@ def run_monte_carlo_simulation(simulation_data: Dict[str, Any]) -> Dict[str, Any
     results_table = []
     p = 100
     while p >= 0:
-        duration = percentile(duration_histogram, p / 100)
-        tasks = percentile(tasks_histogram, p / 100)
-        lead_time = percentile(lt_histogram, p / 100)
-        effort = percentile(effort_histogram, p / 100)
+        # Interpret likelihood as "probability of completing at most this amount."
+        # Higher likelihoods should yield smaller, more conservative outcomes.
+        percentile_index = (100 - p) / 100
+        duration = percentile(duration_histogram, percentile_index)
+        tasks = percentile(tasks_histogram, percentile_index)
+        lead_time = percentile(lt_histogram, percentile_index)
+        effort = percentile(effort_histogram, percentile_index)
         results_table.append({
             'Likelihood': p,
             'Duration': round(duration),

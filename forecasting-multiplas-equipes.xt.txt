@@ -1,0 +1,143 @@
+https://medium.com/thrivve-partners/multi-team-forecasting-with-dependencies-5a7b9f0e2649
+
+Principais Conceitos
+
+  1. Evolução dos Métodos de Forecasting
+
+  - Burn-up/Burn-down charts → baseados em médias, 50% de probabilidade
+  - Probabilistic burn-up → usa simulação de Monte Carlo para range de datas
+  - Feature Monte Carlo → considera times trabalhando em múltiplas features (Feature WIP > 1)
+  - Multi-team com dependências → o foco do artigo
+
+  2. O Problema das Dependências
+
+  Quando 3 times têm 85% de confiança individual, a confiança combinada é 61% (0.85 × 0.85 × 0.85), não 85%!
+
+  3. A Solução Proposta
+
+  O autor desenvolveu uma ferramenta (Power BI) que:
+
+  - Suporta até 9 times trabalhando em uma iniciativa
+  - Mapeia dependências entre times
+  - Calcula probabilisticamente datas de entrega considerando as dependências
+  - Valida a qualidade dos dados usando Process Behaviour Charts (PBC)
+  - Integra com Jira/ADO automaticamente
+
+  4. Process Behaviour Chart (PBC)
+
+  - Valida se os dados de Throughput são confiáveis/previsíveis
+  - UNPL (Upper Natural Process Limit) - valores acima indicam dados imprevisíveis
+  - Se há pontos acima do UNPL, deve-se ter cautela com a previsão
+
+  5. Como Funciona com Dependências
+
+  - Sem dependências: usa a data mais tardia entre os times
+  - Com dependências: adiciona a duração do forecast à data de término do time dependente
+  - Assume que você começa assim que o time dependente termina
+
+
+  Análise de Viabilidade: SIM, é totalmente possível! ✅
+
+  A boa notícia é que o Flow Forecaster já tem uma base excelente para implementar essas funcionalidades. Vou detalhar o que encontrei:
+
+  O que JÁ EXISTE no Flow Forecaster
+
+  ✅ 1. Multi-Team Forecasting (70% implementado)
+
+  - Model Portfolio e PortfolioProject
+  - Simulação de múltiplos projetos em paralelo/sequencial
+  - Critical path identification
+  - Agregação de Cost of Delay
+
+  ✅ 2. Dependências Entre Times (Backend pronto!)
+
+  # models.py - PortfolioProject
+  depends_on: JSON  # Array de project_ids bloqueadores
+  blocks: JSON      # Array de project_ids bloqueados
+
+  - dependency_analyzer.py com modelo probabilístico (2^n)
+  - Cálculo de impacto de atrasos
+  - Identificação de dependências críticas
+
+  ✅ 3. Monte Carlo Simulation (Muito avançado!)
+
+  - Distribuição de Weibull (mais precisa que random)
+  - 10.000+ simulações por execução
+  - Percentis P10, P25, P50, P75, P85, P90, P95
+  - S-curve para ramp-up/down de times
+  - Risk assessment integrado
+
+  O que FALTA Implementar
+
+  ❌ 1. Process Behaviour Charts (PBC)
+
+  Esforço: 2-3 dias
+
+  Precisa adicionar:
+  - Moving Range calculation
+  - UNPL/LNL (Upper/Lower Natural Process Limits)
+  - Visualização de control charts
+  - Detecção de sinais (runs, trends)
+
+  Base existente: trend_analysis.py já tem detecção de anomalias
+
+  ⚠️ 2. Combined Probability com Dependências
+
+  Esforço: 4-5 dias
+
+  Implementar:
+  - Integração do dependency_analyzer.py com portfolio_simulator.py
+  - Cálculo: 0.85 × 0.85 × 0.85 = 0.61 (61%)
+  - Monte Carlo considerando delays das dependências
+  - Timeline com impacto cumulativo
+
+  ❌ 3. Dependency Mapping UI
+
+  Esforço: 3-4 dias
+
+  Construir:
+  - Network diagram visual (D3.js, vis.js, ou Cytoscape.js)
+  - Drag-and-drop para criar dependências
+  - Timeline com dependency chains
+  - Highlight de critical path
+
+  Resumo de Viabilidade
+
+  | Funcionalidade do Artigo | Status Atual | Viabilidade | Esforço  |
+  |--------------------------|--------------|-------------|----------|
+  | Multi-team forecasting   | ✅ 70% pronto | Muito Alta  | 2-3 dias |
+  | Dependencies mapping     | ✅ Backend OK | Alta        | 3-4 dias |
+  | Process Behaviour Charts | ❌ Zero       | Alta        | 2-3 dias |
+  | Combined probabilities   | ⚠️ Parcial   | Média-Alta  | 4-5 dias |
+  | Dependency visualization | ❌ Zero       | Alta        | 3-4 dias |
+
+  Total estimado: 14-19 dias de desenvolvimento
+
+  Arquitetura Atual (Pontos Fortes)
+
+  - Backend: Python/Flask com PostgreSQL
+  - Async: Celery + Redis para simulações pesadas
+  - ML: scikit-learn, XGBoost integrados
+  - Multi-tenancy: Pronto para produção
+  - Export: Excel, PDF já implementados
+
+  Plano de Implementação Sugerido
+
+  Fase 1 (Semana 1): Dependency visualization + integração portfolio
+  Fase 2 (Semana 2): Process Behaviour Charts
+  Fase 3 (Semana 3): Combined probability calculations
+  Fase 4 (Semana 4): Testes e refinamentos
+
+  ---
+  Conclusão
+
+  É TOTALMENTE VIÁVEL! 🎉
+
+  O Flow Forecaster tem uma arquitetura madura e já implementa 60-70% do que o artigo descreve. O trabalho principal é:
+
+  1. Conectar componentes existentes
+  2. Adicionar PBC/UNPL validation
+  3. Criar UI para dependency mapping
+  4. Calcular combined probabilities
+
+  Você quer que eu comece a implementar alguma dessas funcionalidades? Por qual você gostaria de começar?

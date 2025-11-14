@@ -1,0 +1,104 @@
+{
+  "portfolio_name": "Portfolio with Dependencies",
+  "n_simulations": 10000,
+  "baseline_forecast": {
+    "p50_weeks": 7.55,
+    "p85_weeks": 8.27,
+    "p95_weeks": 8.74,
+    "mean_weeks": 7.61
+  },
+  "adjusted_forecast": {
+    "p50_weeks": 14.69,
+    "p85_weeks": 15.91,
+    "p95_weeks": 16.7,
+    "mean_weeks": 14.74,
+    "std_weeks": 1.13
+  },
+  "dependency_impact": {
+    "delay_weeks_p50": 7.14,
+    "delay_weeks_p85": 7.64,
+    "delay_weeks_p95": 7.95,
+    "delay_percentage_p85": 92.29
+  },
+  "dependency_analysis": {
+    "total_dependencies": 2,
+    "on_time_probability": 0.48999999999999994,
+    "on_time_probability_percentage": 49.0,
+    "at_least_one_delayed_probability": 0.51,
+    "at_least_one_delayed_probability_percentage": 51.0,
+    "odds_ratio": "1 in 2",
+    "expected_delay_days": 3.62,
+    "delay_percentiles": {
+      "p10": 4.26,
+      "p25": 5.15,
+      "p50": 6.21,
+      "p75": 8.27,
+      "p85": 10.29,
+      "p90": 11.71,
+      "p95": 12.85
+    },
+    "critical_path": [
+      "DEP-001 (Mobile App depends on Backend API)",
+      "DEP-002 (Marketing Dashboard depends on Backend API)"
+    ],
+    "risk_score": 46.12,
+    "risk_level": "MEDIUM",
+    "recommendations": [
+      "ℹ️ Probabilidade moderada de entrega no prazo (49.0%). Monitore de perto as dependências do caminho crítico.",
+      "Alta variabilidade nos atrasos. Crie múltiplos cenários de contingência e monitore frequentemente.",
+      "⚠️ Dependencies add significant delay (7.6 weeks, 92.3% increase). Consider breaking dependencies or starting dependent work in parallel.",
+      "⚠️ Low combined probability (49.0%). High risk of delays due to dependencies. Add buffer time to schedule."
+    ]
+  },
+  "combined_probabilities": {
+    "dependency_on_time_probability": 49.0,
+    "team_combined_probability": 61.41,
+    "overall_on_time_probability": 30.09,
+    "explanation": "With 2 dependencies, the probability of all being on time is 49.0%. Combined with 3 teams at 85% confidence each, the overall probability is 30.1%."
+  },
+  "project_results": {
+    "baseline": [
+      {
+        "project_id": 1,
+        "project_name": "Backend API",
+        "p85_weeks": 7.42
+      },
+      {
+        "project_id": 2,
+        "project_name": "Mobile App",
+        "p85_weeks": 8.2
+      },
+      {
+        "project_id": 3,
+        "project_name": "Marketing Dashboard",
+        "p85_weeks": 4.3
+      }
+    ],
+    "adjusted": [
+      {
+        "project_id": 1,
+        "project_name": "Backend API",
+        "p85_weeks": 7.42,
+        "delay_vs_baseline": 0.0
+      },
+      {
+        "project_id": 2,
+        "project_name": "Mobile App",
+        "p85_weeks": 15.91,
+        "delay_vs_baseline": 7.71
+      },
+      {
+        "project_id": 3,
+        "project_name": "Marketing Dashboard",
+        "p85_weeks": 12.24,
+        "delay_vs_baseline": 7.94
+      }
+    ]
+  },
+  "recommendations": [
+    "ℹ️ Probabilidade moderada de entrega no prazo (49.0%). Monitore de perto as dependências do caminho crítico.",
+    "Alta variabilidade nos atrasos. Crie múltiplos cenários de contingência e monitore frequentemente.",
+    "⚠️ Dependencies add significant delay (7.6 weeks, 92.3% increase). Consider breaking dependencies or starting dependent work in parallel.",
+    "⚠️ Low combined probability (49.0%). High risk of delays due to dependencies. Add buffer time to schedule."
+  ]
+}

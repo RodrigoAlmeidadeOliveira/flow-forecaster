@@ -1401,3 +1401,162 @@ function exportToPDF() {
     // Open export endpoint in new tab
     window.open(`/api/portfolios/${currentPortfolioId}/export/pdf`, '_blank');
 }
+
+// ============================================================================
+// DEPENDENCY VISUALIZATION
+// ============================================================================
+
+let dependencyVisualizer = null;
+
+/**
+ * Initialize dependency visualization
+ */
+async function initializeDependencyVisualization(portfolioId) {
+    try {
+        // Fetch portfolio projects
+        const response = await fetch(`/api/portfolios/${portfolioId}/projects`);
+        if (!response.ok) throw new Error('Failed to load projects');
+
+        const portfolioProjects = await response.json();
+
+        // Extract projects and dependencies
+        const projects = portfolioProjects.map(pp => ({
+            id: pp.project_id,
+            name: pp.project_name,
+            priority: pp.portfolio_priority || 3,
+            status: pp.status || 'active',
+            backlog: pp.backlog
+        }));
+
+        const dependencies = [];
+        portfolioProjects.forEach(pp => {
+            if (pp.depends_on && pp.depends_on.length > 0) {
+                pp.depends_on.forEach(targetId => {
+                    const targetProject = portfolioProjects.find(p => p.project_id === targetId);
+                    dependencies.push({
+                        source_id: pp.project_id,
+                        target_id: targetId,
+                        source_name: pp.project_name,
+                        target_name: targetProject?.project_name || `Project ${targetId}`,
+                        name: `${pp.project_name} → ${targetProject?.project_name || targetId}`,
+                        criticality: 'HIGH'
+                    });
+                });
+            }
+        });
+
+        // Initialize visualizer
+        if (!dependencyVisualizer) {
+            dependencyVisualizer = new DependencyVisualizer('dependencyNetwork');
+        }
+
+        dependencyVisualizer.initialize(projects, dependencies, portfolioId);
+
+        // Setup callbacks
+        dependencyVisualizer.onDependencyAdded = async (sourceId, targetId) => {
+            await addDependency(portfolioId, sourceId, targetId);
+        };
+
+        dependencyVisualizer.onDependencyRemoved = async (sourceId, targetId) => {
+            await removeDependency(portfolioId, sourceId, targetId);
+        };
+
+        dependencyVisualizer.onProjectClicked = (projectId) => {
+            console.log('Project clicked:', projectId);
+            // Could open project details modal here
+        };
+
+        // Fit to view
+        setTimeout(() => {
+            dependencyVisualizer.fit();
+        }, 100);
+
+    } catch (error) {
+        console.error('Error initializing dependency visualization:', error);
+        showError('Erro ao inicializar visualização de dependências');
+    }
+}
+
+/**
+ * Add a dependency between projects
+ */
+async function addDependency(portfolioId, sourceId, targetId) {
+    try {
+        const response = await fetch(`/api/portfolios/${portfolioId}/projects/${sourceId}/dependencies`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                target_project_id: targetId
+            })
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Failed to add dependency');
+        }
+
+        showSuccess('Dependência adicionada com sucesso!');
+
+        // Reload portfolio projects
+        await loadPortfolioProjects(portfolioId);
+
+    } catch (error) {
+        console.error('Error adding dependency:', error);
+        showError(error.message);
+
+        // Refresh visualization to remove the invalid edge
+        await refreshDependencyVisualization();
+    }
+}
+
+/**
+ * Remove a dependency between projects
+ */
+async function removeDependency(portfolioId, sourceId, targetId) {
+    try {
+        const response = await fetch(`/api/portfolios/${portfolioId}/projects/${sourceId}/dependencies/${targetId}`, {
+            method: 'DELETE'
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Failed to remove dependency');
+        }
+
+        showSuccess('Dependência removida com sucesso!');
+
+        // Reload portfolio projects
+        await loadPortfolioProjects(portfolioId);
+
+    } catch (error) {
+        console.error('Error removing dependency:', error);
+        showError(error.message);
+    }
+}
+
+/**
+ * Refresh dependency visualization
+ */
+async function refreshDependencyVisualization() {
+    if (currentPortfolioId) {
+        await initializeDependencyVisualization(currentPortfolioId);
+    }
+}
+
+/**
+ * Fit dependency network to view
+ */
+function fitDependencyNetwork() {
+    if (dependencyVisualizer) {
+        dependencyVisualizer.fit();
+    }
+}
+
+// Update the selectPortfolio function to initialize dependency viz
+const originalSelectPortfolio = selectPortfolio;
+selectPortfolio = async function(portfolioId) {
+    await originalSelectPortfolio(portfolioId);
+
+    // Initialize dependency visualization
+    await initializeDependencyVisualization(portfolioId);
+};

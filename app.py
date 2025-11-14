@@ -2457,6 +2457,253 @@ def handle_portfolio_project(portfolio_id, project_id):
         session.close()
 
 
+@app.route('/api/portfolios/<int:portfolio_id>/projects/<int:project_id>/dependencies', methods=['POST'])
+@login_required
+def add_project_dependency(portfolio_id, project_id):
+    """
+    Add a dependency to a project in a portfolio.
+    The project (source) will depend on the target project.
+    """
+    session = get_session()
+    try:
+        # Verify portfolio ownership
+        portfolio = session.query(Portfolio).filter(
+            Portfolio.id == portfolio_id,
+            Portfolio.user_id == current_user.id
+        ).one_or_none()
+
+        if not portfolio:
+            return jsonify({'error': 'Portfolio not found'}), 404
+
+        # Get source portfolio project
+        source_pp = session.query(PortfolioProject).filter(
+            PortfolioProject.portfolio_id == portfolio_id,
+            PortfolioProject.project_id == project_id,
+            PortfolioProject.is_active == True
+        ).one_or_none()
+
+        if not source_pp:
+            return jsonify({'error': 'Source project not in portfolio'}), 404
+
+        # Get request data
+        data = request.json or {}
+        target_project_id = data.get('target_project_id')
+
+        if not target_project_id:
+            return jsonify({'error': 'target_project_id is required'}), 400
+
+        # Verify target project exists in portfolio
+        target_pp = session.query(PortfolioProject).filter(
+            PortfolioProject.portfolio_id == portfolio_id,
+            PortfolioProject.project_id == target_project_id,
+            PortfolioProject.is_active == True
+        ).one_or_none()
+
+        if not target_pp:
+            return jsonify({'error': 'Target project not in portfolio'}), 404
+
+        # Cannot depend on itself
+        if project_id == target_project_id:
+            return jsonify({'error': 'Project cannot depend on itself'}), 400
+
+        # Get existing dependencies
+        depends_on = []
+        if source_pp.depends_on:
+            try:
+                depends_on = json.loads(source_pp.depends_on) if isinstance(source_pp.depends_on, str) else source_pp.depends_on
+            except:
+                depends_on = []
+
+        # Check if dependency already exists
+        if target_project_id in depends_on:
+            return jsonify({'error': 'Dependency already exists'}), 400
+
+        # Check for circular dependencies (simple check - would create circle if target depends on source)
+        target_depends_on = []
+        if target_pp.depends_on:
+            try:
+                target_depends_on = json.loads(target_pp.depends_on) if isinstance(target_pp.depends_on, str) else target_pp.depends_on
+            except:
+                target_depends_on = []
+
+        if project_id in target_depends_on:
+            return jsonify({'error': 'Cannot create circular dependency'}), 400
+
+        # More comprehensive circular dependency check (DFS)
+        def would_create_cycle(source_id, target_id, portfolio_id, session):
+            """Check if adding source->target dependency would create a cycle"""
+            # Build adjacency list of all current dependencies
+            all_projects = session.query(PortfolioProject).filter(
+                PortfolioProject.portfolio_id == portfolio_id,
+                PortfolioProject.is_active == True
+            ).all()
+
+            graph = {}
+            for pp in all_projects:
+                deps = []
+                if pp.depends_on:
+                    try:
+                        deps = json.loads(pp.depends_on) if isinstance(pp.depends_on, str) else pp.depends_on
+                    except:
+                        deps = []
+                graph[pp.project_id] = deps
+
+            # Add proposed edge
+            if source_id not in graph:
+                graph[source_id] = []
+            proposed_graph = {k: list(v) for k, v in graph.items()}
+            proposed_graph[source_id].append(target_id)
+
+            # DFS to detect cycle
+            visited = set()
+            rec_stack = set()
+
+            def has_cycle(node):
+                if node in rec_stack:
+                    return True
+                if node in visited:
+                    return False
+
+                visited.add(node)
+                rec_stack.add(node)
+
+                neighbors = proposed_graph.get(node, [])
+                for neighbor in neighbors:
+                    if has_cycle(neighbor):
+                        return True
+
+                rec_stack.remove(node)
+                return False
+
+            # Check all nodes
+            for node in proposed_graph:
+                if has_cycle(node):
+                    return True
+
+            return False
+
+        # Check for cycles
+        if would_create_cycle(project_id, target_project_id, portfolio_id, session):
+            return jsonify({'error': 'Cannot create circular dependency (cycle detected)'}), 400
+
+        # Add dependency
+        depends_on.append(target_project_id)
+        source_pp.depends_on = json.dumps(depends_on)
+
+        # Update blocks for target project
+        blocks = []
+        if target_pp.blocks:
+            try:
+                blocks = json.loads(target_pp.blocks) if isinstance(target_pp.blocks, str) else target_pp.blocks
+            except:
+                blocks = []
+
+        if project_id not in blocks:
+            blocks.append(project_id)
+            target_pp.blocks = json.dumps(blocks)
+
+        session.commit()
+
+        return jsonify({
+            'success': True,
+            'source_project': source_pp.to_dict(),
+            'target_project': target_pp.to_dict(),
+            'message': f'Dependency added: Project {project_id} now depends on Project {target_project_id}'
+        }), 200
+
+    except Exception as e:
+        session.rollback()
+        import traceback
+        print(f"Error adding dependency: {e}")
+        print(traceback.format_exc())
+        return jsonify({'error': str(e)}), 500
+    finally:
+        session.close()
+
+
+@app.route('/api/portfolios/<int:portfolio_id>/projects/<int:project_id>/dependencies/<int:target_id>', methods=['DELETE'])
+@login_required
+def remove_project_dependency(portfolio_id, project_id, target_id):
+    """
+    Remove a dependency from a project in a portfolio.
+    Removes the dependency relationship where project_id depends on target_id.
+    """
+    session = get_session()
+    try:
+        # Verify portfolio ownership
+        portfolio = session.query(Portfolio).filter(
+            Portfolio.id == portfolio_id,
+            Portfolio.user_id == current_user.id
+        ).one_or_none()
+
+        if not portfolio:
+            return jsonify({'error': 'Portfolio not found'}), 404
+
+        # Get source portfolio project
+        source_pp = session.query(PortfolioProject).filter(
+            PortfolioProject.portfolio_id == portfolio_id,
+            PortfolioProject.project_id == project_id,
+            PortfolioProject.is_active == True
+        ).one_or_none()
+
+        if not source_pp:
+            return jsonify({'error': 'Source project not in portfolio'}), 404
+
+        # Get target portfolio project
+        target_pp = session.query(PortfolioProject).filter(
+            PortfolioProject.portfolio_id == portfolio_id,
+            PortfolioProject.project_id == target_id,
+            PortfolioProject.is_active == True
+        ).one_or_none()
+
+        if not target_pp:
+            return jsonify({'error': 'Target project not in portfolio'}), 404
+
+        # Get existing dependencies
+        depends_on = []
+        if source_pp.depends_on:
+            try:
+                depends_on = json.loads(source_pp.depends_on) if isinstance(source_pp.depends_on, str) else source_pp.depends_on
+            except:
+                depends_on = []
+
+        # Check if dependency exists
+        if target_id not in depends_on:
+            return jsonify({'error': 'Dependency does not exist'}), 404
+
+        # Remove dependency
+        depends_on.remove(target_id)
+        source_pp.depends_on = json.dumps(depends_on)
+
+        # Update blocks for target project
+        blocks = []
+        if target_pp.blocks:
+            try:
+                blocks = json.loads(target_pp.blocks) if isinstance(target_pp.blocks, str) else target_pp.blocks
+            except:
+                blocks = []
+
+        if project_id in blocks:
+            blocks.remove(project_id)
+            target_pp.blocks = json.dumps(blocks)
+
+        session.commit()
+
+        return jsonify({
+            'success': True,
+            'message': f'Dependency removed: Project {project_id} no longer depends on Project {target_id}'
+        }), 200
+
+    except Exception as e:
+        session.rollback()
+        import traceback
+        print(f"Error removing dependency: {e}")
+        print(traceback.format_exc())
+        return jsonify({'error': str(e)}), 500
+    finally:
+        session.close()
+
+
 @app.route('/api/portfolios/<int:portfolio_id>/simulate', methods=['POST'])
 @login_required
 def simulate_portfolio(portfolio_id):
