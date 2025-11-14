@@ -3089,12 +3089,12 @@ def simulate_portfolio_with_dependencies_endpoint(portfolio_id):
                 ]
             }),
             results_data=json.dumps(result),
-            portfolio_completion_p50=result['adjusted_forecast']['p50_weeks'],
-            portfolio_completion_p85=result['adjusted_forecast']['p85_weeks'],
-            portfolio_completion_p95=result['adjusted_forecast']['p95_weeks'],
+            portfolio_completion_p50=float(result['adjusted_forecast']['p50_weeks']) if result.get('adjusted_forecast', {}).get('p50_weeks') is not None else None,
+            portfolio_completion_p85=float(result['adjusted_forecast']['p85_weeks']) if result.get('adjusted_forecast', {}).get('p85_weeks') is not None else None,
+            portfolio_completion_p95=float(result['adjusted_forecast']['p95_weeks']) if result.get('adjusted_forecast', {}).get('p95_weeks') is not None else None,
             total_cost_of_delay=None,  # CoD calculation handled separately
             critical_path_projects=json.dumps([]),  # Dependencies handle critical path
-            risk_score=result.get('dependency_analysis', {}).get('risk_score', 0) if result.get('dependency_analysis') else 0,
+            risk_score=float(result.get('dependency_analysis', {}).get('risk_score', 0)) if result.get('dependency_analysis') else 0.0,
             high_risk_projects_count=len(dependencies),
             status='completed',
             created_by=current_user.name
