@@ -87,6 +87,9 @@ load_test_results/
 *.csv
 *.html
 
+# Keep template source files tracked even though *.html files are ignored globally.
+!templates/**/*.html
+
 # Microsoft Office
 *.pptx
 *.docx
