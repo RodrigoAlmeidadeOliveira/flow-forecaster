@@ -801,6 +801,12 @@ function renderDependencySimulationResults(result) {
                                                         <p><strong>Can Forecast:</strong> ${pbc.interpretation.can_forecast ? 'Yes ✓' : 'No ✗'}</p>
                                                     </div>
                                                 </div>
+                                                ${pbc.chart_data ? `
+                                                    <div class="mt-3">
+                                                        <h6>Process Behaviour Chart (X Chart):</h6>
+                                                        <canvas id="pbc-chart-${projectId}" height="200"></canvas>
+                                                    </div>
+                                                ` : ''}
                                                 ${pbc.signals && pbc.signals.length > 0 ? `
                                                     <div class="mt-2">
                                                         <strong>Signals Detected:</strong>
@@ -858,6 +864,186 @@ function renderDependencySimulationResults(result) {
         ${projectLevelCard}
         ${recommendationsCard}
     `;
+
+    // Render PBC charts after DOM insertion
+    if (pbcAnalysis.by_project) {
+        setTimeout(() => {
+            Object.entries(pbcAnalysis.by_project).forEach(([projectId, pbc]) => {
+                if (pbc && pbc.chart_data) {
+                    renderPBCChart(projectId, pbc);
+                }
+            });
+        }, 100);
+    }
+}
+
+/**
+ * Render PBC Chart for a project
+ * Reuses logic from trend_insights.js
+ */
+function renderPBCChart(projectId, pbcData) {
+    const canvasId = `pbc-chart-${projectId}`;
+    const canvas = document.getElementById(canvasId);
+
+    if (!canvas || typeof Chart === 'undefined') {
+        console.warn('Canvas or Chart.js not available for PBC chart:', canvasId);
+        return;
+    }
+
+    const chartData = pbcData.chart_data;
+    if (!chartData || !chartData.x_chart) {
+        console.warn('No chart data available for project:', projectId);
+        return;
+    }
+
+    const xChart = chartData.x_chart;
+    const values = xChart.values || [];
+    const mean = xChart.average;
+    const unpl = xChart.unpl;
+    const lnl = xChart.lnl;
+
+    // Detect special causes (points beyond limits)
+    const beyondIndices = new Set();
+    values.forEach((value, index) => {
+        if (value > unpl || value < lnl) {
+            beyondIndices.add(index);
+        }
+    });
+
+    // Color points based on signals
+    const pointColors = values.map((value, index) => {
+        if (beyondIndices.has(index)) return '#dc3545'; // Red
+        return '#0d6efd'; // Blue
+    });
+
+    const pointRadius = values.map((value, index) => {
+        return beyondIndices.has(index) ? 6 : 4;
+    });
+
+    const labels = values.map((_, index) => index + 1);
+
+    // Build Chart.js config
+    const ctx = canvas.getContext('2d');
+
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels,
+            datasets: [{
+                label: 'Throughput',
+                data: values,
+                borderColor: '#0d6efd',
+                backgroundColor: 'transparent',
+                fill: false,
+                lineTension: 0,
+                pointBackgroundColor: pointColors,
+                pointBorderColor: pointColors,
+                pointRadius,
+                pointHoverRadius: pointRadius.map(r => r + 1),
+                borderWidth: 2
+            }]
+        },
+        options: {
+            maintainAspectRatio: false,
+            responsive: true,
+            legend: { display: false },
+            animation: { duration: 200 },
+            tooltips: {
+                mode: 'nearest',
+                intersect: false,
+                backgroundColor: 'rgba(0,0,0,0.8)',
+                callbacks: {
+                    label: function(tooltipItem) {
+                        const index = tooltipItem.index;
+                        const value = tooltipItem.yLabel;
+                        const isBeyond = beyondIndices.has(index);
+                        const badgeText = isBeyond ? ' • Beyond limits!' : '';
+                        return `${value.toFixed(2)}${badgeText}`;
+                    },
+                    afterLabel: function() {
+                        return `UNPL: ${unpl.toFixed(2)} · LNL: ${lnl.toFixed(2)}`;
+                    }
+                }
+            },
+            scales: {
+                xAxes: [{
+                    gridLines: { display: false },
+                    ticks: { fontSize: 11 }
+                }],
+                yAxes: [{
+                    ticks: {
+                        fontSize: 11,
+                        beginAtZero: lnl >= 0
+                    }
+                }]
+            },
+            annotation: {
+                drawTime: 'beforeDatasetsDraw',
+                annotations: [
+                    // Mean line
+                    {
+                        type: 'line',
+                        mode: 'horizontal',
+                        scaleID: 'y-axis-0',
+                        value: mean,
+                        borderColor: '#6c757d',
+                        borderDash: [6, 4],
+                        borderWidth: 1.5,
+                        label: {
+                            enabled: true,
+                            content: `Mean: ${mean.toFixed(2)}`,
+                            position: 'right',
+                            backgroundColor: '#6c757d',
+                            fontColor: '#fff',
+                            fontSize: 10,
+                            xAdjust: -6,
+                            padding: 4
+                        }
+                    },
+                    // UNPL line
+                    {
+                        type: 'line',
+                        mode: 'horizontal',
+                        scaleID: 'y-axis-0',
+                        value: unpl,
+                        borderColor: '#198754',
+                        borderDash: [4, 4],
+                        borderWidth: 1.5,
+                        label: {
+                            enabled: true,
+                            content: `UNPL: ${unpl.toFixed(2)}`,
+                            position: 'right',
+                            backgroundColor: '#198754',
+                            fontColor: '#fff',
+                            fontSize: 10,
+                            xAdjust: -6,
+                            padding: 4
+                        }
+                    },
+                    // LNL line
+                    {
+                        type: 'line',
+                        mode: 'horizontal',
+                        scaleID: 'y-axis-0',
+                        value: lnl,
+                        borderColor: '#dc3545',
+                        borderDash: [4, 4],
+                        borderWidth: 1.5,
+                        label: {
+                            enabled: true,
+                            content: `LNL: ${lnl.toFixed(2)}`,
+                            position: 'right',
+                            backgroundColor: '#dc3545',
+                            fontColor: '#fff',
+                            fontSize: 10,
+                            xAdjust: -6,
+                            padding: 4
+                        }
+                    }
+                ]
+            }
+        }
+    });
 }
 
 /**

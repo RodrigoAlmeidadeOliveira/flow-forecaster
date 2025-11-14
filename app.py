@@ -10,6 +10,10 @@ import numpy as np
 import re
 import pickle
 import pandas as pd
+import smtplib
+import ssl
+from email.message import EmailMessage
+from email.utils import formataddr
 from pathlib import Path
 from datetime import datetime, timedelta
 from typing import Optional, Set
@@ -168,6 +172,59 @@ logger.info(f"Root path: {app.root_path}")
 logger.info("=" * 60)
 
 EMAIL_REGEX = re.compile(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
+
+PASSWORD_RESET_EXPIRATION_MINUTES = int(os.environ.get('FLOW_FORECASTER_PASSWORD_RESET_EXPIRATION_MINUTES', '90'))
+SMTP_SERVER = os.environ.get('FLOW_FORECASTER_SMTP_SERVER')
+SMTP_PORT = os.environ.get('FLOW_FORECASTER_SMTP_PORT')
+SMTP_USERNAME = os.environ.get('FLOW_FORECASTER_SMTP_USERNAME')
+SMTP_PASSWORD = os.environ.get('FLOW_FORECASTER_SMTP_PASSWORD')
+SMTP_USE_TLS = os.environ.get('FLOW_FORECASTER_SMTP_USE_TLS', 'true').lower() not in ('0', 'false', 'no')
+EMAIL_SENDER_NAME = os.environ.get('FLOW_FORECASTER_EMAIL_FROM_NAME', 'Flow Forecaster')
+EMAIL_SENDER_ADDRESS = os.environ.get('FLOW_FORECASTER_EMAIL_FROM', 'no-reply@flow-forecaster.com')
+RESET_EMAIL_FROM = formataddr((EMAIL_SENDER_NAME, EMAIL_SENDER_ADDRESS))
+
+
+def deliver_password_reset_email(user, reset_link):
+    """Send or log a password reset link for a user."""
+    subject = 'Flow Forecaster: Redefinição de senha'
+    body = f"""Olá {user.name},
+
+Recebemos uma solicitação para redefinir a senha associada a este e-mail.
+Use o link abaixo para escolher uma nova senha. O link expira em {PASSWORD_RESET_EXPIRATION_MINUTES} minutos.
+
+{reset_link}
+
+Se você não solicitou esta alteração, pode ignorar esta mensagem.
+
+Abraços,
+Equipe Flow Forecaster
+"""
+    message = EmailMessage()
+    message['Subject'] = subject
+    message['From'] = RESET_EMAIL_FROM
+    message['To'] = user.email
+    message.set_content(body)
+
+    if not SMTP_SERVER:
+        logger.info("SMTP não configurado; registrando link de redefinição no log.")
+        logger.info(f"Password reset link for {user.email}: {reset_link}")
+        return False
+
+    try:
+        smtp_port = int(SMTP_PORT or '587')
+        context = ssl.create_default_context()
+        with smtplib.SMTP(SMTP_SERVER, smtp_port, timeout=15) as server:
+            if SMTP_USE_TLS:
+                server.starttls(context=context)
+            if SMTP_USERNAME and SMTP_PASSWORD:
+                server.login(SMTP_USERNAME, SMTP_PASSWORD)
+            server.send_message(message)
+        logger.info(f"Password reset email enviado para {user.email}")
+        return True
+    except Exception as exc:
+        logger.exception(f"Erro ao enviar e-mail de redefinição para {user.email}: {exc}")
+        logger.info(f"Password reset link: {reset_link}")
+        return False
 ADMIN_ROLES = {'admin', 'instructor'}
 
 COD_REQUIRED_COLUMNS = {
@@ -474,6 +531,94 @@ def login():
             session.close()
 
     return render_template('auth/login.html', errors=errors, form_data=form_data, next=next_url)
+
+
+@app.route('/forgot-password', methods=['GET', 'POST'])
+def forgot_password():
+    """Allow users to request a password reset link."""
+    if current_user.is_authenticated:
+        return redirect(url_for('index'))
+
+    errors = []
+    form_data = {'email': ''}
+
+    if request.method == 'POST':
+        email_raw = (request.form.get('email') or '').strip()
+        form_data['email'] = email_raw
+        email = email_raw.lower()
+
+        if not email or not EMAIL_REGEX.match(email):
+            errors.append('Informe um e-mail válido.')
+        else:
+            session = None
+            try:
+                session = get_session()
+                user = session.query(User).filter(User.email == email).first()
+                if user:
+                    token = user.generate_password_reset_token(expiration_minutes=PASSWORD_RESET_EXPIRATION_MINUTES)
+                    session.commit()
+                    reset_link = url_for('reset_password', token=token, _external=True)
+                    deliver_password_reset_email(user, reset_link)
+                else:
+                    logger.debug(f"Password reset solicitado para e-mail desconhecido: {email}")
+            except Exception as exc:
+                logger.exception(f"Erro ao processar pedido de redefinição para {email}: {exc}")
+            finally:
+                if session:
+                    session.close()
+            if not errors:
+                flash('Se o e-mail estiver cadastrado, enviamos instruções para redefinir a senha.', 'info')
+                return redirect(url_for('login'))
+
+    return render_template(
+        'auth/forgot_password.html',
+        errors=errors,
+        form_data=form_data,
+        expiration_minutes=PASSWORD_RESET_EXPIRATION_MINUTES
+    )
+
+
+@app.route('/reset-password/<token>', methods=['GET', 'POST'])
+def reset_password(token):
+    """Allow users to update their password using the reset token."""
+    if current_user.is_authenticated:
+        return redirect(url_for('index'))
+
+    session = get_session()
+    try:
+        user = session.query(User).filter(User.password_reset_token == token).first()
+        if not user or not user.password_reset_token_expires_at or user.password_reset_token_expires_at < datetime.utcnow():
+            flash('O link de redefinição é inválido ou expirou.', 'danger')
+            return redirect(url_for('forgot_password'))
+
+        errors = []
+        form_data = {'email': user.email}
+
+        if request.method == 'POST':
+            password = request.form.get('password') or ''
+            confirm_password = request.form.get('confirm_password') or ''
+
+            if len(password) < 8:
+                errors.append('A senha deve ter pelo menos 8 caracteres.')
+            if password != confirm_password:
+                errors.append('As senhas informadas não coincidem.')
+
+            if not errors:
+                user.set_password(password)
+                user.clear_password_reset_token()
+                session.commit()
+                flash('Senha atualizada com sucesso. Faça login com a nova senha.', 'success')
+                return redirect(url_for('login'))
+
+        return render_template(
+            'auth/reset_password.html',
+            errors=errors,
+            form_data=form_data,
+            token=token,
+            expiration_minutes=PASSWORD_RESET_EXPIRATION_MINUTES
+        )
+    finally:
+        session.close()
 
 
 @app.route('/logout')

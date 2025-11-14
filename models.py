@@ -3,6 +3,7 @@ Database models for Flow Forecaster
 SQLAlchemy models for persisting forecasts, projects, and actuals
 """
 from datetime import datetime, timedelta
+import secrets
 from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, Text, ForeignKey, Boolean, LargeBinary
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, sessionmaker
@@ -33,6 +34,9 @@ class User(Base, UserMixin):
         nullable=False,
         default=lambda: datetime.utcnow() + timedelta(days=365)
     )
+    password_reset_token = Column(String(200), nullable=True, index=True)
+    password_reset_token_sent_at = Column(DateTime, nullable=True)
+    password_reset_token_expires_at = Column(DateTime, nullable=True)
 
     # Relationships
     projects = relationship('Project', back_populates='user', cascade='all, delete-orphan')
@@ -60,6 +64,22 @@ class User(Base, UserMixin):
             'registration_date': self.registration_date.isoformat() if self.registration_date else None,
             'access_expires_at': self.access_expires_at.isoformat() if self.access_expires_at else None,
         }
+
+    def generate_password_reset_token(self, expiration_minutes: int = 60) -> str:
+        """Generate and store a time-limited password reset token."""
+        token = secrets.token_urlsafe(32)
+        now = datetime.utcnow()
+        self.password_reset_token = token
+        self.password_reset_token_sent_at = now
+        self.password_reset_token_expires_at = now + timedelta(minutes=expiration_minutes)
+
+        return token
+
+    def clear_password_reset_token(self):
+        """Remove any stored password reset token."""
+        self.password_reset_token = None
+        self.password_reset_token_sent_at = None
+        self.password_reset_token_expires_at = None
 
 
 class Project(Base):

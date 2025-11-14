@@ -468,7 +468,12 @@ def simulate_portfolio_with_dependencies(
         try:
             pbc_analyzer = PBCAnalyzer(project.tp_samples)
             pbc_result = pbc_analyzer.analyze()
-            pbc_results[project.project_id] = pbc_result.to_dict()
+            pbc_dict = pbc_result.to_dict()
+
+            # Include chart data for visualization
+            pbc_dict['chart_data'] = pbc_analyzer.get_chart_data()
+
+            pbc_results[project.project_id] = pbc_dict
 
             # Warn if data quality is poor
             if pbc_result.predictability_score < 60:

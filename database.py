@@ -127,6 +127,21 @@ def ensure_schema():
                             "WHERE access_expires_at IS NULL"
                         ),
                     ),
+                    (
+                        'password_reset_token',
+                        "ALTER TABLE users ADD COLUMN password_reset_token VARCHAR(200)",
+                        None,
+                    ),
+                    (
+                        'password_reset_token_sent_at',
+                        "ALTER TABLE users ADD COLUMN password_reset_token_sent_at TIMESTAMP",
+                        None,
+                    ),
+                    (
+                        'password_reset_token_expires_at',
+                        "ALTER TABLE users ADD COLUMN password_reset_token_expires_at TIMESTAMP",
+                        None,
+                    ),
                 ]
             else:
                 user_columns = [
@@ -144,6 +159,21 @@ def ensure_schema():
                             "COALESCE(registration_date, created_at, CURRENT_TIMESTAMP), '+365 days') "
                             "WHERE access_expires_at IS NULL"
                         ),
+                    ),
+                    (
+                        'password_reset_token',
+                        "ALTER TABLE users ADD COLUMN password_reset_token VARCHAR(200)",
+                        None,
+                    ),
+                    (
+                        'password_reset_token_sent_at',
+                        "ALTER TABLE users ADD COLUMN password_reset_token_sent_at DATETIME",
+                        None,
+                    ),
+                    (
+                        'password_reset_token_expires_at',
+                        "ALTER TABLE users ADD COLUMN password_reset_token_expires_at DATETIME",
+                        None,
                     ),
                 ]
 
