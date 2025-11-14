@@ -692,6 +692,136 @@ function renderDependencySimulationResults(result) {
         </div>
     ` : '';
 
+    // Process Behaviour Chart (PBC) Analysis
+    const pbcAnalysis = result.pbc_analysis || {};
+    const pbcSummary = pbcAnalysis.summary || {};
+    const pbcWarnings = pbcAnalysis.warnings || [];
+
+    const pbcCard = pbcSummary.total_projects_analyzed ? `
+        <div class="card mt-4 ${pbcWarnings.length > 0 ? 'border-warning' : 'border-success'}">
+            <div class="card-header ${pbcWarnings.length > 0 ? 'bg-warning' : 'bg-success'} text-white">
+                <h5 class="mb-0">
+                    <i class="fas fa-chart-bar mr-2"></i>
+                    Process Behaviour Chart (PBC) - Data Quality Validation
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row mb-3">
+                    <div class="col-md-4">
+                        <div class="text-center">
+                            <h6 class="text-muted">Projects Analyzed</h6>
+                            <h4>${pbcSummary.total_projects_analyzed}</h4>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="text-center">
+                            <h6 class="text-muted">Poor Data Quality</h6>
+                            <h4 class="${pbcWarnings.length > 0 ? 'text-warning' : 'text-success'}">
+                                ${pbcSummary.projects_with_poor_data}
+                            </h4>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="text-center">
+                            <h6 class="text-muted">Overall Quality</h6>
+                            <h4>
+                                <span class="badge ${
+                                    pbcSummary.overall_data_quality === 'Good' ? 'bg-success' :
+                                    pbcSummary.overall_data_quality === 'Fair' ? 'bg-warning' : 'bg-danger'
+                                }">
+                                    ${pbcSummary.overall_data_quality}
+                                </span>
+                            </h4>
+                        </div>
+                    </div>
+                </div>
+
+                ${pbcWarnings.length > 0 ? `
+                    <div class="alert alert-warning">
+                        <h6 class="alert-heading">
+                            <i class="fas fa-exclamation-triangle mr-2"></i>
+                            Data Quality Warnings
+                        </h6>
+                        <ul class="mb-0">
+                            ${pbcWarnings.map(w => `
+                                <li>
+                                    <strong>${escapeHtml(w.project_name)}</strong>:
+                                    Predictability Score ${w.score.toFixed(0)}/100
+                                </li>
+                            `).join('')}
+                        </ul>
+                    </div>
+                ` : `
+                    <div class="alert alert-success">
+                        <i class="fas fa-check-circle mr-2"></i>
+                        All projects have good throughput data quality. Forecasts are reliable.
+                    </div>
+                `}
+
+                ${pbcAnalysis.by_project && Object.keys(pbcAnalysis.by_project).length > 0 ? `
+                    <div class="mt-3">
+                        <h6>Details by Project:</h6>
+                        <div class="accordion" id="pbcAccordion">
+                            ${Object.entries(pbcAnalysis.by_project).map(([projectId, pbc], index) => {
+                                if (!pbc) return '';
+                                const project = projectResults.adjusted?.find(p => p.project_id == projectId);
+                                const projectName = project ? project.project_name : `Project ${projectId}`;
+
+                                return `
+                                    <div class="accordion-item">
+                                        <h2 class="accordion-header" id="heading${projectId}">
+                                            <button class="accordion-button ${index === 0 ? '' : 'collapsed'}" type="button"
+                                                    data-bs-toggle="collapse" data-bs-target="#collapse${projectId}">
+                                                ${escapeHtml(projectName)}
+                                                <span class="badge ${pbc.is_predictable ? 'bg-success' : 'bg-warning'} ms-2">
+                                                    ${pbc.predictability_score.toFixed(0)}/100
+                                                </span>
+                                            </button>
+                                        </h2>
+                                        <div id="collapse${projectId}" class="accordion-collapse collapse ${index === 0 ? 'show' : ''}"
+                                             data-bs-parent="#pbcAccordion">
+                                            <div class="accordion-body">
+                                                <div class="row">
+                                                    <div class="col-md-6">
+                                                        <p><strong>Average:</strong> ${pbc.average.toFixed(2)}</p>
+                                                        <p><strong>UNPL:</strong> ${pbc.unpl.toFixed(2)}</p>
+                                                        <p><strong>LNL:</strong> ${pbc.lnl.toFixed(2)}</p>
+                                                    </div>
+                                                    <div class="col-md-6">
+                                                        <p><strong>Predictable:</strong> ${pbc.is_predictable ? 'Yes ✓' : 'No ✗'}</p>
+                                                        <p><strong>Quality:</strong> ${pbc.interpretation.quality}</p>
+                                                        <p><strong>Can Forecast:</strong> ${pbc.interpretation.can_forecast ? 'Yes ✓' : 'No ✗'}</p>
+                                                    </div>
+                                                </div>
+                                                ${pbc.signals && pbc.signals.length > 0 ? `
+                                                    <div class="mt-2">
+                                                        <strong>Signals Detected:</strong>
+                                                        <ul class="small">
+                                                            ${pbc.signals.map(s => `<li>${s}</li>`).join('')}
+                                                        </ul>
+                                                    </div>
+                                                ` : ''}
+                                                <div class="mt-2">
+                                                    <em class="small text-muted">${pbc.recommendation}</em>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                    </div>
+                ` : ''}
+
+                <div class="mt-3 small text-muted">
+                    <i class="fas fa-info-circle mr-1"></i>
+                    <strong>About PBC:</strong> Process Behaviour Charts validate if throughput data is predictable.
+                    Scores below 60 indicate unreliable data that may produce inaccurate forecasts.
+                </div>
+            </div>
+        </div>
+    ` : '';
+
     // Recommendations
     const recommendationsCard = result.recommendations && result.recommendations.length > 0 ? `
         <div class="card mt-4 border-info">
@@ -714,6 +844,7 @@ function renderDependencySimulationResults(result) {
         ${combinedProbsCard}
         ${forecastComparisonCard}
         ${depAnalysisCard}
+        ${pbcCard}
         ${projectLevelCard}
         ${recommendationsCard}
     `;

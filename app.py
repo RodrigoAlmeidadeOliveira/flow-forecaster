@@ -2873,6 +2873,67 @@ def simulate_portfolio_with_dependencies_endpoint(portfolio_id):
         session.close()
 
 
+@app.route('/api/projects/<int:project_id>/pbc-analysis', methods=['POST'])
+@login_required
+def analyze_project_pbc(project_id):
+    """
+    Analyze throughput data quality using Process Behaviour Charts (PBC).
+
+    Validates if throughput data is predictable enough for forecasting.
+    Returns UNPL/LNL limits, signals, and predictability score.
+    """
+    session = get_session()
+    try:
+        from pbc_analyzer import PBCAnalyzer
+
+        # Verify project ownership
+        project = session.query(Project).filter(
+            Project.id == project_id,
+            Project.user_id == current_user.id
+        ).one_or_none()
+
+        if not project:
+            return jsonify({'error': 'Project not found'}), 404
+
+        # Get throughput samples from request
+        data = request.json or {}
+        tp_samples = data.get('tp_samples', [])
+
+        if not tp_samples or len(tp_samples) < 2:
+            return jsonify({
+                'error': 'At least 2 throughput samples are required for PBC analysis'
+            }), 400
+
+        # Run PBC analysis
+        analyzer = PBCAnalyzer(tp_samples)
+        result = analyzer.analyze()
+        chart_data = analyzer.get_chart_data()
+
+        # Build response
+        response = {
+            'project_id': project_id,
+            'project_name': project.name,
+            'analysis': result.to_dict(),
+            'chart_data': chart_data,
+            'input_data': {
+                'tp_samples': tp_samples,
+                'n_samples': len(tp_samples)
+            }
+        }
+
+        return jsonify(response), 200
+
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+    except Exception as e:
+        import traceback
+        print(f"Error in PBC analysis: {e}")
+        print(traceback.format_exc())
+        return jsonify({'error': str(e)}), 500
+    finally:
+        session.close()
+
+
 @app.route('/api/portfolios/<int:portfolio_id>/simulations', methods=['GET'])
 @login_required
 def get_portfolio_simulations(portfolio_id):

@@ -7,6 +7,7 @@ from typing import List, Dict, Optional, Tuple
 from dataclasses import dataclass
 import json
 from dependency_analyzer import Dependency, DependencyAnalyzer, create_dependencies_from_dict
+from pbc_analyzer import PBCAnalyzer, analyze_throughput_predictability
 
 
 @dataclass
@@ -459,12 +460,35 @@ def simulate_portfolio_with_dependencies(
         dep_analysis = None
         dep_simulation = None
 
-    # 2. Create a mapping of project dependencies
+    # 2. Validate throughput data quality using Process Behaviour Charts
+    pbc_results = {}  # project_id -> PBC analysis
+    pbc_warnings = []
+
+    for project in projects:
+        try:
+            pbc_analyzer = PBCAnalyzer(project.tp_samples)
+            pbc_result = pbc_analyzer.analyze()
+            pbc_results[project.project_id] = pbc_result.to_dict()
+
+            # Warn if data quality is poor
+            if pbc_result.predictability_score < 60:
+                pbc_warnings.append({
+                    'project_id': project.project_id,
+                    'project_name': project.project_name,
+                    'score': pbc_result.predictability_score,
+                    'recommendation': pbc_result.recommendation
+                })
+        except Exception as e:
+            # If PBC analysis fails, log but continue
+            print(f"Warning: PBC analysis failed for project {project.project_id}: {e}")
+            pbc_results[project.project_id] = None
+
+    # 3. Create a mapping of project dependencies
     project_dep_map = {}  # project_id -> list of project_ids it depends on
     for project in projects:
         project_dep_map[project.project_id] = project.depends_on or []
 
-    # 3. Simulate each project individually first
+    # 4. Simulate each project individually first
     project_results = []
     project_simulations = {}  # project_id -> array of simulated weeks (base)
 
@@ -666,6 +690,17 @@ def simulate_portfolio_with_dependencies(
             ]
         },
 
+        # Process Behaviour Chart (PBC) Analysis
+        'pbc_analysis': {
+            'by_project': pbc_results,
+            'warnings': pbc_warnings,
+            'summary': {
+                'total_projects_analyzed': len([p for p in pbc_results.values() if p is not None]),
+                'projects_with_poor_data': len(pbc_warnings),
+                'overall_data_quality': 'Good' if len(pbc_warnings) == 0 else 'Fair' if len(pbc_warnings) <= len(projects) // 2 else 'Poor'
+            }
+        },
+
         # Recommendations
         'recommendations': []
     }
@@ -686,5 +721,16 @@ def simulate_portfolio_with_dependencies(
             f"⚠️ Low combined probability ({combined_probability*100:.1f}%). "
             f"High risk of delays due to dependencies. Add buffer time to schedule."
         )
+
+    # Add PBC-based recommendations
+    if pbc_warnings:
+        result['recommendations'].append(
+            f"⚠️ Data quality warning: {len(pbc_warnings)} project(s) have poor throughput data quality. "
+            f"Forecasts for these projects may be unreliable. Consider collecting more data or investigating process changes."
+        )
+        for warning in pbc_warnings[:3]:  # Show top 3 warnings
+            result['recommendations'].append(
+                f"  - {warning['project_name']}: Predictability score {warning['score']:.0f}/100"
+            )
 
     return result
