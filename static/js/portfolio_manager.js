@@ -803,8 +803,12 @@ function renderDependencySimulationResults(result) {
                                                 </div>
                                                 ${pbc.chart_data ? `
                                                     <div class="mt-3">
-                                                        <h6>Process Behaviour Chart (X Chart):</h6>
-                                                        <canvas id="pbc-chart-${projectId}" height="200"></canvas>
+                                                        <button class="btn btn-sm btn-outline-primary" onclick="togglePBCChart('${projectId}')">
+                                                            <i class="fas fa-chart-line"></i> Show/Hide Chart
+                                                        </button>
+                                                        <div id="pbc-chart-container-${projectId}" style="display: none; margin-top: 15px; height: 250px; max-width: 100%;">
+                                                            <canvas id="pbc-chart-${projectId}"></canvas>
+                                                        </div>
                                                     </div>
                                                 ` : ''}
                                                 ${pbc.signals && pbc.signals.length > 0 ? `
@@ -865,15 +869,33 @@ function renderDependencySimulationResults(result) {
         ${recommendationsCard}
     `;
 
-    // Render PBC charts after DOM insertion
-    if (pbcAnalysis.by_project) {
-        setTimeout(() => {
-            Object.entries(pbcAnalysis.by_project).forEach(([projectId, pbc]) => {
-                if (pbc && pbc.chart_data) {
-                    renderPBCChart(projectId, pbc);
-                }
-            });
-        }, 100);
+    // Store PBC data globally for lazy loading
+    window.pbcDataStore = pbcAnalysis.by_project || {};
+    window.pbcChartsRendered = new Set();
+}
+
+/**
+ * Toggle PBC Chart visibility and render on first show (lazy loading)
+ */
+function togglePBCChart(projectId) {
+    const container = document.getElementById(`pbc-chart-container-${projectId}`);
+
+    if (!container) {
+        console.warn('PBC chart container not found for project:', projectId);
+        return;
+    }
+
+    // Toggle visibility
+    const isVisible = container.style.display !== 'none';
+    container.style.display = isVisible ? 'none' : 'block';
+
+    // Render chart only on first show
+    if (!isVisible && !window.pbcChartsRendered.has(projectId)) {
+        const pbcData = window.pbcDataStore[projectId];
+        if (pbcData) {
+            renderPBCChart(projectId, pbcData);
+            window.pbcChartsRendered.add(projectId);
+        }
     }
 }
 
@@ -924,6 +946,13 @@ function renderPBCChart(projectId, pbcData) {
 
     // Build Chart.js config
     const ctx = canvas.getContext('2d');
+
+    // Set canvas size from container
+    const container = canvas.parentElement;
+    if (container) {
+        canvas.width = container.clientWidth;
+        canvas.height = container.clientHeight;
+    }
 
     new Chart(ctx, {
         type: 'line',
